@@ -159,4 +159,30 @@ suite('chatParticipant integration', () => {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}
 	});
+
+	test('selectSessionForResume can disambiguate multi-root sessions using workspace-prefixed titles', () => {
+		const sessions = [
+			{
+				id: '1',
+				title: 'Fix auth bug',
+				displayTitle: '[frontend] Fix auth bug',
+				savedAt: '2026-04-12T10:00:00.000Z',
+				fileName: 'fix-auth-bug-frontend.json',
+				turnCount: 4,
+				git: null,
+			},
+			{
+				id: '2',
+				title: 'Fix auth bug',
+				displayTitle: '[backend] Fix auth bug',
+				savedAt: '2026-04-12T11:00:00.000Z',
+				fileName: 'fix-auth-bug-backend.json',
+				turnCount: 4,
+				git: null,
+			},
+		];
+
+		const selection = selectSessionForResume('backend fix auth', sessions);
+		assert.equal(selection.session?.fileName, 'fix-auth-bug-backend.json');
+	});
 });

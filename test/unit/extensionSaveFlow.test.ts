@@ -175,4 +175,38 @@ suite('extension save flow', () => {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}
 	});
+
+	test('runSaveSessionFlow adds the storage folder to .gitignore when configured', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-extension-save-flow-gitignore-'));
+		const workspaceRoot = path.join(tempRoot, 'workspace');
+		const storageDirectory = path.join(workspaceRoot, '.chat');
+
+		try {
+			await fs.mkdir(workspaceRoot, { recursive: true });
+
+			const workspaceFolder = {
+				uri: vscode.Uri.file(workspaceRoot),
+				name: 'workspace',
+				index: 0,
+			} as vscode.WorkspaceFolder;
+
+			await runSaveSessionFlow(
+				{} as vscode.ExtensionContext,
+				workspaceFolder,
+				storageDirectory,
+				{
+					readCopilotSessions: async () => [createCopilotSession()],
+					selectSession: async (sessions) => sessions[0],
+					promptTitle: async () => 'Auth Bug Investigation',
+					getIncludeInGitignore: () => true,
+					showInformationMessage: async () => undefined,
+				},
+			);
+
+			const gitignore = await fs.readFile(path.join(workspaceRoot, '.gitignore'), 'utf8');
+			assert.equal(gitignore.includes('.chat/'), true);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
 });

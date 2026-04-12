@@ -47,6 +47,28 @@
         "command": "chat-commit.deleteSession",
         "title": "Chat Commit: Delete Saved Session",
         "category": "Chat Commit"
+      },
+      {
+        "command": "chat-commit.refreshSessionExplorer",
+        "title": "Refresh Session Explorer",
+        "category": "Chat Commit",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "chat-commit.openSessionFromExplorer",
+        "title": "Open Saved Session",
+        "category": "Chat Commit"
+      },
+      {
+        "command": "chat-commit.deleteSessionFromExplorer",
+        "title": "Delete Saved Session",
+        "category": "Chat Commit",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "chat-commit.toggleAutoSaveOnCommit",
+        "title": "Toggle Auto-Save On Commit",
+        "category": "Chat Commit"
       }
     ],
     "configuration": {
@@ -171,6 +193,23 @@
         ]
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "chat-commit",
+          "title": "Chat Commit",
+          "icon": "media/chat-commit.svg"
+        }
+      ]
+    },
+    "views": {
+      "chat-commit": [
+        {
+          "id": "chat-commit.sessionExplorer",
+          "name": "Saved Sessions"
+        }
+      ]
+    },
     "menus": {
       "commandPalette": [
         {
@@ -181,6 +220,28 @@
         },
         {
           "command": "chat-commit.deleteSession"
+        },
+        {
+          "command": "chat-commit.toggleAutoSaveOnCommit"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "chat-commit.refreshSessionExplorer",
+          "when": "view == chat-commit.sessionExplorer",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "chat-commit.openSessionFromExplorer",
+          "when": "view == chat-commit.sessionExplorer && viewItem == chat-commit.session",
+          "group": "inline"
+        },
+        {
+          "command": "chat-commit.deleteSessionFromExplorer",
+          "when": "view == chat-commit.sessionExplorer && viewItem == chat-commit.session",
+          "group": "inline"
         }
       ]
     }

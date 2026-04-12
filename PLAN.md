@@ -47,9 +47,17 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
   - Completed: integration-style listener coverage in `test/unit/extensionAutoSave.test.ts` for commit-triggered save and listener disable on error
   - Completed: pruning coverage in `test/unit/sessionStore.test.ts` and save-flow prune assertions in `test/unit/extensionSaveFlow.test.ts`
   - Validation completed: `npm run lint`, `npm test` (49 passing)
-- [ ] **Phase 10 — Polish & Multi-Root**
+- [x] **Phase 10 — Polish & Multi-Root**
+  - Completed: configuration validation helpers in `src/extension.ts` and `src/chatParticipant.ts` for safe relative `storagePath` resolution and bounded resume settings
+  - Completed: multi-root manual save/list/delete handling in `src/extension.ts` with active-editor workspace preference, QuickPick folder selection, and cross-workspace session browsing
+  - Completed: multi-root resume/list handling in `src/chatParticipant.ts` with cross-workspace session discovery, folder-prefixed disambiguation, and resume config lookup based on the originating workspace folder
+  - Completed: `.gitignore` management in `src/extension.ts` for `chat-commit.includeInGitignore`, including idempotent workspace-relative entry creation during save flow
+  - Completed: session explorer tree view in `src/sessionExplorer.ts` with workspace-grouped saved sessions, open-in-editor, refresh, and delete actions
+  - Completed: status bar auto-save indicator/toggle in `src/extension.ts` with dynamic listener sync on configuration changes
+  - Completed: Phase 10 coverage in `test/unit/extensionPhase10.test.ts`, `test/unit/extensionSaveFlow.test.ts`, `test/unit/sessionExplorer.test.ts`, and expanded multi-root selection coverage in `test/unit/chatParticipant.integration.test.ts`
+  - Validation completed: `npm run lint`, `npm test` (58 passing)
 
-**Current focus:** Start Phase 10 (configuration validation, multi-root support, and final polish).
+**Current focus:** Phase implementation complete; next work is release/readme polish or checkpointing.
 
 ---
 
@@ -396,6 +404,8 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 - Validate numeric settings (positive integers)
 - Validate `maxFileSize` format (`500kb`, `1mb`, etc.)
 
+Status: Implemented for `storagePath`, bounded resume limits, and save-size parsing on the save flow.
+
 ### Step 10.2 — Multi-root workspace support
 - **On manual save**: use workspace folder of active editor's file; if no file open, prompt via QuickPick
 - **On auto-save**: use workspace folder of the repository that committed
@@ -403,17 +413,25 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 - Settings can be configured per workspace folder via `.vscode/settings.json`
 - See **Multi-Root Workspace Handling** reference section for full details
 
+Status: Implemented for manual save, auto-save, list/delete, and chat resume/list flows.
+
 ### Step 10.3 — .gitignore management
 - If `includeInGitignore` is true, add `.chat/` to `.gitignore`
 - Otherwise, leave it tracked (default — the whole point is source control)
+
+Status: Implemented in the save flow with idempotent workspace-relative `.gitignore` updates.
 
 ### Step 10.4 — Session explorer tree view (stretch)
 - `chat-commit.sessionExplorer` — sidebar panel listing saved sessions
 - Click to preview session metadata; double-click to resume
 
+Status: Implemented as a dedicated activity-bar view with workspace-grouped saved sessions, open-in-editor, refresh, and delete actions.
+
 ### Step 10.5 — Status bar indicator (stretch)
 - Show a status bar item when auto-save is active
 - Click to toggle auto-save or save manually
+
+Status: Implemented as an auto-save status/toggle control that follows the active workspace context.
 
 ---
 

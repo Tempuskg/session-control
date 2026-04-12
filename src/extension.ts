@@ -1,13 +1,20 @@
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { registerChatParticipant } from './chatParticipant';
 import { getGitContext } from './gitIntegration';
 import { CopilotSession, readCopilotSessions } from './sessionReader';
+import { SessionExplorerProvider, SessionExplorerSessionItem } from './sessionExplorer';
 import { createSessionStore, SessionPruneAction } from './sessionStore';
 import { applySaveBloatControls, createChatSession, SaveOverflowStrategy } from './sessionWriter';
 import { parseFileSize } from './utils';
 
 const sessionStore = createSessionStore();
+
+export interface WorkspaceSessionMeta extends SavedSessionPickItem {
+	storageDirectory: string;
+	workspaceFolder: vscode.WorkspaceFolder;
+}
 
 interface CopilotSessionPickItem extends vscode.QuickPickItem {
 	session: CopilotSession;
@@ -24,6 +31,8 @@ interface SaveSessionFlowDeps {
 	getGitContext: typeof getGitContext;
 	createChatSession: typeof createChatSession;
 	applySaveBloatControls: typeof applySaveBloatControls;
+	getIncludeInGitignore: (workspaceFolder: vscode.WorkspaceFolder) => boolean;
+	ensureGitignoreEntry: (workspaceFolder: vscode.WorkspaceFolder, storageDirectory: string) => Promise<boolean>;
 	getPruneConfiguration: (workspaceFolder: vscode.WorkspaceFolder) => PruneConfiguration;
 	writeSession: (storageDirectory: string, session: ReturnType<typeof createChatSession>) => Promise<string>;
 	pruneSessions: (storageDirectory: string, maxSavedSessions: number, action: SessionPruneAction) => Promise<{ archived: number; deleted: number }>;
@@ -65,12 +74,86 @@ interface AutoSaveListenerDeps {
 	clearSchedule: (handle: ReturnType<typeof setTimeout>) => void;
 }
 
+interface ManualWorkspaceSelectionDeps {
+	getWorkspaceFolders: () => readonly vscode.WorkspaceFolder[] | undefined;
+	getActiveEditorUri: () => vscode.Uri | undefined;
+	getWorkspaceFolder: (uri: vscode.Uri) => vscode.WorkspaceFolder | undefined;
+	pickWorkspaceFolder: (items: vscode.QuickPickItem[]) => Promise<vscode.QuickPickItem | undefined>;
+}
+
+export function validateStoragePath(workspaceFolder: vscode.WorkspaceFolder, configured: string): string {
+	if (!configured.trim()) {
+		throw new Error('chat-commit.storagePath must not be empty.');
+	}
+
+	if (path.isAbsolute(configured)) {
+		throw new Error('chat-commit.storagePath must be relative to the workspace folder.');
+	}
+
+	const resolved = path.resolve(workspaceFolder.uri.fsPath, configured);
+	const relative = path.relative(workspaceFolder.uri.fsPath, resolved);
+	if (relative.startsWith('..') || path.isAbsolute(relative)) {
+		throw new Error('chat-commit.storagePath must stay within the workspace folder.');
+	}
+
+	return resolved;
+}
+
+function normalizeGitignoreEntry(value: string): string {
+	const normalized = value.trim().replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
+	if (!normalized || normalized.startsWith('#')) {
+		return '';
+	}
+
+	return `${normalized}/`;
+}
+
+export function createStorageGitignoreEntry(workspaceFolder: vscode.WorkspaceFolder, storageDirectory: string): string {
+	const relative = path.relative(workspaceFolder.uri.fsPath, storageDirectory);
+	if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+		throw new Error('Storage directory must be inside the workspace folder before updating .gitignore.');
+	}
+
+	return normalizeGitignoreEntry(relative);
+}
+
+export async function ensureStoragePathInGitignore(
+	workspaceFolder: vscode.WorkspaceFolder,
+	storageDirectory: string,
+): Promise<boolean> {
+	const entry = createStorageGitignoreEntry(workspaceFolder, storageDirectory);
+	const gitignorePath = path.join(workspaceFolder.uri.fsPath, '.gitignore');
+
+	let existing = '';
+	try {
+		existing = await fs.readFile(gitignorePath, 'utf8');
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		if (!/no such file|cannot find|enoent/i.test(message)) {
+			throw error;
+		}
+	}
+
+	const hasEntry = existing
+		.split(/\r?\n/)
+		.some((line) => normalizeGitignoreEntry(line) === entry);
+	if (hasEntry) {
+		return false;
+	}
+
+	const nextContent = existing.length === 0
+		? `${entry}\n`
+		: `${existing.replace(/\s*$/, '')}\n${entry}\n`;
+	await fs.writeFile(gitignorePath, nextContent, 'utf8');
+	return true;
+}
+
 function getStoragePath(workspaceFolder: vscode.WorkspaceFolder): string {
 	const configured = vscode.workspace
 		.getConfiguration('chat-commit', workspaceFolder.uri)
 		.get<string>('storagePath', '.chat');
 
-	return path.join(workspaceFolder.uri.fsPath, configured);
+	return validateStoragePath(workspaceFolder, configured);
 }
 
 function getSaveConfiguration(workspaceFolder: vscode.WorkspaceFolder): SaveConfiguration {
@@ -87,6 +170,17 @@ function getSaveConfiguration(workspaceFolder: vscode.WorkspaceFolder): SaveConf
 	};
 }
 
+export function resolveResumeConfiguration(workspaceFolder: vscode.WorkspaceFolder): {
+	maxTurns: number;
+	maxContextChars: number;
+} {
+	const config = vscode.workspace.getConfiguration('chat-commit', workspaceFolder.uri);
+	const maxTurns = Math.max(1, config.get<number>('resume.maxTurns', 50));
+	const maxContextChars = Math.max(1000, config.get<number>('resume.maxContextChars', 80000));
+
+	return { maxTurns, maxContextChars };
+}
+
 function getPruneConfiguration(workspaceFolder: vscode.WorkspaceFolder): PruneConfiguration {
 	const config = vscode.workspace.getConfiguration('chat-commit', workspaceFolder.uri);
 	return {
@@ -95,16 +189,73 @@ function getPruneConfiguration(workspaceFolder: vscode.WorkspaceFolder): PruneCo
 	};
 }
 
-function pickWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
-	const activeUri = vscode.window.activeTextEditor?.document.uri;
+export async function resolveManualWorkspaceFolder(
+	depsOverrides: Partial<ManualWorkspaceSelectionDeps> = {},
+): Promise<vscode.WorkspaceFolder | undefined> {
+	const deps: ManualWorkspaceSelectionDeps = {
+		getWorkspaceFolders: () => vscode.workspace.workspaceFolders,
+		getActiveEditorUri: () => vscode.window.activeTextEditor?.document.uri,
+		getWorkspaceFolder: (uri: vscode.Uri) => vscode.workspace.getWorkspaceFolder(uri),
+		pickWorkspaceFolder: async (items: vscode.QuickPickItem[]) => vscode.window.showQuickPick(items, {
+			title: 'Select workspace folder',
+		}),
+		...depsOverrides,
+	};
+
+	const activeUri = deps.getActiveEditorUri();
 	if (activeUri) {
-		const fromActiveEditor = vscode.workspace.getWorkspaceFolder(activeUri);
+		const fromActiveEditor = deps.getWorkspaceFolder(activeUri);
 		if (fromActiveEditor) {
 			return fromActiveEditor;
 		}
 	}
 
-	return vscode.workspace.workspaceFolders?.[0];
+	const folders = deps.getWorkspaceFolders();
+	if (!folders?.length) {
+		return undefined;
+	}
+
+	if (folders.length === 1) {
+		return folders[0];
+	}
+
+	const pick = await deps.pickWorkspaceFolder(
+		folders.map((folder) => ({
+			label: folder.name,
+			detail: folder.uri.fsPath,
+		})),
+	);
+
+	if (!pick) {
+		return undefined;
+	}
+
+	return folders.find((folder) => folder.name === pick.label && folder.uri.fsPath === pick.detail);
+}
+
+export async function listSessionsAcrossWorkspaceFolders(
+	workspaceFolders: readonly vscode.WorkspaceFolder[] | undefined,
+): Promise<WorkspaceSessionMeta[]> {
+	if (!workspaceFolders?.length) {
+		return [];
+	}
+
+	const results = await Promise.all(
+		workspaceFolders.map(async (workspaceFolder) => {
+			const storageDirectory = getStoragePath(workspaceFolder);
+			const sessions = await sessionStore.listSessions(storageDirectory);
+			return sessions.map((session) => ({
+				label: `[${workspaceFolder.name}] ${session.title}`,
+				description: `${session.turnCount} turns`,
+				detail: `${session.savedAt} | ${session.fileName}`,
+				fileName: session.fileName,
+				storageDirectory,
+				workspaceFolder,
+			}));
+		}),
+	);
+
+	return results.flat().sort((a, b) => Date.parse(b.detail.split('|')[0]?.trim() ?? '') - Date.parse(a.detail.split('|')[0]?.trim() ?? ''));
 }
 
 function toSessionQuickPickItem(session: CopilotSession): CopilotSessionPickItem {
@@ -136,6 +287,10 @@ function createDefaultSaveFlowDeps(): SaveSessionFlowDeps {
 		getGitContext,
 		createChatSession,
 		applySaveBloatControls,
+		getIncludeInGitignore: (workspaceFolder) => vscode.workspace
+			.getConfiguration('chat-commit', workspaceFolder.uri)
+			.get<boolean>('includeInGitignore', false),
+		ensureGitignoreEntry: ensureStoragePathInGitignore,
 		getPruneConfiguration,
 		writeSession: async (storageDirectory, session) => sessionStore.writeSession(storageDirectory, session),
 		pruneSessions: async (storageDirectory, maxSavedSessions, action) =>
@@ -189,6 +344,10 @@ export async function runSaveSessionFlow(
 		writtenFiles.push(fileName);
 	}
 
+	if (deps.getIncludeInGitignore(workspaceFolder)) {
+		await deps.ensureGitignoreEntry(workspaceFolder, storageDirectory);
+	}
+
 	if (saveResult.warning) {
 		await deps.showInformationMessage(saveResult.warning);
 	}
@@ -215,7 +374,7 @@ export async function runSaveSessionFlow(
 }
 
 async function runSaveSessionCommand(context: vscode.ExtensionContext): Promise<void> {
-	const workspaceFolder = pickWorkspaceFolder();
+	const workspaceFolder = await resolveManualWorkspaceFolder();
 	if (!workspaceFolder) {
 		await vscode.window.showInformationMessage('Open a workspace folder before saving a chat session.');
 		return;
@@ -226,52 +385,37 @@ async function runSaveSessionCommand(context: vscode.ExtensionContext): Promise<
 }
 
 async function runListSessionsCommand(): Promise<void> {
-	const workspaceFolder = pickWorkspaceFolder();
-	if (!workspaceFolder) {
+	if (!vscode.workspace.workspaceFolders?.length) {
 		await vscode.window.showInformationMessage('Open a workspace folder before listing sessions.');
 		return;
 	}
 
-	const storageDirectory = getStoragePath(workspaceFolder);
-	const sessions = await sessionStore.listSessions(storageDirectory);
-
+	const sessions = await listSessionsAcrossWorkspaceFolders(vscode.workspace.workspaceFolders);
 	if (!sessions.length) {
 		await vscode.window.showInformationMessage('No saved sessions found.');
 		return;
 	}
 
 	await vscode.window.showQuickPick<SavedSessionPickItem>(
-		sessions.map((session) => ({
-			label: session.title,
-			description: `${session.turnCount} turns`,
-			detail: `${session.savedAt} | ${session.fileName}`,
-			fileName: session.fileName,
-		})),
+		sessions,
 		{ title: 'Saved chat sessions' },
 	);
 }
 
 async function runDeleteSessionCommand(): Promise<void> {
-	const workspaceFolder = pickWorkspaceFolder();
-	if (!workspaceFolder) {
+	if (!vscode.workspace.workspaceFolders?.length) {
 		await vscode.window.showInformationMessage('Open a workspace folder before deleting sessions.');
 		return;
 	}
 
-	const storageDirectory = getStoragePath(workspaceFolder);
-	const sessions = await sessionStore.listSessions(storageDirectory);
+	const sessions = await listSessionsAcrossWorkspaceFolders(vscode.workspace.workspaceFolders);
 	if (!sessions.length) {
 		await vscode.window.showInformationMessage('No saved sessions found.');
 		return;
 	}
 
-	const pick = await vscode.window.showQuickPick<SavedSessionPickItem>(
-		sessions.map((session) => ({
-			label: session.title,
-			description: `${session.turnCount} turns`,
-			detail: `${session.savedAt} | ${session.fileName}`,
-			fileName: session.fileName,
-		})),
+	const pick = await vscode.window.showQuickPick<WorkspaceSessionMeta>(
+		sessions,
 		{ title: 'Select saved session to delete' },
 	);
 
@@ -289,7 +433,7 @@ async function runDeleteSessionCommand(): Promise<void> {
 		return;
 	}
 
-	const deleted = await sessionStore.deleteSession(storageDirectory, pick.fileName);
+	const deleted = await sessionStore.deleteSession(pick.storageDirectory, pick.fileName);
 	if (!deleted) {
 		await vscode.window.showInformationMessage('Session file no longer exists.');
 		return;
@@ -328,16 +472,17 @@ export function registerAutoSaveOnCommitListener(
 	context: vscode.ExtensionContext,
 	output: vscode.OutputChannel,
  	depsOverrides: Partial<AutoSaveListenerDeps> = {},
-): void {
+): vscode.Disposable | undefined {
 	const deps = {
 		...createDefaultAutoSaveDeps(),
 		...depsOverrides,
 	};
+	const disposables: vscode.Disposable[] = [];
 
 	const gitApi = deps.getGitApi();
 	if (!gitApi) {
 		void deps.showInformationMessage('Git extension not available. Auto-save on commit is disabled.');
-		return;
+		return undefined;
 	}
 
 	const lastCommitByRepo = new Map<string, string | undefined>();
@@ -396,10 +541,10 @@ export function registerAutoSaveOnCommitListener(
 			debounceTimers.set(repoKey, timer);
 		});
 
-		context.subscriptions.push(disposable);
+		disposables.push(disposable);
 	}
 
-	context.subscriptions.push({
+	disposables.push({
 		dispose: () => {
 			for (const timer of debounceTimers.values()) {
 				deps.clearSchedule(timer);
@@ -407,26 +552,154 @@ export function registerAutoSaveOnCommitListener(
 			debounceTimers.clear();
 		},
 	});
+
+	const registration = {
+		dispose: () => {
+			for (const disposable of disposables) {
+				disposable.dispose();
+			}
+		},
+	};
+	context.subscriptions.push(registration);
+	return registration;
+}
+
+function getImplicitWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
+	const activeUri = vscode.window.activeTextEditor?.document.uri;
+	if (activeUri) {
+		const workspaceFolder = vscode.workspace.getWorkspaceFolder(activeUri);
+		if (workspaceFolder) {
+			return workspaceFolder;
+		}
+	}
+
+	return vscode.workspace.workspaceFolders?.[0];
+}
+
+function isAnyWorkspaceAutoSaveEnabled(): boolean {
+	return (vscode.workspace.workspaceFolders ?? []).some((workspaceFolder) => vscode.workspace
+		.getConfiguration('chat-commit', workspaceFolder.uri)
+		.get<boolean>('autoSaveOnCommit', false));
+}
+
+function updateAutoSaveStatusBar(item: vscode.StatusBarItem): void {
+	const workspaceFolder = getImplicitWorkspaceFolder();
+	if (!workspaceFolder) {
+		item.hide();
+		return;
+	}
+
+	const enabled = vscode.workspace
+		.getConfiguration('chat-commit', workspaceFolder.uri)
+		.get<boolean>('autoSaveOnCommit', false);
+	item.text = `$(history) Chat Commit ${enabled ? 'Auto-Save On' : 'Auto-Save Off'}`;
+	item.tooltip = `${workspaceFolder.name}: click to ${enabled ? 'disable' : 'enable'} auto-save on commit`;
+	item.show();
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+	const sessionExplorerProvider = new SessionExplorerProvider();
+	const sessionExplorerView = vscode.window.createTreeView('chat-commit.sessionExplorer', {
+		treeDataProvider: sessionExplorerProvider,
+		showCollapseAll: true,
+	});
+	context.subscriptions.push(sessionExplorerView);
+	const autoSaveStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+	autoSaveStatusBar.command = 'chat-commit.toggleAutoSaveOnCommit';
+	context.subscriptions.push(autoSaveStatusBar);
+
 	// The onStartupFinished activation event fires here; check autoSaveOnCommit
 	// and register the git listener only if enabled.
-	const autoSave = vscode.workspace
-		.getConfiguration('chat-commit')
-		.get<boolean>('autoSaveOnCommit', false);
 	const output = vscode.window.createOutputChannel('Chat Commit');
 	context.subscriptions.push(output);
+	let autoSaveListener: vscode.Disposable | undefined;
+	const syncAutoSaveListener = () => {
+		const enabled = isAnyWorkspaceAutoSaveEnabled();
+		if (enabled && !autoSaveListener) {
+			autoSaveListener = registerAutoSaveOnCommitListener(context, output);
+			return;
+		}
 
-	if (autoSave) {
-		registerAutoSaveOnCommitListener(context, output);
-	}
+		if (!enabled && autoSaveListener) {
+			autoSaveListener.dispose();
+			autoSaveListener = undefined;
+		}
+	};
+
+	syncAutoSaveListener();
+	updateAutoSaveStatusBar(autoSaveStatusBar);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('chat-commit.saveSession', async () => runSaveSessionCommand(context)),
+		vscode.commands.registerCommand('chat-commit.saveSession', async () => {
+			await runSaveSessionCommand(context);
+			sessionExplorerProvider.refresh();
+		}),
 		vscode.commands.registerCommand('chat-commit.listSessions', async () => runListSessionsCommand()),
-		vscode.commands.registerCommand('chat-commit.deleteSession', async () => runDeleteSessionCommand()),
+		vscode.commands.registerCommand('chat-commit.deleteSession', async () => {
+			await runDeleteSessionCommand();
+			sessionExplorerProvider.refresh();
+		}),
+		vscode.commands.registerCommand('chat-commit.refreshSessionExplorer', () => sessionExplorerProvider.refresh()),
+		vscode.commands.registerCommand('chat-commit.openSessionFromExplorer', async (item: SessionExplorerSessionItem) => {
+			await vscode.commands.executeCommand('vscode.open', item.resourceUri);
+		}),
+		vscode.commands.registerCommand('chat-commit.deleteSessionFromExplorer', async (item: SessionExplorerSessionItem) => {
+			const confirmation = await vscode.window.showWarningMessage(
+				`Delete session '${item.label}'?`,
+				{ modal: true },
+				'Delete',
+			);
+
+			if (confirmation !== 'Delete') {
+				return;
+			}
+
+			const deleted = await sessionStore.deleteSession(item.storageDirectory, item.fileName);
+			if (!deleted) {
+				await vscode.window.showInformationMessage('Session file no longer exists.');
+				sessionExplorerProvider.refresh();
+				return;
+			}
+
+			await vscode.window.showInformationMessage(`Deleted session ${item.label}`);
+			sessionExplorerProvider.refresh();
+		}),
+		vscode.commands.registerCommand('chat-commit.toggleAutoSaveOnCommit', async () => {
+			const workspaceFolder = await resolveManualWorkspaceFolder({
+				getActiveEditorUri: () => vscode.window.activeTextEditor?.document.uri,
+			});
+			if (!workspaceFolder) {
+				await vscode.window.showInformationMessage('Open a workspace folder before changing auto-save on commit.');
+				return;
+			}
+
+			const configuration = vscode.workspace.getConfiguration('chat-commit', workspaceFolder.uri);
+			const current = configuration.get<boolean>('autoSaveOnCommit', false);
+			await configuration.update('autoSaveOnCommit', !current, vscode.ConfigurationTarget.WorkspaceFolder);
+			updateAutoSaveStatusBar(autoSaveStatusBar);
+			syncAutoSaveListener();
+			await vscode.window.showInformationMessage(
+				`${workspaceFolder.name}: auto-save on commit ${current ? 'disabled' : 'enabled'}.`,
+			);
+		}),
 	);
+
+	context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
+		sessionExplorerProvider.refresh();
+		syncAutoSaveListener();
+		updateAutoSaveStatusBar(autoSaveStatusBar);
+	}));
+	context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
+		if (event.affectsConfiguration('chat-commit.autoSaveOnCommit')) {
+			syncAutoSaveListener();
+			updateAutoSaveStatusBar(autoSaveStatusBar);
+		}
+
+		if (event.affectsConfiguration('chat-commit.storagePath')) {
+			sessionExplorerProvider.refresh();
+		}
+	}));
+	context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => updateAutoSaveStatusBar(autoSaveStatusBar)));
 
 	registerChatParticipant(context);
 }

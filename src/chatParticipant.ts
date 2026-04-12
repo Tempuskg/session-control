@@ -27,12 +27,32 @@ export interface ReassembledSessionResult {
 	partFiles: string[];
 }
 
+interface WorkspaceSessionMeta extends SessionMeta {
+	workspaceFolder: vscode.WorkspaceFolder;
+	storageDirectory: string;
+	displayTitle: string;
+}
+
 function getStoragePath(workspaceFolder: vscode.WorkspaceFolder): string {
 	const configured = vscode.workspace
 		.getConfiguration('chat-commit', workspaceFolder.uri)
 		.get<string>('storagePath', '.chat');
 
-	return path.join(workspaceFolder.uri.fsPath, configured);
+	if (!configured.trim()) {
+		throw new Error('chat-commit.storagePath must not be empty.');
+	}
+
+	if (path.isAbsolute(configured)) {
+		throw new Error('chat-commit.storagePath must be relative to the workspace folder.');
+	}
+
+	const resolved = path.resolve(workspaceFolder.uri.fsPath, configured);
+	const relative = path.relative(workspaceFolder.uri.fsPath, resolved);
+	if (relative.startsWith('..') || path.isAbsolute(relative)) {
+		throw new Error('chat-commit.storagePath must stay within the workspace folder.');
+	}
+
+	return resolved;
 }
 
 function pickWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
@@ -53,12 +73,49 @@ function asMarkdownListItem(session: SessionMeta): string {
 	return `- **${session.title}** | ${session.savedAt} | ${session.turnCount} turns | ${branch}@${commit}`;
 }
 
+function asWorkspaceMarkdownListItem(session: WorkspaceSessionMeta): string {
+	const commit = session.git?.commit ? session.git.commit.slice(0, 7) : 'n/a';
+	const branch = session.git?.branch ?? 'n/a';
+	return `- **[${session.workspaceFolder.name}] ${session.title}** | ${session.savedAt} | ${session.turnCount} turns | ${branch}@${commit}`;
+}
+
+async function listSessionsAcrossWorkspaceFolders(
+	workspaceFolders: readonly vscode.WorkspaceFolder[] | undefined,
+): Promise<WorkspaceSessionMeta[]> {
+	if (!workspaceFolders?.length) {
+		return [];
+	}
+
+	const results = await Promise.all(
+		workspaceFolders.map(async (workspaceFolder) => {
+			const storageDirectory = getStoragePath(workspaceFolder);
+			const sessions = await chatSessionStore.listSessions(storageDirectory);
+			return sessions.map((session) => ({
+				...session,
+				workspaceFolder,
+				storageDirectory,
+				displayTitle: `[${workspaceFolder.name}] ${session.title}`,
+			}));
+		}),
+	);
+
+	return results.flat().sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt));
+}
+
 export function renderSessionListMarkdown(sessions: SessionMeta[]): string {
 	if (!sessions.length) {
 		return 'No saved sessions found. Use Command Palette: Chat Commit: Save Current Chat Session.';
 	}
 
 	return ['## Saved Sessions', '', ...sessions.map((session) => asMarkdownListItem(session))].join('\n');
+}
+
+function renderWorkspaceSessionListMarkdown(sessions: WorkspaceSessionMeta[]): string {
+	if (!sessions.length) {
+		return 'No saved sessions found. Use Command Palette: Chat Commit: Save Current Chat Session.';
+	}
+
+	return ['## Saved Sessions', '', ...sessions.map((session) => asWorkspaceMarkdownListItem(session))].join('\n');
 }
 
 export function trimTurnsForResume(turns: SavedTurn[], maxTurns: number, maxContextChars: number): SavedTurn[] {
@@ -226,24 +283,49 @@ export function buildResumePrompt(
 	return composeResumePrompt(constrained.turns, prompt, constrained.note);
 }
 
-export function selectSessionForResume(query: string, sessions: SessionMeta[]): ResumeSelection {
+export function selectSessionForResume<T extends SessionMeta>(query: string, sessions: T[]): { session?: T; candidates?: T[] } {
 	const normalizedQuery = query.trim();
 	if (!normalizedQuery) {
 		return {};
 	}
 
-	const scored = fuzzyMatchSessions(normalizedQuery, sessions);
+	const scored = fuzzyMatchSessions(
+		normalizedQuery,
+		sessions.map((session) => {
+			const displayTitle = 'displayTitle' in session && typeof session.displayTitle === 'string'
+				? session.displayTitle
+				: session.title;
+			return {
+				...session,
+				title: displayTitle,
+			};
+		}),
+	);
 	if (!scored.length) {
 		return {};
 	}
 
+	const findOriginal = (scoredSession: SessionMeta): T | undefined =>
+		sessions.find((session) => session.fileName === scoredSession.fileName && session.savedAt === scoredSession.savedAt);
+
+	if (scored.length === 1) {
+		const single = scored[0];
+		if (!single) {
+			return {};
+		}
+
+		const onlyMatch = findOriginal(single);
+		return onlyMatch ? { session: onlyMatch } : {};
+	}
+
 	const best = scored[0];
 	if (best && best.score >= MIN_AUTO_SELECT_SCORE) {
-		return { session: best };
+		const match = findOriginal(best);
+		return match ? { session: match } : {};
 	}
 
 	return {
-		candidates: scored.slice(0, 5),
+		candidates: scored.slice(0, 5).map((session) => findOriginal(session)).filter((session): session is T => Boolean(session)),
 	};
 }
 
@@ -356,6 +438,13 @@ function findResumedSessionMeta(history: readonly (vscode.ChatRequestTurn | vsco
 	return null;
 }
 
+function findWorkspaceFolderForStorageDirectory(storageDirectory: string): vscode.WorkspaceFolder | undefined {
+	return vscode.workspace.workspaceFolders?.find((workspaceFolder) => {
+		const relative = path.relative(workspaceFolder.uri.fsPath, storageDirectory);
+		return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+	});
+}
+
 async function sendModelResponse(
 	request: vscode.ChatRequest,
 	response: vscode.ChatResponseStream,
@@ -414,38 +503,37 @@ async function sendModelResponse(
 
 export function registerChatParticipant(context: vscode.ExtensionContext): void {
 	const participant = vscode.chat.createChatParticipant(CHAT_PARTICIPANT_ID, async (request, chatContext, stream, token) => {
-		const workspaceFolder = pickWorkspaceFolder();
-		if (!workspaceFolder) {
+		const workspaceFolders = vscode.workspace.workspaceFolders;
+		if (!workspaceFolders?.length) {
 			stream.markdown('Open a workspace folder before using @chat-commit.');
 			return;
 		}
-
-		const storageDirectory = getStoragePath(workspaceFolder);
-		const sessions = await chatSessionStore.listSessions(storageDirectory);
+		const workspaceSessions = await listSessionsAcrossWorkspaceFolders(workspaceFolders);
+		const workspaceFolder = pickWorkspaceFolder() ?? workspaceFolders[0];
 
 		if (request.command === 'list') {
-			stream.markdown(renderSessionListMarkdown(sessions));
+			stream.markdown(renderWorkspaceSessionListMarkdown(workspaceSessions));
 			return;
 		}
 
 		if (request.command === 'resume') {
-			if (!sessions.length) {
+			if (!workspaceSessions.length) {
 				stream.markdown('No saved sessions found. Save a session before resuming.');
 				return;
 			}
 
-			const selection = selectSessionForResume(request.prompt, sessions);
+			const selection = selectSessionForResume(request.prompt, workspaceSessions);
 			if (selection.session) {
-				const reassembled = await loadReassembledSession(storageDirectory, selection.session.fileName);
+				const reassembled = await loadReassembledSession(selection.session.storageDirectory, selection.session.fileName);
 				const resumed = reassembled.session;
 				const maxTurns = vscode.workspace
-					.getConfiguration('chat-commit', workspaceFolder.uri)
+					.getConfiguration('chat-commit', selection.session.workspaceFolder.uri)
 					.get<number>('resume.maxTurns', 50);
 				const maxContextChars = vscode.workspace
-					.getConfiguration('chat-commit', workspaceFolder.uri)
+					.getConfiguration('chat-commit', selection.session.workspaceFolder.uri)
 					.get<number>('resume.maxContextChars', 80000);
 				const overflowStrategy = vscode.workspace
-					.getConfiguration('chat-commit', workspaceFolder.uri)
+					.getConfiguration('chat-commit', selection.session.workspaceFolder.uri)
 					.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize');
 				const constrained = applyResumeOverflowStrategy(resumed.turns, maxTurns, maxContextChars, overflowStrategy);
 				stream.markdown(
@@ -458,7 +546,7 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 				return {
 					metadata: {
 						resumedSessionFile: reassembled.rootFileName,
-						storageDirectory,
+						storageDirectory: selection.session.storageDirectory,
 					},
 				};
 			}
@@ -468,7 +556,7 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 					[
 						'Multiple sessions match your query. Try a more specific title or pick one of these:',
 						'',
-						...selection.candidates.map((session) => asMarkdownListItem(session)),
+						...selection.candidates.map((session) => asWorkspaceMarkdownListItem(session)),
 					].join('\n'),
 				);
 				return;
@@ -489,14 +577,21 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 			resumedSessionMeta.fileName,
 		);
 		const resumedSession = reassembled.session;
+		const resumedWorkspaceFolder = findWorkspaceFolderForStorageDirectory(resumedSessionMeta.storageDirectory)
+			?? workspaceFolder
+			?? workspaceFolders[0];
+		if (!resumedWorkspaceFolder) {
+			stream.markdown('Open a workspace folder before using @chat-commit.');
+			return;
+		}
 		const maxTurns = vscode.workspace
-			.getConfiguration('chat-commit', workspaceFolder.uri)
+			.getConfiguration('chat-commit', resumedWorkspaceFolder.uri)
 			.get<number>('resume.maxTurns', 50);
 		const maxContextChars = vscode.workspace
-			.getConfiguration('chat-commit', workspaceFolder.uri)
+			.getConfiguration('chat-commit', resumedWorkspaceFolder.uri)
 			.get<number>('resume.maxContextChars', 80000);
 		const overflowStrategy = vscode.workspace
-			.getConfiguration('chat-commit', workspaceFolder.uri)
+			.getConfiguration('chat-commit', resumedWorkspaceFolder.uri)
 			.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize');
 
 		await sendModelResponse(request, stream, token, resumedSession, request.prompt, maxTurns, maxContextChars, overflowStrategy);
