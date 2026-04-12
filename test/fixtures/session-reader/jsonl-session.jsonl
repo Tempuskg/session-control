@@ -1,0 +1,3 @@
+{"kind":"meta","id":"session-jsonl","title":"JSONL session","lastMessageDate":"2026-04-11T10:00:00.000Z"}
+{"role":"user","text":"Show me the bug","timestamp":"2026-04-11T09:55:00.000Z"}
+{"role":"assistant","content":"The issue is in token refresh.","timestamp":"2026-04-11T10:00:00.000Z"}

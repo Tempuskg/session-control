@@ -14,7 +14,9 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 - [x] **Phase 3 — Git Integration**
   - Completed: `src/gitIntegration.ts` with repository matching by workspace URI, dirty-state detection, graceful fallback when git extension/repo are unavailable, and one-time user notification when git extension is missing
   - Validation completed: `npm run lint`, `npm test` (14 passing, including `test/unit/gitIntegration.test.ts`)
-- [ ] **Phase 4 — Session Reader**
+- [x] **Phase 4 — Session Reader**
+  - Completed: `src/sessionReader.ts` with storage-path derivation, `.json`/`.jsonl` parsing, turn normalization, recency sorting, corrupt-file skipping with warnings, and unknown-format fail-safe behavior
+  - Validation completed: `npm test` (18 passing, including fixture-driven `test/unit/sessionReader.test.ts`)
 - [ ] **Phase 5 — Session Writer & Store**
 - [ ] **Phase 6 — Save Command**
 - [ ] **Phase 7 — Chat Participant & Resume**
@@ -22,7 +24,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 - [ ] **Phase 9 — Auto-Save & Session Pruning**
 - [ ] **Phase 10 — Polish & Multi-Root**
 
-**Current focus:** Start Phase 4 (`src/sessionReader.ts`, format detection, and fixture-based tests).
+**Current focus:** Start Phase 5 (`src/sessionWriter.ts`, `src/sessionStore.ts`, and save-format tests).
 
 ---
 
@@ -146,7 +148,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 
 ---
 
-## Phase 4: Session Reader
+## Phase 4: Session Reader (Completed)
 
 > **Goal:** Read and parse Copilot's internal session storage. This is the fragile layer — isolate it.
 

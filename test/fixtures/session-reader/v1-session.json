@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "id": "session-v1",
+  "title": "Fix auth bug",
+  "lastMessageDate": "2026-04-10T11:00:00.000Z",
+  "turns": [
+    {
+      "type": "request",
+      "participant": "copilot",
+      "prompt": "How do I fix login?",
+      "references": ["src/auth.ts"],
+      "timestamp": "2026-04-10T10:55:00.000Z"
+    },
+    {
+      "type": "response",
+      "participant": "copilot",
+      "content": "Add a null check before token parse.",
+      "toolCalls": [
+        {
+          "name": "read_file",
+          "summary": "Read src/auth.ts"
+        }
+      ],
+      "timestamp": "2026-04-10T11:00:00.000Z"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 2,
+  "session": {
+    "id": "session-v2",
+    "name": "Refactor auth flow",
+    "updatedAt": "2026-04-12T09:00:00.000Z",
+    "messages": [
+      {
+        "role": "user",
+        "text": "Please refactor the auth middleware",
+        "at": "2026-04-12T08:55:00.000Z"
+      },
+      {
+        "role": "assistant",
+        "content": "Split validation from token parsing.",
+        "at": "2026-04-12T09:00:00.000Z",
+        "toolCalls": [
+          {
+            "name": "read_file",
+            "summary": "Read src/middleware/auth.ts"
+          }
+        ]
+      }
+    ]
+  }
+}
