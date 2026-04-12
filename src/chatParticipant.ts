@@ -40,7 +40,15 @@ function asMarkdownListItem(session: SessionMeta): string {
 	return `- **${session.title}** | ${session.savedAt} | ${session.turnCount} turns | ${branch}@${commit}`;
 }
 
-function trimTurnsForResume(turns: SavedTurn[], maxTurns: number, maxContextChars: number): SavedTurn[] {
+export function renderSessionListMarkdown(sessions: SessionMeta[]): string {
+	if (!sessions.length) {
+		return 'No saved sessions found. Use Command Palette: Chat Commit: Save Current Chat Session.';
+	}
+
+	return ['## Saved Sessions', '', ...sessions.map((session) => asMarkdownListItem(session))].join('\n');
+}
+
+export function trimTurnsForResume(turns: SavedTurn[], maxTurns: number, maxContextChars: number): SavedTurn[] {
 	if (maxTurns <= 0 || maxContextChars <= 0) {
 		return [];
 	}
@@ -80,6 +88,25 @@ function turnsToContextBlock(turns: SavedTurn[]): string {
 			return `Copilot: ${turn.content}`;
 		})
 		.join('\n\n');
+}
+
+export function buildResumePrompt(
+	session: ChatSession,
+	prompt: string,
+	maxTurns: number,
+	maxContextChars: number,
+): string {
+	const trimmedTurns = trimTurnsForResume(session.turns, maxTurns, maxContextChars);
+	const contextBlock = turnsToContextBlock(trimmedTurns);
+
+	return [
+		'The following is a previous conversation that the user wants to continue.',
+		'Use it as context for the next response.',
+		'',
+		contextBlock,
+		'',
+		`User follow-up: ${prompt}`,
+	].join('\n');
 }
 
 export function selectSessionForResume(query: string, sessions: SessionMeta[]): ResumeSelection {
@@ -140,16 +167,7 @@ async function sendModelResponse(
 	maxTurns: number,
 	maxContextChars: number,
 ): Promise<void> {
-	const trimmedTurns = trimTurnsForResume(session.turns, maxTurns, maxContextChars);
-	const contextBlock = turnsToContextBlock(trimmedTurns);
-	const messageText = [
-		'The following is a previous conversation that the user wants to continue.',
-		'Use it as context for the next response.',
-		'',
-		contextBlock,
-		'',
-		`User follow-up: ${prompt}`,
-	].join('\n');
+	const messageText = buildResumePrompt(session, prompt, maxTurns, maxContextChars);
 
 	const modelResponse = await request.model.sendRequest(
 		[vscode.LanguageModelChatMessage.User(messageText)],
@@ -176,12 +194,7 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 		const sessions = await chatSessionStore.listSessions(storageDirectory);
 
 		if (request.command === 'list') {
-			if (!sessions.length) {
-				stream.markdown('No saved sessions found. Use Command Palette: Chat Commit: Save Current Chat Session.');
-				return;
-			}
-
-			stream.markdown(['## Saved Sessions', '', ...sessions.map((session) => asMarkdownListItem(session))].join('\n'));
+			stream.markdown(renderSessionListMarkdown(sessions));
 			return;
 		}
 

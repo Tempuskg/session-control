@@ -1,6 +1,6 @@
 import * as assert from 'node:assert';
-import { selectSessionForResume } from '../../src/chatParticipant';
-import { SessionMeta } from '../../src/types';
+import { renderSessionListMarkdown, selectSessionForResume, trimTurnsForResume } from '../../src/chatParticipant';
+import { SavedTurn, SessionMeta } from '../../src/types';
 
 function createMeta(overrides: Partial<SessionMeta> = {}): SessionMeta {
 	return {
@@ -47,5 +47,40 @@ suite('chatParticipant selection', () => {
 		assert.equal(noQuery.candidates, undefined);
 		assert.equal(noMatches.session, undefined);
 		assert.equal(noMatches.candidates, undefined);
+	});
+
+	test('trimTurnsForResume honors max turn and char budgets', () => {
+		const turns: SavedTurn[] = [
+			{
+				type: 'request',
+				participant: 'copilot',
+				prompt: 'one',
+				references: [],
+				timestamp: '2026-04-12T12:00:00.000Z',
+			},
+			{
+				type: 'response',
+				participant: 'copilot',
+				content: 'two two',
+				toolCalls: [],
+				timestamp: '2026-04-12T12:01:00.000Z',
+			},
+			{
+				type: 'request',
+				participant: 'copilot',
+				prompt: 'three',
+				references: [],
+				timestamp: '2026-04-12T12:02:00.000Z',
+			},
+		];
+
+		const trimmed = trimTurnsForResume(turns, 2, 9);
+		assert.equal(trimmed.length, 1);
+		assert.equal(trimmed[0]?.type, 'request');
+	});
+
+	test('renderSessionListMarkdown returns a friendly empty message', () => {
+		const markdown = renderSessionListMarkdown([]);
+		assert.equal(markdown.includes('No saved sessions found.'), true);
 	});
 });

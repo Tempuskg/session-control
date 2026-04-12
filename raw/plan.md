@@ -25,17 +25,17 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
   - Completed: `sessionStore.deleteSession` support added with unit coverage
   - Completed: dedicated save round-trip integration-style coverage in `test/unit/extensionSaveFlow.test.ts`
   - Validation completed: `npm run lint`, `npm test` (29 passing)
-- [ ] **Phase 7 — Chat Participant & Resume**
-  - In progress: added `src/chatParticipant.ts` and registration in `src/extension.ts` via `vscode.chat.createChatParticipant('chat-commit.resume', ...)`
-  - In progress: implemented `/list` and `/resume` handlers backed by `sessionStore`, `fuzzyMatchSessions`, and resume metadata persistence in chat result metadata
-  - In progress: implemented follow-up request handling that reloads resumed session context and sends it through `request.model.sendRequest(...)`
-  - In progress: added participant selection tests in `test/unit/chatParticipant.test.ts`
-  - Validation completed: `npm run lint`, `npm test` (32 passing)
+- [x] **Phase 7 — Chat Participant & Resume**
+  - Completed: `src/chatParticipant.ts` with participant registration (`chat-commit.resume`) and command handling for `/list` and `/resume`
+  - Completed: resume follow-up flow via chat history metadata + `request.model.sendRequest(...)` context injection
+  - Completed: helper exports for resume context/list rendering and selection behavior (`buildResumePrompt`, `renderSessionListMarkdown`, `trimTurnsForResume`)
+  - Completed: integration-style round-trip resume coverage in `test/unit/chatParticipant.integration.test.ts`
+  - Validation completed: `npm run lint`, `npm test` (35 passing)
 - [ ] **Phase 8 — Bloat Controls**
 - [ ] **Phase 9 — Auto-Save & Session Pruning**
 - [ ] **Phase 10 — Polish & Multi-Root**
 
-**Current focus:** Continue Phase 7 (`/resume` behavior polish + integration coverage).
+**Current focus:** Start Phase 8 (`save/resume` bloat controls and overflow strategies).
 
 ---
 
