@@ -17,6 +17,8 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 
 ## Phase 1: Project Scaffolding
 
+> **Goal:** A buildable, empty extension with all boilerplate in place.
+
 ### Step 1.1 — Scaffold the extension
 - Use `yo code` to generate a TypeScript VS Code extension
 - Target minimum VS Code engine version `^1.93.0` (chat participant API stabilized)
@@ -24,7 +26,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 - Configure `.vscodeignore`
 - Initialize as a public GitHub repository with `MIT` license
 
-### Step 1.1b — Open source project files
+### Step 1.2 — Open source project files
 - **`LICENSE`** — MIT license
 - **`README.md`** — Project description, features, installation, usage, configuration reference, contributing link, license badge
 - **`CONTRIBUTING.md`** — How to set up the dev environment, run tests, submit PRs, and report issues. Code style expectations (TypeScript strict, ESLint config)
@@ -35,16 +37,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 - **`.github/workflows/ci.yml`** — GitHub Actions: lint, build, unit tests, integration tests (via `xvfb-run`), Snyk scan
 - **`.github/workflows/release.yml`** — GitHub Actions: on tag push, `vsce package` → publish to VS Code Marketplace + Open VSX Registry, create GitHub Release with `.vsix` asset
 
-### Step 1.1a — Extension activation events
-- **`activationEvents`**: The extension should activate lazily. Define activation events in `package.json`:
-  - `onCommand:chat-commit.saveSession` — activate when the user runs the save command
-  - `onCommand:chat-commit.listSessions` — activate when the user browses sessions
-  - `onCommand:chat-commit.deleteSession` — activate when the user deletes a session
-  - The chat participant (`chat-commit.resume`) automatically activates the extension when invoked — no explicit activation event needed for chat participants in VS Code ≥1.93
-- **No `*` activation**: Do not use `"*"` (activate on startup). The extension has no reason to run until the user interacts with it.
-- **`autoSaveOnCommit` re-activation**: When `autoSaveOnCommit` is enabled, the extension must activate on workspace open to register the git state listener. Add `onStartupFinished` as a conditional activation event — in `activate()`, check the setting and only register the git listener if enabled. If disabled, the activation is effectively a no-op and returns immediately.
-
-### Step 1.2 — Define package.json contributions
+### Step 1.3 — package.json contributions
 - **Commands:**
   - `chat-commit.saveSession` — "Chat Commit: Save Current Chat Session"
   - `chat-commit.listSessions` — "Chat Commit: Browse Saved Sessions"
@@ -53,44 +46,120 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
   - `chat-commit.storagePath` (string, default: `.chat`) — folder relative to workspace root
   - `chat-commit.autoSaveOnCommit` (boolean, default: false) — auto-save active session on git commit
   - `chat-commit.includeInGitignore` (boolean, default: false) — optionally gitignore the .chat folder
-  - **Large session options (resume context):**
-    - `chat-commit.resume.maxTurns` (number, default: 50) — max number of turns to inject when resuming. Older turns beyond this limit are handled per `resume.overflowStrategy`
-    - `chat-commit.resume.overflowStrategy` (enum, default: `summarize`) — what to do when a session exceeds `maxTurns`: `summarize` (LLM-summarize older turns into a preamble), `truncate` (drop oldest turns), `recent-only` (only load the last N turns with no summary)
-    - `chat-commit.resume.maxContextChars` (number, default: 80000) — hard cap on total character count injected as context. Acts as a safety net regardless of turn count. Overflow handled per `overflowStrategy`
-  - **Session file bloat options (save size):**
-    - `chat-commit.save.maxFileSize` (string, default: `1mb`) — max size per saved session file. Sessions exceeding this are handled per `save.overflowStrategy`
-    - `chat-commit.save.overflowStrategy` (enum, default: `split`) — what to do when a session file exceeds `maxFileSize`: `split` (chunk into part files e.g. `…-part1.json`, `…-part2.json` with linking metadata), `truncateOldest` (drop oldest turns to fit), `warn` (save anyway but show a warning)
-    - `chat-commit.save.stripToolOutput` (boolean, default: false) — strip verbose tool call outputs (file contents, terminal output) from saved turns to reduce size. Tool call names and summaries are preserved
-    - `chat-commit.save.maxSavedSessions` (number, default: 0 = unlimited) — max number of session files to keep in `.chat/`. When exceeded, the oldest sessions are moved to `.chat/.archive/` (or deleted per `save.pruneAction`)
-    - `chat-commit.save.pruneAction` (enum, default: `archive`) — what to do when `maxSavedSessions` is exceeded: `archive` (move to `.chat/.archive/`), `delete` (permanently remove oldest)
+  - **Resume context settings:**
+    - `chat-commit.resume.maxTurns` (number, default: 50) — max turns to inject when resuming
+    - `chat-commit.resume.overflowStrategy` (enum, default: `summarize`) — `summarize`, `truncate`, `recent-only`
+    - `chat-commit.resume.maxContextChars` (number, default: 80000) — hard cap on total injected characters
+  - **Save bloat settings:**
+    - `chat-commit.save.maxFileSize` (string, default: `1mb`) — max size per saved session file
+    - `chat-commit.save.overflowStrategy` (enum, default: `split`) — `split`, `truncateOldest`, `warn`
+    - `chat-commit.save.stripToolOutput` (boolean, default: false) — strip verbose tool call outputs
+    - `chat-commit.save.maxSavedSessions` (number, default: 0 = unlimited) — max session files in `.chat/`
+    - `chat-commit.save.pruneAction` (enum, default: `archive`) — `archive` or `delete`
 - **Chat Participant:**
-  - id: `chat-commit.resume`
-  - name: `chat-commit`
-  - description: "Resume a saved chat session"
+  - id: `chat-commit.resume`, name: `chat-commit`, description: "Resume a saved chat session"
   - commands: `resume`, `list`
-- **Menus:**
-  - Add "Save Chat Session" to `chat/context` menu (if available) or command palette
-- **Tree View (optional Phase 3):**
-  - `chat-commit.sessionExplorer` — sidebar panel listing saved sessions
+- **Menus:** Add "Save Chat Session" to `chat/context` menu or command palette
+
+### Step 1.4 — Extension activation events
+- Activate lazily via `onCommand` for each command
+- The chat participant (`chat-commit.resume`) automatically activates the extension when invoked — no explicit event needed in VS Code ≥1.93
+- **No `*` activation** — the extension has no reason to run until the user interacts with it
+- Add `onStartupFinished` for `autoSaveOnCommit` — in `activate()`, check the setting and only register the git listener if enabled; otherwise return immediately
+
+### Step 1.5 — Entry point stub
+- Create `src/extension.ts` with empty `activate()` / `deactivate()` functions
+- Verify the extension compiles, bundles, and loads in the Extension Host (`F5`)
+
+**Deliverable:** Extension installs, activates on command, shows commands in palette. No functionality yet.
 
 ---
 
-## Phase 2: Save System
+## Phase 2: Types & Core Utilities
 
-### Step 2.1 — Locate and read Copilot chat session files
-- Access internal storage path: `{context.globalStorageUri}/../../../workspaceStorage/{workspaceId}/chatSessions/`
-  - Alternatively, derive from `context.storageUri` which gives `workspaceStorage/{workspaceId}/{extensionId}` — go up one level + into `chatSessions/`
-- Read `.json` and `.jsonl` session files
-- Parse session data: extract turns (user prompts, assistant responses, tool invocations, file references)
-- **Important:** This relies on VS Code internal format. Implement a version-detection layer to handle format changes gracefully with a clear error message.
+> **Goal:** All shared data structures and pure utility functions, fully unit-tested.
 
-### Step 2.2 — Determine active/most-recent session
-- Read the session index from the chatSessions directory listing
-- Sort by `lastMessageDate` to find active/recent session
-- Present a QuickPick list to the user so they can choose which session to save
+### Step 2.1 — TypeScript types (`src/types.ts`)
+- Define `ChatSession`, `GitContext`, `RequestTurn`, `ResponseTurn`, `ToolCall`, `SessionMeta`
+- Define type guards and validation functions (e.g., `isChatSession()`, `isValidTurn()`)
 
-### Step 2.3 — Transform to save format
-- Create a `ChatSession` JSON schema:
+### Step 2.2 — Utilities (`src/utils.ts`)
+- `slugify(title: string): string` — convert title to filename-safe slug
+- `formatTimestamp(date: Date): string` — produce `YYYY-MM-DDTHH-mm` format
+- `parseFileSize(size: string): number` — convert `"1mb"` → `1048576`
+
+### Step 2.3 — Fuzzy matching (`src/utils.ts`)
+- `fuzzyMatchSessions(query: string, sessions: SessionMeta[]): ScoredSession[]`
+- Scoring tiers: exact (100), prefix (80), substring (60), word-boundary (40), character-order (20), no match (0)
+- Case-insensitive, sorted by score then `savedAt` descending
+- See **Fuzzy Matching** reference section for full algorithm and behavior rules
+
+### Step 2.4 — Unit tests for types & utilities
+- Test slugify edge cases (unicode, special chars, long strings)
+- Test timestamp formatting
+- Test parseFileSize with various units (`500kb`, `1mb`, `2mb`, invalid input)
+- Full fuzzy matching test matrix (exact, prefix, substring, word-boundary, fuzzy, no match)
+
+**Deliverable:** `src/types.ts`, `src/utils.ts`, `test/unit/types.test.ts`, `test/unit/utils.test.ts` — all tests pass.
+
+---
+
+## Phase 3: Git Integration
+
+> **Goal:** A self-contained module for reading git metadata, resilient to missing repos.
+
+### Step 3.1 — Git extension API wrapper (`src/gitIntegration.ts`)
+- Access the built-in `vscode.git` extension API
+- `getGitContext(workspaceFolder: Uri): Promise<GitContext | null>` — returns `{ branch, commit, dirty }` or `null` if git unavailable
+- Match workspace folder URI to the correct repository via `repo.rootUri`
+
+### Step 3.2 — Graceful degradation
+- If `vscode.git` extension isn't installed/active → return `null`, show info message on first occurrence
+- If workspace has no git repo → return `null`
+
+### Step 3.3 — Unit tests
+- Mock `vscode.git` API, test metadata extraction
+- Test null handling when git unavailable
+
+**Deliverable:** `src/gitIntegration.ts`, `test/unit/gitIntegration.test.ts` — git metadata works or gracefully returns null.
+
+---
+
+## Phase 4: Session Reader
+
+> **Goal:** Read and parse Copilot's internal session storage. This is the fragile layer — isolate it.
+
+### Step 4.1 — Locate Copilot session storage (`src/sessionReader.ts`)
+- Derive path from `context.storageUri`: go up from `workspaceStorage/{workspaceId}/{extensionId}` → into `chatSessions/`
+- Handle "directory not found" gracefully with info message
+
+### Step 4.2 — Read and parse session files
+- Read `.json` and `.jsonl` files from the `chatSessions/` directory
+- Parse into internal session structures: extract turns (user prompts, assistant responses, tool invocations, file references)
+- Skip corrupt files with a warning in the output channel; never crash on a single bad file
+
+### Step 4.3 — Version detection layer
+- Detect the internal format structure and handle known versions
+- On unknown format: show error with VS Code version, link to file an issue, return empty list
+
+### Step 4.4 — Determine active/most-recent session
+- Sort parsed sessions by `lastMessageDate`
+- Return sorted session list for upstream to present in QuickPick
+
+### Step 4.5 — Test fixtures
+- Create `test/fixtures/` with sample session files based on observed real structures
+- Test each known format version via fixture files
+
+**Deliverable:** `src/sessionReader.ts`, `test/fixtures/*.json`, `test/unit/sessionReader.test.ts` — can read real Copilot sessions or fail gracefully.
+
+---
+
+## Phase 5: Session Writer & Store
+
+> **Goal:** Transform parsed sessions into the save format and write to `.chat/`.
+
+### Step 5.1 — Transform to save format (`src/sessionWriter.ts`)
+- Map internal Copilot session data → `ChatSession` JSON schema:
 ```json
 {
   "version": 1,
@@ -127,77 +196,174 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
   "markdownSummary": "# Chat: <title>\n\n## User\n...\n\n## Copilot\n..."
 }
 ```
-- Use Git extension API (`vscode.git`) to get branch name and commit SHA
-- Auto-generate title from first user prompt (truncated) or let user rename
-- **Bloat controls applied here:** check `save.maxFileSize` after serialization. If exceeded, apply `save.overflowStrategy` (split/truncateOldest/warn). If `save.stripToolOutput` is true, replace tool call output bodies with `"[output stripped — N chars]"` summaries before size check.
+- Enrich with git metadata from `gitIntegration`
+- Auto-generate title from first user prompt (truncated) or accept user-provided title
+- Generate `markdownSummary` field (see **Markdown Summary Generation** reference section)
 
-### Step 2.4 — Write to .chat/ folder
+### Step 5.2 — Session store CRUD (`src/sessionStore.ts`)
 - Create `.chat/` directory if it doesn't exist
-- File naming: `{timestamp}-{slugified-title}.json` (e.g., `2026-04-12T14-30-fix-auth-bug.json`)
-  - For split sessions: append `-part1`, `-part2`, etc.
-- Optionally create a parallel `.md` file for easy browsing in git diffs
-- If `autoSaveOnCommit` is enabled, register a git post-commit hook or listen to `Repository.state` changes
-- **After write:** check `save.maxSavedSessions`. If exceeded, apply `save.pruneAction` (archive or delete oldest sessions)
+- File naming: `{timestamp}-{slugified-title}.json`
+- Atomic writes: write to temp file, then rename
+- Read a session back from `.chat/` by filename or fuzzy search
+- List all sessions with metadata (title, date, turn count, git context)
 
-### Step 2.5 — Auto-save on commit (optional)
-- Watch `git.repositories[0].state.onDidChange` for HEAD changes
-- When a new commit is detected, automatically save the most recent active chat session
-- Debounce to avoid saving on every micro-state change
-- Only save if there are new turns since last save (track via turn count or hash)
+### Step 5.3 — Unit tests
+- Test JSON schema output matches expected structure
+- Test title generation from various prompt inputs
+- Test file naming with slugify + timestamp
+- Test atomic write behavior (temp-then-rename)
+- Test markdown summary generation format and truncation rules
+
+**Deliverable:** `src/sessionWriter.ts`, `src/sessionStore.ts`, unit tests — can transform and persist sessions.
 
 ---
 
-## Phase 3: Resume System (Chat Participant)
+## Phase 6: Save Command
 
-### Step 3.1 — Register the chat participant
+> **Goal:** The user can save a chat session end-to-end. First user-facing feature.
+
+### Step 6.1 — Register the save command
+- Wire `chat-commit.saveSession` in `src/extension.ts`
+- Call `sessionReader` → present QuickPick → call `sessionWriter` → call `sessionStore`
+
+### Step 6.2 — QuickPick session selection
+- Present list of available Copilot sessions sorted by most recent
+- Display: first prompt line (truncated), date, turn count
+- Allow user to rename the title before saving
+
+### Step 6.3 — Register list and delete commands
+- `chat-commit.listSessions` — QuickPick showing all saved sessions with metadata (title, date, branch, commit SHA, turn count)
+- `chat-commit.deleteSession` — soft-delete (move to `.chat/.trash/`) or hard-delete with confirmation
+
+### Step 6.4 — Integration test: save round-trip
+- Save a mock session → read back → verify JSON structure matches schema
+- Verify git metadata captured correctly (using real git repo in temp dir)
+
+**Deliverable:** User can run "Chat Commit: Save Current Chat Session" from the command palette and see the JSON file appear in `.chat/`. Can browse and delete sessions.
+
+---
+
+## Phase 7: Chat Participant & Resume
+
+> **Goal:** The user can resume a saved session via `@chat-commit /resume`.
+
+### Step 7.1 — Register the chat participant (`src/chatParticipant.ts`)
 - Register `@chat-commit` via `vscode.chat.createChatParticipant()`
-- Handle commands:
-  - `/resume <session-name-or-id>` — load and inject a saved session as context
-  - `/list` — show available saved sessions in the chat response stream
+- Route `/resume` and `/list` commands to handlers
 
-### Step 3.2 — Implement resume flow
-- When user types `@chat-commit /resume fix-auth-bug`:
-  1. Search `.chat/` folder for matching session file (fuzzy match on title/filename — see **Fuzzy Matching** section below)
-  2. Parse the JSON session file (if split across parts, load all parts and reassemble)
-  3. **Apply large session limits:** check turn count against `resume.maxTurns` and total character length against `resume.maxContextChars`. If either limit is exceeded, apply `resume.overflowStrategy`:
-     - `summarize`: Send older turns to the LLM with a "summarize this conversation so far" prompt, use the summary as a preamble, then include the most recent turns verbatim
-     - `truncate`: Silently drop oldest turns until within limits
-     - `recent-only`: Load only the last N turns, prepend a note: "Earlier turns omitted (M total)"
-  4. Build a context prompt from the (possibly reduced) turns:
-     - Format as a system message: "The following is a previous conversation that the user wants to continue:"
-     - Include all included turns in chronological order
-  5. Stream a context summary to the user via `stream.markdown()` so they see what was loaded (including any truncation/summarization notices)
-  6. Make the context available for follow-up questions via `ChatContext.history`
-  
-### Step 3.3 — Session selection UX
-- If multiple matches, present options in chat response with clickable command buttons
-- If no argument given, show a QuickPick of all saved sessions
-- Display metadata: title, date, branch, commit SHA, turn count
+### Step 7.2 — `/list` command
+- Read all sessions from `sessionStore`
+- Format as a list in the chat response with metadata (title, date, branch, turn count)
 
-### Step 3.4 — Context injection for follow-up
-- On subsequent turns (detected via `context.history`), re-inject the loaded session context
+### Step 7.3 — `/resume` command
+- Accept session name/query as argument
+- Use `fuzzyMatchSessions` to find matching session(s)
+  - Single match (score ≥ 60) → auto-select and load
+  - Multiple matches → present sorted list with clickable command buttons
+  - No matches → error message with suggestion to use `/list`
+  - No query → show QuickPick of all sessions
+- Load session JSON (single file for now — multi-part in Phase 8)
+- Build context prompt: "The following is a previous conversation that the user wants to continue:" + chronological turns
+- Stream context summary via `stream.markdown()` showing what was loaded
+
+### Step 7.4 — Context injection for follow-up turns
+- On subsequent turns (detected via `context.history`), re-inject loaded session context
 - Use `request.model.sendRequest()` or similar to prepend saved turns as prior context
-- Re-apply `resume.maxTurns` / `resume.maxContextChars` limits on each follow-up (the budget now includes both the saved context AND the new turns in the current conversation)
-- This ensures the LLM "remembers" the saved conversation across follow-ups while staying within context limits
+
+### Step 7.5 — Integration test: resume flow
+- Save a session → resume via chat participant → verify context prompt format
+- Test fuzzy matching with various query inputs
+
+**Deliverable:** User can type `@chat-commit /resume fix-auth-bug` and get the saved conversation injected as context. Follow-up messages retain context.
 
 ---
 
-## Phase 4: Polish & Settings
+## Phase 8: Bloat Controls
 
-### Step 4.1 — Configuration handling
+> **Goal:** Handle large sessions gracefully on both save and resume sides.
+
+### Step 8.1 — Save-side: strip tool output
+- When `save.stripToolOutput` is true, replace tool call output bodies with `"[output stripped — N chars]"` before serialization
+- Tool call names and summaries preserved
+
+### Step 8.2 — Save-side: size limits & split
+- After serialization, check against `save.maxFileSize`
+- **`split`** strategy: chunk into part files (`-part1.json`, `-part2.json`, ...) with linking metadata (`part`, `totalParts`, `previousPartFile`, `nextPartFile`)
+- **`truncateOldest`** strategy: drop oldest turns until within size limit
+- **`warn`** strategy: save as-is, show warning notification
+
+### Step 8.3 — Resume-side: multi-part reassembly
+- When loading a session, detect part files and reassemble all parts in order
+
+### Step 8.4 — Resume-side: context overflow strategies
+- Check turn count against `resume.maxTurns` and character length against `resume.maxContextChars`
+- **`summarize`**: Send older turns to the LLM with a "summarize this conversation so far" prompt; use summary as preamble, recent turns verbatim. Fall back to `truncate` on LLM error.
+- **`truncate`**: Silently drop oldest turns until within limits
+- **`recent-only`**: Load only last N turns, prepend note: *"Earlier turns omitted (M total)"*
+- Re-apply limits on each follow-up turn (budget covers saved + new turns)
+
+### Step 8.5 — Unit & integration tests
+- `split`: 1.5MB session with `maxFileSize=1mb` → 2 part files, linked correctly
+- `truncateOldest`: 100 turns, `500kb` limit → oldest turns dropped, remaining fit
+- `warn`: Oversized session saved as-is, warning returned
+- `stripToolOutput`: Tool output replaced with summary placeholders
+- Multi-part reassembly: save a split session → resume → verify all parts loaded and ordered
+- Each resume overflow strategy tested with 100+ turn session
+
+**Deliverable:** Large sessions handled gracefully — split on save, reassembled on resume, context trimmed to fit LLM limits.
+
+---
+
+## Phase 9: Auto-Save & Session Pruning
+
+> **Goal:** Automatic save triggers and storage housekeeping.
+
+### Step 9.1 — Auto-save on commit
+- When `autoSaveOnCommit` is enabled, watch `git.repositories[*].state.onDidChange` for HEAD changes
+- Debounce to avoid saving on micro-state changes (staging, etc.)
+- Only save if new turns exist since last save (tracked via turn count or content hash)
+- On listener error: log to output channel, disable auto-save for the session with a warning
+
+### Step 9.2 — Session pruning
+- After each save, check `save.maxSavedSessions`
+- When exceeded, apply `save.pruneAction`:
+  - **`archive`**: move oldest sessions to `.chat/.archive/`
+  - **`delete`**: permanently remove oldest sessions
+
+### Step 9.3 — Integration tests
+- Enable `autoSaveOnCommit`, make a commit in test repo → verify session saved
+- Set `maxSavedSessions=2`, save 4 → verify 2 archived/deleted
+
+**Deliverable:** Sessions auto-save on commit. Old sessions automatically archived or deleted per config.
+
+---
+
+## Phase 10: Polish & Multi-Root
+
+> **Goal:** Configuration validation, multi-root support, and final polish.
+
+### Step 10.1 — Configuration validation
 - Read settings via `vscode.workspace.getConfiguration('chat-commit')`
-- Validate storage path (must be relative, within workspace)
-- Handle multi-root workspaces (see **Multi-Root Workspace Handling** section below)
+- Validate `storagePath` (must be relative, within workspace)
+- Validate numeric settings (positive integers)
+- Validate `maxFileSize` format (`500kb`, `1mb`, etc.)
 
-### Step 4.2 — .gitignore management
+### Step 10.2 — Multi-root workspace support
+- **On manual save**: use workspace folder of active editor's file; if no file open, prompt via QuickPick
+- **On auto-save**: use workspace folder of the repository that committed
+- **On resume/list**: search `.chat/` across all workspace folders, prefix results with folder name for disambiguation (e.g., *"[backend] fix-auth-bug"*)
+- Settings can be configured per workspace folder via `.vscode/settings.json`
+- See **Multi-Root Workspace Handling** reference section for full details
+
+### Step 10.3 — .gitignore management
 - If `includeInGitignore` is true, add `.chat/` to `.gitignore`
 - Otherwise, leave it tracked (default — the whole point is source control)
 
-### Step 4.3 — Session management commands
-- `listSessions`: Open a QuickPick showing all sessions with metadata
-- `deleteSession`: Soft-delete (move to `.chat/.trash/`) or hard-delete with confirmation
+### Step 10.4 — Session explorer tree view (stretch)
+- `chat-commit.sessionExplorer` — sidebar panel listing saved sessions
+- Click to preview session metadata; double-click to resume
 
-### Step 4.4 — Status bar indicator (stretch)
+### Step 10.5 — Status bar indicator (stretch)
 - Show a status bar item when auto-save is active
 - Click to toggle auto-save or save manually
 

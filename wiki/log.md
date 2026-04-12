@@ -23,3 +23,7 @@ Pages touched: source-plan.md
 ## [2026-04-12] update | Open Source Project
 Updated PLAN.md to declare the project as open source (MIT). Added Step 1.1b for open source project files (LICENSE, README, CONTRIBUTING, CODE_OF_CONDUCT, CHANGELOG, GitHub issue/PR templates, CI/CD workflows). Updated Decisions & Assumptions and Risks & Mitigations. Updated file manifest with open source project files.
 Pages touched: overview.md, source-plan.md, file-manifest.md
+
+## [2026-04-12] restructure | Break Plan into Smaller Phases
+Restructured PLAN.md from 4 large phases to 10 incremental phases, each with a clear deliverable. Phases now follow the dependency graph: scaffolding → types → git → reader → writer → save command → resume → bloat controls → auto-save → polish. Added JSON schema back to Phase 5. Updated overview.md phase table and source-plan.md phase description.
+Pages touched: overview.md, source-plan.md

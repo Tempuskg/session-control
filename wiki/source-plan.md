@@ -46,7 +46,7 @@ The founding document for the chat-commit VS Code extension. Defines the complet
 
 4. **Extensive bloat controls**: Both save-side (file size limits, splitting, tool output stripping, session pruning) and resume-side (max turns, max chars, overflow strategies including LLM summarization).
 
-5. **Four implementation phases**: scaffolding → save system → resume system → polish. Clean separation of concerns.
+5. **Ten incremental phases**: scaffolding → types & utilities → git integration → session reader → session writer & store → save command → chat participant & resume → bloat controls → auto-save & pruning → polish & multi-root. Each phase delivers a testable milestone.
 
 6. **Nine planned source files**: Clear module boundaries — reader, writer, store, participant, git integration, types, utils, plus entry point and manifest.
 

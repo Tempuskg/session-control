@@ -36,14 +36,20 @@ The extension has two main subsystems:
 
 ## Implementation Phases
 
-The plan is organized into four phases:
+The plan is organized into ten incremental phases, each delivering a testable milestone:
 
-| Phase | Focus | Key Deliverables |
-|-------|-------|-----------------|
-| 1 | Scaffolding | Extension scaffold, `package.json` contributions, commands, settings, chat participant registration |
-| 2 | Save System | Session reading, transformation, file writing, bloat controls, auto-save on commit |
-| 3 | Resume System | Chat participant handler, context injection, session selection UX, follow-up context management |
-| 4 | Polish | Configuration handling, gitignore management, session management commands, status bar |
+| Phase | Focus | Key Deliverable |
+|-------|-------|------------------|
+| 1 | Project Scaffolding | Buildable extension with package.json, open source files, CI/CD |
+| 2 | Types & Core Utilities | `types.ts`, `utils.ts` (slugify, fuzzy matching), unit tests |
+| 3 | Git Integration | `gitIntegration.ts` with graceful degradation |
+| 4 | Session Reader | Read Copilot internal storage with version detection |
+| 5 | Session Writer & Store | Transform to JSON, write to `.chat/`, atomic writes |
+| 6 | Save Command | End-to-end save flow — first user-facing feature |
+| 7 | Chat Participant & Resume | `@chat-commit /resume` and `/list` commands |
+| 8 | Bloat Controls | Split files, strip output, context overflow strategies |
+| 9 | Auto-Save & Pruning | Auto-save on commit, session archival/deletion |
+| 10 | Polish & Multi-Root | Config validation, multi-root support, tree view, status bar |
 
 ## Key Design Decisions
 
