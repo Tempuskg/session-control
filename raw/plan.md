@@ -17,14 +17,16 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 - [x] **Phase 4 — Session Reader**
   - Completed: `src/sessionReader.ts` with storage-path derivation, `.json`/`.jsonl` parsing, turn normalization, recency sorting, corrupt-file skipping with warnings, and unknown-format fail-safe behavior
   - Validation completed: `npm test` (18 passing, including fixture-driven `test/unit/sessionReader.test.ts`)
-- [ ] **Phase 5 — Session Writer & Store**
+- [x] **Phase 5 — Session Writer & Store**
+  - Completed: `src/sessionWriter.ts` (`createChatSession`, markdown summary generation with turn/size limits) and `src/sessionStore.ts` (file naming, atomic writes, read/list metadata)
+  - Validation completed: `npm run lint`, `npm test` (27 passing, including `test/unit/sessionWriter.test.ts` and `test/unit/sessionStore.test.ts`)
 - [ ] **Phase 6 — Save Command**
 - [ ] **Phase 7 — Chat Participant & Resume**
 - [ ] **Phase 8 — Bloat Controls**
 - [ ] **Phase 9 — Auto-Save & Session Pruning**
 - [ ] **Phase 10 — Polish & Multi-Root**
 
-**Current focus:** Start Phase 5 (`src/sessionWriter.ts`, `src/sessionStore.ts`, and save-format tests).
+**Current focus:** Start Phase 6 (`src/extension.ts` command wiring + save flow integration).
 
 ---
 
@@ -177,7 +179,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 
 ---
 
-## Phase 5: Session Writer & Store
+## Phase 5: Session Writer & Store (Completed)
 
 > **Goal:** Transform parsed sessions into the save format and write to `.chat/`.
 

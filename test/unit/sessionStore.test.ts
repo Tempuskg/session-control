@@ -1,0 +1,101 @@
+import * as assert from 'node:assert';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { ChatSession } from '../../src/types';
+import { createSessionFileName, createSessionStore } from '../../src/sessionStore';
+
+function createSession(id: string, savedAt: string, title: string): ChatSession {
+	return {
+		version: 1,
+		id,
+		title,
+		savedAt,
+		git: { branch: 'main', commit: 'abcdef123456', dirty: false },
+		vscodeVersion: '1.115.0',
+		totalTurns: 2,
+		part: null,
+		totalParts: null,
+		previousPartFile: null,
+		nextPartFile: null,
+		turns: [
+			{
+				type: 'request',
+				participant: 'copilot',
+				prompt: 'Prompt',
+				references: [],
+				timestamp: savedAt,
+			},
+			{
+				type: 'response',
+				participant: 'copilot',
+				content: 'Response',
+				toolCalls: [],
+				timestamp: savedAt,
+			},
+		],
+		markdownSummary: '# Chat: Summary',
+	};
+}
+
+suite('sessionStore', () => {
+	test('createSessionFileName uses timestamp and slugified title', () => {
+		const fileName = createSessionFileName({
+			savedAt: '2026-04-12T14:30:00.000Z',
+			title: 'Fix Auth Bug!',
+		});
+
+		assert.equal(fileName, '2026-04-12T14-30-fix-auth-bug.json');
+	});
+
+	test('writeSession persists session atomically and readSession restores it', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createSessionStore();
+
+		try {
+			const session = createSession('a', '2026-04-12T10:00:00.000Z', 'Write Test');
+			const fileName = await store.writeSession(storageDirectory, session);
+			const restored = await store.readSession(storageDirectory, fileName);
+
+			assert.equal(restored.id, 'a');
+			assert.equal(restored.title, 'Write Test');
+
+			const files = await fs.readdir(storageDirectory);
+			assert.equal(files.some((file) => file.endsWith('.tmp')), false);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('listSessions returns metadata sorted by newest first', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createSessionStore();
+
+		try {
+			await store.writeSession(storageDirectory, createSession('older', '2026-04-10T10:00:00.000Z', 'Older Session'));
+			await store.writeSession(storageDirectory, createSession('newer', '2026-04-12T10:00:00.000Z', 'Newer Session'));
+
+			const sessions = await store.listSessions(storageDirectory);
+			assert.equal(sessions.length, 2);
+			assert.equal(sessions[0]?.id, 'newer');
+			assert.equal(sessions[1]?.id, 'older');
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('listSessions returns empty when directory does not exist', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createSessionStore();
+
+		try {
+			const sessions = await store.listSessions(storageDirectory);
+			assert.equal(sessions.length, 0);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+});
