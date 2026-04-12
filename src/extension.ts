@@ -1,5 +1,5 @@
-import * as vscode from 'vscode';
 import * as path from 'node:path';
+import * as vscode from 'vscode';
 import { getGitContext } from './gitIntegration';
 import { CopilotSession, readCopilotSessions } from './sessionReader';
 import { createSessionStore } from './sessionStore';
@@ -13,6 +13,16 @@ interface CopilotSessionPickItem extends vscode.QuickPickItem {
 
 interface SavedSessionPickItem extends vscode.QuickPickItem {
 	fileName: string;
+}
+
+interface SaveSessionFlowDeps {
+	readCopilotSessions: typeof readCopilotSessions;
+	selectSession: (sessions: CopilotSession[]) => Promise<CopilotSession | undefined>;
+	promptTitle: (defaultTitle: string) => Promise<string | undefined>;
+	getGitContext: typeof getGitContext;
+	createChatSession: typeof createChatSession;
+	writeSession: (storageDirectory: string, session: ReturnType<typeof createChatSession>) => Promise<string>;
+	showInformationMessage: (message: string) => Thenable<unknown>;
 }
 
 function getStoragePath(workspaceFolder: vscode.WorkspaceFolder): string {
@@ -44,6 +54,68 @@ function toSessionQuickPickItem(session: CopilotSession): CopilotSessionPickItem
 	};
 }
 
+function createDefaultSaveFlowDeps(): SaveSessionFlowDeps {
+	return {
+		readCopilotSessions,
+		selectSession: async (sessions: CopilotSession[]) => {
+			const pick = await vscode.window.showQuickPick(
+				sessions.map((session) => toSessionQuickPickItem(session)),
+				{ title: 'Select Copilot session to save' },
+			);
+
+			return pick?.session;
+		},
+		promptTitle: async (defaultTitle: string) =>
+			vscode.window.showInputBox({
+				title: 'Session title',
+				value: defaultTitle,
+				prompt: 'Edit the title before saving (optional)',
+			}),
+		getGitContext,
+		createChatSession,
+		writeSession: async (storageDirectory, session) => sessionStore.writeSession(storageDirectory, session),
+		showInformationMessage: (message: string) => vscode.window.showInformationMessage(message),
+	};
+}
+
+export async function runSaveSessionFlow(
+	context: vscode.ExtensionContext,
+	workspaceFolder: vscode.WorkspaceFolder,
+	storageDirectory: string,
+	depsOverrides: Partial<SaveSessionFlowDeps> = {},
+): Promise<string | undefined> {
+	const deps = {
+		...createDefaultSaveFlowDeps(),
+		...depsOverrides,
+	};
+
+	const sessions = await deps.readCopilotSessions(context);
+	if (!sessions.length) {
+		return undefined;
+	}
+
+	const selected = await deps.selectSession(sessions);
+	if (!selected) {
+		return undefined;
+	}
+
+	const title = await deps.promptTitle(selected.title);
+	if (title === undefined) {
+		return undefined;
+	}
+
+	const git = await deps.getGitContext(workspaceFolder.uri);
+	const chatSession = deps.createChatSession(selected, {
+		title,
+		git,
+		vscodeVersion: vscode.version,
+	});
+
+	const fileName = await deps.writeSession(storageDirectory, chatSession);
+	await deps.showInformationMessage(`Saved chat session to ${path.join(storageDirectory, fileName)}`);
+ return fileName;
+}
+
 async function runSaveSessionCommand(context: vscode.ExtensionContext): Promise<void> {
 	const workspaceFolder = pickWorkspaceFolder();
 	if (!workspaceFolder) {
@@ -51,41 +123,8 @@ async function runSaveSessionCommand(context: vscode.ExtensionContext): Promise<
 		return;
 	}
 
-	const sessions = await readCopilotSessions(context);
-	if (!sessions.length) {
-		return;
-	}
-
-	const pick = await vscode.window.showQuickPick(
-		sessions.map((session) => toSessionQuickPickItem(session)),
-		{ title: 'Select Copilot session to save' },
-	);
-
-	if (!pick) {
-		return;
-	}
-
-	const title = await vscode.window.showInputBox({
-		title: 'Session title',
-		value: pick.session.title,
-		prompt: 'Edit the title before saving (optional)',
-	});
-
-	if (title === undefined) {
-		return;
-	}
-
-	const git = await getGitContext(workspaceFolder.uri);
-	const chatSession = createChatSession(pick.session, {
-		title,
-		git,
-		vscodeVersion: vscode.version,
-	});
-
 	const storageDirectory = getStoragePath(workspaceFolder);
-	const fileName = await sessionStore.writeSession(storageDirectory, chatSession);
-
-	await vscode.window.showInformationMessage(`Saved chat session to ${path.join(storageDirectory, fileName)}`);
+	await runSaveSessionFlow(context, workspaceFolder, storageDirectory);
 }
 
 async function runListSessionsCommand(): Promise<void> {
@@ -169,7 +208,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		.get<boolean>('autoSaveOnCommit', false);
 
 	if (autoSave) {
-		// Git commit listener registered in Phase 9 (src/gitIntegration.ts).
+		void vscode.window.showInformationMessage('Chat Commit auto-save on commit will be wired in Phase 9.');
 	}
 
 	context.subscriptions.push(

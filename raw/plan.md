@@ -20,16 +20,17 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 - [x] **Phase 5 — Session Writer & Store**
   - Completed: `src/sessionWriter.ts` (`createChatSession`, markdown summary generation with turn/size limits) and `src/sessionStore.ts` (file naming, atomic writes, read/list metadata)
   - Validation completed: `npm run lint`, `npm test` (27 passing, including `test/unit/sessionWriter.test.ts` and `test/unit/sessionStore.test.ts`)
-- [ ] **Phase 6 — Save Command**
-  - In progress: command wiring completed in `src/extension.ts` (`saveSession`, `listSessions`, `deleteSession`) using `sessionReader` → QuickPick/InputBox → `sessionWriter` → `sessionStore`
-  - In progress: `sessionStore.deleteSession` added and covered by tests; full suite currently passes (`npm run lint`, `npm test` with 28 passing)
-  - Remaining: add dedicated integration coverage for Phase 6 save round-trip command flow
+- [x] **Phase 6 — Save Command**
+  - Completed: command wiring in `src/extension.ts` (`saveSession`, `listSessions`, `deleteSession`) using `sessionReader` → QuickPick/InputBox → `sessionWriter` → `sessionStore`
+  - Completed: `sessionStore.deleteSession` support added with unit coverage
+  - Completed: dedicated save round-trip integration-style coverage in `test/unit/extensionSaveFlow.test.ts`
+  - Validation completed: `npm run lint`, `npm test` (29 passing)
 - [ ] **Phase 7 — Chat Participant & Resume**
 - [ ] **Phase 8 — Bloat Controls**
 - [ ] **Phase 9 — Auto-Save & Session Pruning**
 - [ ] **Phase 10 — Polish & Multi-Root**
 
-**Current focus:** Start Phase 6 (`src/extension.ts` command wiring + save flow integration).
+**Current focus:** Start Phase 7 (`src/chatParticipant.ts` chat participant + resume flow).
 
 ---
 
