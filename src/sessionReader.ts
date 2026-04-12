@@ -47,6 +47,200 @@ function toIsoTimestamp(value: unknown): string {
 	return new Date().toISOString();
 }
 
+function firstNonEmpty(...values: unknown[]): string | undefined {
+	for (const value of values) {
+		const text = extractText(value);
+		if (text) {
+			return text;
+		}
+	}
+
+	return undefined;
+}
+
+function extractText(value: unknown): string | undefined {
+	if (typeof value === 'string') {
+		const trimmed = value.trim();
+		return trimmed.length ? trimmed : undefined;
+	}
+
+	if (Array.isArray(value)) {
+		const parts = value
+			.map((part) => extractText(part))
+			.filter((part): part is string => typeof part === 'string' && part.length > 0);
+
+		if (!parts.length) {
+			return undefined;
+		}
+
+		return parts.join('\n').trim();
+	}
+
+	if (!isRecord(value)) {
+		return undefined;
+	}
+
+	return firstNonEmpty(
+		value.text,
+		value.value,
+		value.markdown,
+		value.content,
+		value.prompt,
+		value.message,
+		value.input,
+		value.output,
+		value.parts,
+		value.items,
+	);
+}
+
+function asReferences(value: unknown): string[] {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+
+	const references: string[] = [];
+	for (const item of value) {
+		if (typeof item === 'string') {
+			references.push(item);
+			continue;
+		}
+
+		if (!isRecord(item)) {
+			continue;
+		}
+
+		const candidate = firstNonEmpty(item.path, item.uri, item.value, item.text);
+		if (candidate) {
+			references.push(candidate);
+		}
+	}
+
+	return references;
+}
+
+function isRequestLike(rawType: string | undefined, rawRole: string | undefined): boolean {
+	return rawType === 'request'
+		|| rawType === 'user'
+		|| rawType === 'prompt'
+		|| rawType === 'human'
+		|| rawRole === 'user';
+}
+
+function isResponseLike(rawType: string | undefined, rawRole: string | undefined): boolean {
+	return rawType === 'response'
+		|| rawType === 'assistant'
+		|| rawType === 'model'
+		|| rawRole === 'assistant';
+}
+
+function toTurnCandidate(raw: Record<string, unknown>, type: 'request' | 'response'): Record<string, unknown> {
+	if (type === 'request') {
+		const nested = isRecord(raw.request)
+			? raw.request
+			: isRecord(raw.userMessage)
+				? raw.userMessage
+				: isRecord(raw.promptMessage)
+					? raw.promptMessage
+					: undefined;
+
+		if (nested) {
+			return {
+				...raw,
+				...nested,
+				type,
+			};
+		}
+	}
+
+	const nested = isRecord(raw.response)
+		? raw.response
+		: isRecord(raw.assistantMessage)
+			? raw.assistantMessage
+			: isRecord(raw.modelResponse)
+				? raw.modelResponse
+				: undefined;
+
+	if (nested) {
+		return {
+			...raw,
+			...nested,
+			type,
+		};
+	}
+
+	return {
+		...raw,
+		type,
+	};
+}
+
+function normalizeTurnEntry(raw: unknown): SavedTurn[] {
+	if (!isRecord(raw)) {
+		return [];
+	}
+
+	const hasNestedRequest = isRecord(raw.request) || isRecord(raw.userMessage) || isRecord(raw.promptMessage);
+	const hasNestedResponse = isRecord(raw.response) || isRecord(raw.assistantMessage) || isRecord(raw.modelResponse);
+
+	if (hasNestedRequest || hasNestedResponse) {
+		const turns: SavedTurn[] = [];
+		const requestTurn = normalizeTurn(toTurnCandidate(raw, 'request'));
+		if (requestTurn) {
+			turns.push(requestTurn);
+		}
+
+		const responseTurn = normalizeTurn(toTurnCandidate(raw, 'response'));
+		if (responseTurn) {
+			turns.push(responseTurn);
+		}
+
+		return turns;
+	}
+
+	const turn = normalizeTurn(raw);
+	return turn ? [turn] : [];
+}
+
+function pickRawTurns(payload: Record<string, unknown>): unknown {
+	if (Array.isArray(payload.turns)) {
+		return payload.turns;
+	}
+
+	if (Array.isArray(payload.messages)) {
+		return payload.messages;
+	}
+
+	if (Array.isArray(payload.entries)) {
+		return payload.entries;
+	}
+
+	if (Array.isArray(payload.events)) {
+		return payload.events;
+	}
+
+	if (Array.isArray(payload.exchanges)) {
+		return payload.exchanges;
+	}
+
+	if (isRecord(payload.conversation)) {
+		const conversation = payload.conversation;
+		if (Array.isArray(conversation.turns)) {
+			return conversation.turns;
+		}
+
+		if (Array.isArray(conversation.messages)) {
+			return conversation.messages;
+		}
+
+		if (Array.isArray(conversation.entries)) {
+			return conversation.entries;
+		}
+	}
+
+	return undefined;
+}
+
 function asToolCalls(value: unknown): ToolCall[] {
 	if (!Array.isArray(value)) {
 		return [];
@@ -67,27 +261,37 @@ function normalizeTurn(raw: unknown): SavedTurn | null {
 		return null;
 	}
 
-	const rawType = typeof raw.type === 'string' ? raw.type.toLowerCase() : undefined;
-	const rawRole = typeof raw.role === 'string' ? raw.role.toLowerCase() : undefined;
-	const participant = typeof raw.participant === 'string' ? raw.participant : 'copilot';
+	const rawType = typeof raw.type === 'string'
+		? raw.type.toLowerCase()
+		: typeof raw.kind === 'string'
+			? raw.kind.toLowerCase()
+			: typeof raw.messageType === 'string'
+				? raw.messageType.toLowerCase()
+				: undefined;
+	const rawRole = typeof raw.role === 'string'
+		? raw.role.toLowerCase()
+		: typeof raw.author === 'string'
+			? raw.author.toLowerCase()
+			: undefined;
+	const participant = firstNonEmpty(raw.participant, raw.agent, raw.author) ?? 'copilot';
 	const timestamp = toIsoTimestamp(raw.timestamp ?? raw.at ?? raw.createdAt);
 
-	if (rawType === 'request' || rawRole === 'user') {
-		const prompt = typeof raw.prompt === 'string'
-			? raw.prompt
-			: typeof raw.text === 'string'
-				? raw.text
-				: typeof raw.content === 'string'
-					? raw.content
-					: '';
+	if (isRequestLike(rawType, rawRole)) {
+		const prompt = firstNonEmpty(
+			raw.prompt,
+			raw.text,
+			raw.content,
+			raw.message,
+			raw.input,
+			raw.request,
+			raw.userMessage,
+		) ?? '';
 
 		if (!prompt) {
 			return null;
 		}
 
-		const references = Array.isArray(raw.references)
-			? raw.references.filter((reference) => typeof reference === 'string')
-			: [];
+		const references = asReferences(raw.references ?? raw.files ?? raw.attachments);
 
 		return {
 			type: 'request',
@@ -98,12 +302,15 @@ function normalizeTurn(raw: unknown): SavedTurn | null {
 		};
 	}
 
-	if (rawType === 'response' || rawRole === 'assistant') {
-		const content = typeof raw.content === 'string'
-			? raw.content
-			: typeof raw.text === 'string'
-				? raw.text
-				: '';
+	if (isResponseLike(rawType, rawRole)) {
+		const content = firstNonEmpty(
+			raw.content,
+			raw.text,
+			raw.message,
+			raw.output,
+			raw.response,
+			raw.assistantMessage,
+		) ?? '';
 
 		if (!content) {
 			return null;
@@ -113,7 +320,7 @@ function normalizeTurn(raw: unknown): SavedTurn | null {
 			type: 'response',
 			participant,
 			content,
-			toolCalls: asToolCalls(raw.toolCalls ?? raw.calls),
+			toolCalls: asToolCalls(raw.toolCalls ?? raw.calls ?? raw.tools ?? raw.toolInvocations),
 			timestamp,
 		};
 	}
@@ -126,14 +333,13 @@ function normalizeTurns(rawTurns: unknown): SavedTurn[] {
 		return [];
 	}
 
-	return rawTurns
-		.map((turn) => normalizeTurn(turn))
-		.filter((turn): turn is SavedTurn => turn !== null);
+	return rawTurns.flatMap((turn) => normalizeTurnEntry(turn));
 }
 
 function normalizeObjectPayload(payload: Record<string, unknown>, sourceFile: string): CopilotSession | null {
-	if (Array.isArray(payload.turns) || Array.isArray(payload.messages)) {
-		const turns = normalizeTurns(payload.turns ?? payload.messages);
+	const payloadTurns = pickRawTurns(payload);
+	if (Array.isArray(payloadTurns)) {
+		const turns = normalizeTurns(payloadTurns);
 		if (!turns.length) {
 			return null;
 		}
@@ -157,7 +363,7 @@ function normalizeObjectPayload(payload: Record<string, unknown>, sourceFile: st
 
 	if (isRecord(payload.session)) {
 		const session = payload.session;
-		const turns = normalizeTurns(session.turns ?? session.messages);
+		const turns = normalizeTurns(pickRawTurns(session));
 		if (!turns.length) {
 			return null;
 		}

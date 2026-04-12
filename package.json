@@ -7,12 +7,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/darrenjmcleod/session-control"
+    "url": "https://github.com/tempuskg/session-control"
   },
   "bugs": {
-    "url": "https://github.com/darrenjmcleod/session-control/issues"
+    "url": "https://github.com/tempuskg/session-control/issues"
   },
-  "homepage": "https://github.com/darrenjmcleod/session-control#readme",
+  "homepage": "https://github.com/tempuskg/session-control#readme",
   "engines": {
     "vscode": "^1.93.0"
   },

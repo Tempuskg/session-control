@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 3,
+  "id": "session-v3",
+  "title": "Structured content session",
+  "updatedAt": "2026-04-12T12:00:00.000Z",
+  "entries": [
+    {
+      "createdAt": "2026-04-12T11:59:00.000Z",
+      "request": {
+        "content": [
+          {
+            "type": "text",
+            "value": "Investigate the flaky login test"
+          }
+        ],
+        "attachments": [
+          {
+            "path": "test/unit/auth.test.ts"
+          }
+        ]
+      },
+      "response": {
+        "content": [
+          {
+            "type": "markdown",
+            "value": "The failure is caused by a race in token refresh."
+          }
+        ],
+        "toolInvocations": [
+          {
+            "name": "read_file",
+            "summary": "Read test/unit/auth.test.ts"
+          }
+        ]
+      }
+    }
+  ]
+}
