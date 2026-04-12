@@ -4,7 +4,8 @@ import { registerChatParticipant } from './chatParticipant';
 import { getGitContext } from './gitIntegration';
 import { CopilotSession, readCopilotSessions } from './sessionReader';
 import { createSessionStore } from './sessionStore';
-import { createChatSession } from './sessionWriter';
+import { applySaveBloatControls, createChatSession, SaveOverflowStrategy } from './sessionWriter';
+import { parseFileSize } from './utils';
 
 const sessionStore = createSessionStore();
 
@@ -22,8 +23,15 @@ interface SaveSessionFlowDeps {
 	promptTitle: (defaultTitle: string) => Promise<string | undefined>;
 	getGitContext: typeof getGitContext;
 	createChatSession: typeof createChatSession;
+	applySaveBloatControls: typeof applySaveBloatControls;
 	writeSession: (storageDirectory: string, session: ReturnType<typeof createChatSession>) => Promise<string>;
 	showInformationMessage: (message: string) => Thenable<unknown>;
+}
+
+interface SaveConfiguration {
+	maxFileSizeBytes: number;
+	overflowStrategy: SaveOverflowStrategy;
+	stripToolOutput: boolean;
 }
 
 function getStoragePath(workspaceFolder: vscode.WorkspaceFolder): string {
@@ -32,6 +40,20 @@ function getStoragePath(workspaceFolder: vscode.WorkspaceFolder): string {
 		.get<string>('storagePath', '.chat');
 
 	return path.join(workspaceFolder.uri.fsPath, configured);
+}
+
+function getSaveConfiguration(workspaceFolder: vscode.WorkspaceFolder): SaveConfiguration {
+	const config = vscode.workspace.getConfiguration('chat-commit', workspaceFolder.uri);
+	const configuredSize = config.get<string>('save.maxFileSize', '1mb');
+	const parsedSize = parseFileSize(configuredSize);
+	const overflowStrategy = config.get<SaveOverflowStrategy>('save.overflowStrategy', 'split');
+	const stripToolOutput = config.get<boolean>('save.stripToolOutput', false);
+
+	return {
+		maxFileSizeBytes: parsedSize,
+		overflowStrategy,
+		stripToolOutput,
+	};
 }
 
 function pickWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
@@ -74,6 +96,7 @@ function createDefaultSaveFlowDeps(): SaveSessionFlowDeps {
 			}),
 		getGitContext,
 		createChatSession,
+		applySaveBloatControls,
 		writeSession: async (storageDirectory, session) => sessionStore.writeSession(storageDirectory, session),
 		showInformationMessage: (message: string) => vscode.window.showInformationMessage(message),
 	};
@@ -111,10 +134,30 @@ export async function runSaveSessionFlow(
 		git,
 		vscodeVersion: vscode.version,
 	});
+	const saveConfig = getSaveConfiguration(workspaceFolder);
+	const saveResult = deps.applySaveBloatControls(chatSession, {
+		maxFileSizeBytes: saveConfig.maxFileSizeBytes,
+		overflowStrategy: saveConfig.overflowStrategy,
+		stripToolOutput: saveConfig.stripToolOutput,
+	});
 
-	const fileName = await deps.writeSession(storageDirectory, chatSession);
-	await deps.showInformationMessage(`Saved chat session to ${path.join(storageDirectory, fileName)}`);
- return fileName;
+	const writtenFiles: string[] = [];
+	for (const sessionToWrite of saveResult.sessions) {
+		const fileName = await deps.writeSession(storageDirectory, sessionToWrite);
+		writtenFiles.push(fileName);
+	}
+
+	if (saveResult.warning) {
+		await deps.showInformationMessage(saveResult.warning);
+	}
+
+	if (writtenFiles.length === 1) {
+		await deps.showInformationMessage(`Saved chat session to ${path.join(storageDirectory, writtenFiles[0] ?? '')}`);
+		return writtenFiles[0];
+	}
+
+	await deps.showInformationMessage(`Saved ${writtenFiles.length} session part files to ${storageDirectory}`);
+	return writtenFiles[0];
 }
 
 async function runSaveSessionCommand(context: vscode.ExtensionContext): Promise<void> {

@@ -1,6 +1,6 @@
 import * as assert from 'node:assert';
 import { CopilotSession } from '../../src/sessionReader';
-import { createChatSession } from '../../src/sessionWriter';
+import { applySaveBloatControls, createChatSession } from '../../src/sessionWriter';
 
 function createSourceSession(turnCount = 2): CopilotSession {
 	const turns = [] as CopilotSession['turns'];
@@ -107,5 +107,104 @@ suite('sessionWriter', () => {
 
 		assert.equal(result.markdownSummary.length <= 1250, true);
 		assert.equal(result.markdownSummary.includes('... summary truncated ...') || result.markdownSummary.includes('... turns omitted ...'), true);
+	});
+
+	test('save bloat controls can strip tool output', () => {
+		const source = createSourceSession(1);
+		const responseTurn = source.turns.find((turn) => turn.type === 'response');
+		if (responseTurn && responseTurn.type === 'response') {
+			responseTurn.toolCalls = [{ name: 'run_in_terminal', output: 'x'.repeat(100), summary: 'npm test' }];
+		}
+
+		const session = createChatSession(source, {
+			savedAt: '2026-04-12T12:00:00.000Z',
+		});
+
+		const result = applySaveBloatControls(session, {
+			maxFileSizeBytes: 10 * 1024,
+			overflowStrategy: 'warn',
+			stripToolOutput: true,
+		});
+
+		const stripped = result.sessions[0]?.turns.find((turn) => turn.type === 'response');
+		assert.equal(stripped?.type, 'response');
+		if (stripped?.type === 'response') {
+			assert.equal(stripped.toolCalls[0]?.output, '[output stripped - 100 chars]');
+		}
+	});
+
+	test('save bloat controls warn strategy keeps oversized session', () => {
+		const source = createSourceSession(8);
+		for (const turn of source.turns) {
+			if (turn.type === 'request') {
+				turn.prompt = `${turn.prompt} ${'p'.repeat(200)}`;
+			} else {
+				turn.content = `${turn.content} ${'r'.repeat(200)}`;
+			}
+		}
+
+		const session = createChatSession(source, {
+			savedAt: '2026-04-12T12:00:00.000Z',
+		});
+		const result = applySaveBloatControls(session, {
+			maxFileSizeBytes: 900,
+			overflowStrategy: 'warn',
+			stripToolOutput: false,
+		});
+
+		assert.equal(result.sessions.length, 1);
+		assert.equal(result.warning?.includes('save.overflowStrategy=warn'), true);
+		assert.equal(result.sessions[0]?.turns.length, session.turns.length);
+	});
+
+	test('save bloat controls truncateOldest removes early turns', () => {
+		const source = createSourceSession(10);
+		for (const turn of source.turns) {
+			if (turn.type === 'request') {
+				turn.prompt = `${turn.prompt} ${'a'.repeat(140)}`;
+			} else {
+				turn.content = `${turn.content} ${'b'.repeat(140)}`;
+			}
+		}
+
+		const session = createChatSession(source, {
+			savedAt: '2026-04-12T12:00:00.000Z',
+		});
+		const result = applySaveBloatControls(session, {
+			maxFileSizeBytes: 700,
+			overflowStrategy: 'truncateOldest',
+			stripToolOutput: false,
+		});
+
+		assert.equal(result.sessions.length, 1);
+		assert.equal((result.sessions[0]?.turns.length ?? 0) < session.turns.length, true);
+		assert.equal(Boolean(result.warning), true);
+	});
+
+	test('save bloat controls split strategy creates linked parts', () => {
+		const source = createSourceSession(12);
+		for (const turn of source.turns) {
+			if (turn.type === 'request') {
+				turn.prompt = `${turn.prompt} ${'m'.repeat(180)}`;
+			} else {
+				turn.content = `${turn.content} ${'n'.repeat(180)}`;
+			}
+		}
+
+		const session = createChatSession(source, {
+			title: 'Large Session',
+			savedAt: '2026-04-12T12:00:00.000Z',
+		});
+		const result = applySaveBloatControls(session, {
+			maxFileSizeBytes: 1500,
+			overflowStrategy: 'split',
+			stripToolOutput: false,
+		});
+
+		assert.equal(result.sessions.length > 1, true);
+		assert.equal(result.sessions.every((part) => part.totalParts === result.sessions.length), true);
+		assert.equal(result.sessions[0]?.nextPartFile !== null, true);
+		assert.equal(result.sessions[result.sessions.length - 1]?.previousPartFile !== null, true);
+		assert.equal(result.warning?.includes('split into'), true);
 	});
 });

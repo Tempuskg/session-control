@@ -89,4 +89,18 @@ suite('chatParticipant integration', () => {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}
 	});
+
+	test('buildResumePrompt applies summarize and recent-only overflow strategies', () => {
+		const saved = createChatSession(createCopilotSession(), {
+			title: 'Overflow Session',
+			savedAt: '2026-04-12T13:00:00.000Z',
+			vscodeVersion: '1.115.0',
+		});
+
+		const summarizePrompt = buildResumePrompt(saved, 'Continue please', 2, 200, 'summarize');
+		const recentOnlyPrompt = buildResumePrompt(saved, 'Continue please', 2, 200, 'recent-only');
+
+		assert.equal(summarizePrompt.includes('Summary of omitted context:'), true);
+		assert.equal(recentOnlyPrompt.includes('Earlier turns omitted ('), true);
+	});
 });

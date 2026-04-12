@@ -32,10 +32,16 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
   - Completed: integration-style round-trip resume coverage in `test/unit/chatParticipant.integration.test.ts`
   - Validation completed: `npm run lint`, `npm test` (35 passing)
 - [ ] **Phase 8 — Bloat Controls**
+  - In progress: save-side controls implemented in `src/sessionWriter.ts` via `applySaveBloatControls` (`stripToolOutput`, `warn`, `truncateOldest`, `split`)
+  - In progress: save flow wired to configuration in `src/extension.ts` (`save.maxFileSize`, `save.overflowStrategy`, `save.stripToolOutput`) with multi-file split writes
+  - In progress: resume overflow strategy support in `src/chatParticipant.ts` (`summarize`, `truncate`, `recent-only`) through `buildResumePrompt`
+  - In progress: expanded test coverage in `test/unit/sessionWriter.test.ts` and `test/unit/chatParticipant.integration.test.ts`
+  - Validation completed: `npm run lint`, `npm test` (40 passing)
+  - Remaining: multipart session reassembly during resume (`nextPartFile` chain loading) and command-level integration assertions
 - [ ] **Phase 9 — Auto-Save & Session Pruning**
 - [ ] **Phase 10 — Polish & Multi-Root**
 
-**Current focus:** Start Phase 8 (`save/resume` bloat controls and overflow strategies).
+**Current focus:** Continue Phase 8 (multipart reassembly + final integration checks).
 
 ---
 

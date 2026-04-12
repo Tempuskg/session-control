@@ -9,6 +9,8 @@ const chatSessionStore = createSessionStore();
 const CHAT_PARTICIPANT_ID = 'chat-commit.resume';
 const MIN_AUTO_SELECT_SCORE = 60;
 
+export type ResumeOverflowStrategy = 'summarize' | 'truncate' | 'recent-only';
+
 export interface ResumeSelection {
 	session?: SessionMeta;
 	candidates?: SessionMeta[];
@@ -78,6 +80,62 @@ export function trimTurnsForResume(turns: SavedTurn[], maxTurns: number, maxCont
 	return selected;
 }
 
+function summarizeTurns(omittedTurns: SavedTurn[]): string {
+	if (!omittedTurns.length) {
+		return '';
+	}
+
+	const requestCount = omittedTurns.filter((turn) => turn.type === 'request').length;
+	const responseCount = omittedTurns.length - requestCount;
+	const first = omittedTurns[0];
+	const last = omittedTurns[omittedTurns.length - 1];
+	const firstSnippet = first
+		? (first.type === 'request' ? first.prompt : first.content).slice(0, 100)
+		: '';
+	const lastSnippet = last
+		? (last.type === 'request' ? last.prompt : last.content).slice(0, 100)
+		: '';
+
+	return [
+		`Summary of omitted context: ${omittedTurns.length} earlier turns (${requestCount} user, ${responseCount} assistant).`,
+		`Earliest omitted snippet: ${firstSnippet}`,
+		`Latest omitted snippet: ${lastSnippet}`,
+	].join(' ');
+}
+
+function applyResumeOverflowStrategy(
+	turns: SavedTurn[],
+	maxTurns: number,
+	maxContextChars: number,
+	strategy: ResumeOverflowStrategy,
+): { turns: SavedTurn[]; note?: string } {
+	if (strategy === 'recent-only') {
+		const recent = turns.slice(Math.max(0, turns.length - maxTurns));
+		const omitted = Math.max(0, turns.length - recent.length);
+		const constrained = trimTurnsForResume(recent, recent.length || maxTurns, maxContextChars);
+		const note = omitted > 0 ? `Earlier turns omitted (${omitted} total).` : undefined;
+		return {
+			turns: constrained,
+			...(note ? { note } : {}),
+		};
+	}
+
+	if (strategy === 'summarize') {
+		const recent = turns.slice(Math.max(0, turns.length - maxTurns));
+		const omittedTurns = turns.slice(0, Math.max(0, turns.length - recent.length));
+		const constrained = trimTurnsForResume(recent, recent.length || maxTurns, maxContextChars);
+		const summary = summarizeTurns(omittedTurns);
+		return {
+			turns: constrained,
+			...(summary ? { note: summary } : {}),
+		};
+	}
+
+	return {
+		turns: trimTurnsForResume(turns, maxTurns, maxContextChars),
+	};
+}
+
 function turnsToContextBlock(turns: SavedTurn[]): string {
 	return turns
 		.map((turn) => {
@@ -95,14 +153,22 @@ export function buildResumePrompt(
 	prompt: string,
 	maxTurns: number,
 	maxContextChars: number,
+ 	overflowStrategy: ResumeOverflowStrategy = 'truncate',
 ): string {
-	const trimmedTurns = trimTurnsForResume(session.turns, maxTurns, maxContextChars);
-	const contextBlock = turnsToContextBlock(trimmedTurns);
+	const constrained = applyResumeOverflowStrategy(
+		session.turns,
+		maxTurns,
+		maxContextChars,
+		overflowStrategy,
+	);
+	const contextBlock = turnsToContextBlock(constrained.turns);
+	const overflowNote = constrained.note ? `${constrained.note}\n\n` : '';
 
 	return [
 		'The following is a previous conversation that the user wants to continue.',
 		'Use it as context for the next response.',
 		'',
+		overflowNote,
 		contextBlock,
 		'',
 		`User follow-up: ${prompt}`,
@@ -166,8 +232,9 @@ async function sendModelResponse(
 	prompt: string,
 	maxTurns: number,
 	maxContextChars: number,
+ 	overflowStrategy: ResumeOverflowStrategy,
 ): Promise<void> {
-	const messageText = buildResumePrompt(session, prompt, maxTurns, maxContextChars);
+	const messageText = buildResumePrompt(session, prompt, maxTurns, maxContextChars, overflowStrategy);
 
 	const modelResponse = await request.model.sendRequest(
 		[vscode.LanguageModelChatMessage.User(messageText)],
@@ -213,10 +280,13 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 				const maxContextChars = vscode.workspace
 					.getConfiguration('chat-commit', workspaceFolder.uri)
 					.get<number>('resume.maxContextChars', 80000);
-				const trimmed = trimTurnsForResume(resumed.turns, maxTurns, maxContextChars);
+				const overflowStrategy = vscode.workspace
+					.getConfiguration('chat-commit', workspaceFolder.uri)
+					.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize');
+				const constrained = applyResumeOverflowStrategy(resumed.turns, maxTurns, maxContextChars, overflowStrategy);
 				stream.markdown(
 					[
-						`Loaded **${resumed.title}** (${trimmed.length}/${resumed.turns.length} turns).`,
+						`Loaded **${resumed.title}** (${constrained.turns.length}/${resumed.turns.length} turns).`,
 						'Reply in this thread with @chat-commit and your follow-up question to continue with this context.',
 					].join('\n\n'),
 				);
@@ -260,8 +330,11 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 		const maxContextChars = vscode.workspace
 			.getConfiguration('chat-commit', workspaceFolder.uri)
 			.get<number>('resume.maxContextChars', 80000);
+		const overflowStrategy = vscode.workspace
+			.getConfiguration('chat-commit', workspaceFolder.uri)
+			.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize');
 
-		await sendModelResponse(request, stream, token, resumedSession, request.prompt, maxTurns, maxContextChars);
+		await sendModelResponse(request, stream, token, resumedSession, request.prompt, maxTurns, maxContextChars, overflowStrategy);
 		return {
 			metadata: {
 				resumedSessionFile: resumedSessionMeta.fileName,
