@@ -3,6 +3,23 @@
 ## TL;DR
 An **open source** VS Code extension that saves GitHub Copilot Chat sessions as structured JSON files into a configurable `.chat/` folder in the repo, linked to git commits/branches. Users resume saved chats via a `@chat-commit` chat participant that loads prior conversation as LLM context. Manual save + optional auto-save on commit. Licensed under MIT and published to the VS Code Marketplace and Open VSX Registry.
 
+## Implementation Progress (Updated: 2026-04-12)
+
+- [x] **Phase 1 — Project Scaffolding**
+  - Completed: extension manifest/config scaffolding, webpack + TypeScript + ESLint setup, extension/test launch config, baseline `src/extension.ts`, open source docs/templates, CI/release workflows
+  - Validation completed: `npm run compile`, `npm run lint`, `npm test`, `npm audit` (0 vulnerabilities after dependency hardening)
+- [ ] **Phase 2 — Types & Core Utilities**
+- [ ] **Phase 3 — Git Integration**
+- [ ] **Phase 4 — Session Reader**
+- [ ] **Phase 5 — Session Writer & Store**
+- [ ] **Phase 6 — Save Command**
+- [ ] **Phase 7 — Chat Participant & Resume**
+- [ ] **Phase 8 — Bloat Controls**
+- [ ] **Phase 9 — Auto-Save & Session Pruning**
+- [ ] **Phase 10 — Polish & Multi-Root**
+
+**Current focus:** Start Phase 2 (`src/types.ts`, `src/utils.ts`, and unit tests).
+
 ---
 
 ## Architecture Overview
@@ -15,7 +32,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 
 ---
 
-## Phase 1: Project Scaffolding
+## Phase 1: Project Scaffolding (Completed)
 
 > **Goal:** A buildable, empty extension with all boilerplate in place.
 
