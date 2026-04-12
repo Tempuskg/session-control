@@ -39,17 +39,17 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
   - Completed: model-driven summarize overflow behavior with explicit fallback note (`Summary generation failed - showing most recent turns only.`)
   - Completed: expanded integration assertions in `test/unit/chatParticipant.integration.test.ts` and `test/unit/extensionSaveFlow.test.ts` (split save + reassembled resume)
   - Validation completed: `npm run lint`, `npm test` (44 passing)
-- [ ] **Phase 9 — Auto-Save & Session Pruning**
-  - In progress: auto-save-on-commit listener wired in `src/extension.ts` using git repository `state.onDidChange` + commit SHA change detection + per-repo debounce
-  - In progress: auto-save command path reuses `runSaveSessionFlow` with non-interactive session/title selection and listener error fail-safe disablement
-  - In progress: session pruning implemented in `src/sessionStore.ts` via `pruneSessions(..., action)` with `archive` and `delete` strategies
-  - In progress: save flow now applies `save.maxSavedSessions` and `save.pruneAction` post-write with user notifications
-  - In progress: test coverage added in `test/unit/sessionStore.test.ts` and `test/unit/extensionSaveFlow.test.ts`
-  - Validation completed: `npm run lint`, `npm test` (47 passing)
-  - Remaining: integration coverage for real commit-triggered auto-save path and listener disable behavior on runtime exceptions
+- [x] **Phase 9 — Auto-Save & Session Pruning**
+  - Completed: auto-save-on-commit listener in `src/extension.ts` using git repository `state.onDidChange` + commit SHA change detection + per-repo debounce
+  - Completed: auto-save command path reuses `runSaveSessionFlow` with non-interactive session/title selection and listener error fail-safe disablement
+  - Completed: session pruning in `src/sessionStore.ts` via `pruneSessions(..., action)` with `archive` and `delete` strategies
+  - Completed: save flow applies `save.maxSavedSessions` and `save.pruneAction` post-write with user notifications
+  - Completed: integration-style listener coverage in `test/unit/extensionAutoSave.test.ts` for commit-triggered save and listener disable on error
+  - Completed: pruning coverage in `test/unit/sessionStore.test.ts` and save-flow prune assertions in `test/unit/extensionSaveFlow.test.ts`
+  - Validation completed: `npm run lint`, `npm test` (49 passing)
 - [ ] **Phase 10 — Polish & Multi-Root**
 
-**Current focus:** Continue Phase 9 (commit-triggered integration validation + hardening).
+**Current focus:** Start Phase 10 (configuration validation, multi-root support, and final polish).
 
 ---
 

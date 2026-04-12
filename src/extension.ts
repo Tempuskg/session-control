@@ -55,6 +55,16 @@ interface GitApiLike {
 	repositories: GitRepositoryLike[];
 }
 
+interface AutoSaveListenerDeps {
+	getGitApi: () => GitApiLike | null;
+	getWorkspaceFolder: (uri: vscode.Uri) => vscode.WorkspaceFolder | undefined;
+	runSaveSessionFlow: typeof runSaveSessionFlow;
+	showInformationMessage: (message: string) => Thenable<unknown>;
+	showWarningMessage: (message: string) => Thenable<unknown>;
+	schedule: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
+	clearSchedule: (handle: ReturnType<typeof setTimeout>) => void;
+}
+
 function getStoragePath(workspaceFolder: vscode.WorkspaceFolder): string {
 	const configured = vscode.workspace
 		.getConfiguration('chat-commit', workspaceFolder.uri)
@@ -302,18 +312,36 @@ function tryGetGitApi(): GitApiLike | null {
 	return gitExports.getAPI(1);
 }
 
-function registerAutoSaveOnCommitListener(
+function createDefaultAutoSaveDeps(): AutoSaveListenerDeps {
+	return {
+		getGitApi: tryGetGitApi,
+		getWorkspaceFolder: (uri: vscode.Uri) => vscode.workspace.getWorkspaceFolder(uri),
+		runSaveSessionFlow,
+		showInformationMessage: (message: string) => vscode.window.showInformationMessage(message),
+		showWarningMessage: (message: string) => vscode.window.showWarningMessage(message),
+		schedule: (callback: () => void, delayMs: number) => setTimeout(callback, delayMs),
+		clearSchedule: (handle: ReturnType<typeof setTimeout>) => clearTimeout(handle),
+	};
+}
+
+export function registerAutoSaveOnCommitListener(
 	context: vscode.ExtensionContext,
 	output: vscode.OutputChannel,
+ 	depsOverrides: Partial<AutoSaveListenerDeps> = {},
 ): void {
-	const gitApi = tryGetGitApi();
+	const deps = {
+		...createDefaultAutoSaveDeps(),
+		...depsOverrides,
+	};
+
+	const gitApi = deps.getGitApi();
 	if (!gitApi) {
-		void vscode.window.showInformationMessage('Git extension not available. Auto-save on commit is disabled.');
+		void deps.showInformationMessage('Git extension not available. Auto-save on commit is disabled.');
 		return;
 	}
 
 	const lastCommitByRepo = new Map<string, string | undefined>();
-	const debounceTimers = new Map<string, NodeJS.Timeout>();
+	const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 	for (const repository of gitApi.repositories) {
 		const repoKey = repository.rootUri.toString();
@@ -329,18 +357,18 @@ function registerAutoSaveOnCommitListener(
 			lastCommitByRepo.set(repoKey, currentCommit);
 			const existingTimer = debounceTimers.get(repoKey);
 			if (existingTimer) {
-				clearTimeout(existingTimer);
+				deps.clearSchedule(existingTimer);
 			}
 
-			const timer = setTimeout(() => {
+			const timer = deps.schedule(() => {
 				void (async () => {
 					try {
-						const workspaceFolder = vscode.workspace.getWorkspaceFolder(repository.rootUri);
+						const workspaceFolder = deps.getWorkspaceFolder(repository.rootUri);
 						if (!workspaceFolder) {
 							return;
 						}
 
-						await runSaveSessionFlow(
+						await deps.runSaveSessionFlow(
 							context,
 							workspaceFolder,
 							getStoragePath(workspaceFolder),
@@ -352,14 +380,14 @@ function registerAutoSaveOnCommitListener(
 										return;
 									}
 
-									await vscode.window.showInformationMessage(message);
+									await deps.showInformationMessage(message);
 								},
 							},
 						);
 					} catch (error) {
 						const message = error instanceof Error ? error.message : String(error);
 						output.appendLine(`[auto-save] Disabled after listener error: ${message}`);
-						void vscode.window.showWarningMessage('Chat Commit auto-save on commit encountered an error and was disabled for this session.');
+						void deps.showWarningMessage('Chat Commit auto-save on commit encountered an error and was disabled for this session.');
 						disposable.dispose();
 					}
 				})();
@@ -374,7 +402,7 @@ function registerAutoSaveOnCommitListener(
 	context.subscriptions.push({
 		dispose: () => {
 			for (const timer of debounceTimers.values()) {
-				clearTimeout(timer);
+				deps.clearSchedule(timer);
 			}
 			debounceTimers.clear();
 		},
