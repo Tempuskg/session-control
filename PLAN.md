@@ -8,7 +8,9 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 - [x] **Phase 1 — Project Scaffolding**
   - Completed: extension manifest/config scaffolding, webpack + TypeScript + ESLint setup, extension/test launch config, baseline `src/extension.ts`, open source docs/templates, CI/release workflows
   - Validation completed: `npm run compile`, `npm run lint`, `npm test`, `npm audit` (0 vulnerabilities after dependency hardening)
-- [ ] **Phase 2 — Types & Core Utilities**
+- [x] **Phase 2 — Types & Core Utilities**
+  - Completed: `src/types.ts` interfaces + type guards (`isChatSession`, `isSavedTurn`, etc.), `src/utils.ts` helpers (`slugify`, `formatTimestamp`, `parseFileSize`, `fuzzyMatchSessions`), and unit tests in `test/unit/`
+  - Validation completed: `npm test` (10 passing, including guard and utility scoring matrix tests)
 - [ ] **Phase 3 — Git Integration**
 - [ ] **Phase 4 — Session Reader**
 - [ ] **Phase 5 — Session Writer & Store**
@@ -18,7 +20,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 - [ ] **Phase 9 — Auto-Save & Session Pruning**
 - [ ] **Phase 10 — Polish & Multi-Root**
 
-**Current focus:** Start Phase 2 (`src/types.ts`, `src/utils.ts`, and unit tests).
+**Current focus:** Start Phase 3 (`src/gitIntegration.ts` and unit tests).
 
 ---
 
@@ -92,7 +94,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 
 ---
 
-## Phase 2: Types & Core Utilities
+## Phase 2: Types & Core Utilities (Completed)
 
 > **Goal:** All shared data structures and pure utility functions, fully unit-tested.
 

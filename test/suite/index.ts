@@ -28,7 +28,8 @@ export async function run(): Promise<void> {
 		ui: 'tdd',
 		color: true,
 	});
-	const testsRoot = path.resolve(__dirname);
+	// Start at dist-test/test so suite and unit tests are both discovered.
+	const testsRoot = path.resolve(__dirname, '..');
 	const files = await collectTestFiles(testsRoot);
 
 	for (const file of files) {
