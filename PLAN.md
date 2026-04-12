@@ -1,7 +1,7 @@
 # Plan: Chat-Commit — VS Code Extension
 
 ## TL;DR
-A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON files into a configurable `.chat/` folder in the repo, linked to git commits/branches. Users resume saved chats via a `@chat-commit` chat participant that loads prior conversation as LLM context. Manual save + optional auto-save on commit.
+An **open source** VS Code extension that saves GitHub Copilot Chat sessions as structured JSON files into a configurable `.chat/` folder in the repo, linked to git commits/branches. Users resume saved chats via a `@chat-commit` chat participant that loads prior conversation as LLM context. Manual save + optional auto-save on commit. Licensed under MIT and published to the VS Code Marketplace and Open VSX Registry.
 
 ---
 
@@ -22,6 +22,18 @@ A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON f
 - Target minimum VS Code engine version `^1.93.0` (chat participant API stabilized)
 - Set up webpack bundling
 - Configure `.vscodeignore`
+- Initialize as a public GitHub repository with `MIT` license
+
+### Step 1.1b — Open source project files
+- **`LICENSE`** — MIT license
+- **`README.md`** — Project description, features, installation, usage, configuration reference, contributing link, license badge
+- **`CONTRIBUTING.md`** — How to set up the dev environment, run tests, submit PRs, and report issues. Code style expectations (TypeScript strict, ESLint config)
+- **`CODE_OF_CONDUCT.md`** — Contributor Covenant v2.1
+- **`CHANGELOG.md`** — Keep a Changelog format, updated on each release
+- **`.github/ISSUE_TEMPLATE/`** — Bug report and feature request templates
+- **`.github/PULL_REQUEST_TEMPLATE.md`** — PR checklist (tests pass, lint clean, changelog updated)
+- **`.github/workflows/ci.yml`** — GitHub Actions: lint, build, unit tests, integration tests (via `xvfb-run`), Snyk scan
+- **`.github/workflows/release.yml`** — GitHub Actions: on tag push, `vsce package` → publish to VS Code Marketplace + Open VSX Registry, create GitHub Release with `.vsix` asset
 
 ### Step 1.1a — Extension activation events
 - **`activationEvents`**: The extension should activate lazily. Define activation events in `package.json`:
@@ -376,6 +388,15 @@ Run inside VS Code extension host via `@vscode/test-electron`.
 - `test/fixtures/` — Sample Copilot session files for testing the session reader
 - `test/unit/` — Unit tests (pure logic, mocked dependencies)
 - `test/integration/` — Integration tests (run in VS Code extension host)
+- `LICENSE` — MIT license
+- `README.md` — Project overview, installation, usage, configuration, contributing
+- `CONTRIBUTING.md` — Dev setup, testing, PR guidelines
+- `CODE_OF_CONDUCT.md` — Contributor Covenant v2.1
+- `CHANGELOG.md` — Release history (Keep a Changelog format)
+- `.github/ISSUE_TEMPLATE/` — Bug report and feature request templates
+- `.github/PULL_REQUEST_TEMPLATE.md` — PR checklist
+- `.github/workflows/ci.yml` — CI pipeline (lint, build, test, Snyk scan)
+- `.github/workflows/release.yml` — Publish to VS Code Marketplace + Open VSX on tag push
 
 ---
 
@@ -400,7 +421,8 @@ Run inside VS Code extension host via `@vscode/test-electron`.
 - **Internal storage dependency:** Reading Copilot's internal session files is fragile — format may change across VS Code versions. Mitigated by version detection and graceful error handling. This is the only way to access full Copilot session history (public API only exposes history for your own participant).
 - **Resume via chat participant, not native restore:** No public API exists to restore a native Copilot session. The `@chat-commit` participant approach is stable and uses public APIs.
 - **JSON as primary format:** Chosen because the user wants resume capability. Markdown is embedded in the JSON for human readability in diffs.
-- **Personal use focus:** No collaboration features like conflict resolution or merge strategies for `.chat/` files. Sessions are append-only snapshots.
+- **Open source (MIT):** The extension is developed and published as an open source project. Contributions welcome via GitHub PRs. Published to the VS Code Marketplace and Open VSX Registry.
+- **Personal-use origin, community-maintained:** Started as a personal tool. No complex collaboration features like conflict resolution or merge strategies for `.chat/` files — sessions are append-only snapshots. Community contributions may expand scope over time.
 - **Scope boundary — excluded:** No support for non-Copilot chats, no web UI, no cross-repo session syncing, no chat search/indexing.
 
 ---
@@ -410,3 +432,4 @@ Run inside VS Code extension host via `@vscode/test-electron`.
 1. **Copilot internal format changes** — Implement a format version detector in `sessionReader.ts`. If unknown format, show a clear error message with the VS Code version and link to file an issue. Consider contributing a feature request to VS Code for a public chat export API.
 2. **Large session files in repo** — Fully configurable via `save.maxFileSize` (split/truncate/warn), `save.stripToolOutput` (remove verbose tool output), and `save.maxSavedSessions` + `save.pruneAction` (archive/delete oldest). Defaults are conservative (1 MB max, no stripping, unlimited sessions).
 3. **Chat participant context window limits on resume** — Fully configurable via `resume.maxTurns`, `resume.maxContextChars`, and `resume.overflowStrategy` (summarize/truncate/recent-only). Defaults target ~80K chars / 50 turns with summarization as the fallback.
+4. **Open source maintenance burden** — Mitigated by clear contribution guidelines (`CONTRIBUTING.md`), issue templates, PR templates, and automated CI. Semantic versioning and a changelog keep releases predictable. The `CODEOWNERS` file can gate merges on maintainer review.

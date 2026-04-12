@@ -16,7 +16,7 @@ related:
 
 # Project Overview
 
-**Chat-Commit** is a VS Code extension that saves GitHub Copilot Chat sessions as structured JSON files into a configurable `.chat/` folder in the repo, linked to git commits and branches. Users can resume saved chats via a `@chat-commit` chat participant that loads prior conversation as LLM context.
+**Chat-Commit** is an open source (MIT-licensed) VS Code extension that saves GitHub Copilot Chat sessions as structured JSON files into a configurable `.chat/` folder in the repo, linked to git commits and branches. Users can resume saved chats via a `@chat-commit` chat participant that loads prior conversation as LLM context. Published to the VS Code Marketplace and Open VSX Registry.
 
 ## Core Value Proposition
 
@@ -51,6 +51,7 @@ The plan is organized into four phases:
 - **Minimum VS Code `^1.93.0`** — Chat participant API stabilized at this version.
 - **Manual save + optional auto-save** — Auto-save on commit is opt-in, manual save is the primary workflow.
 - **Relies on internal Copilot storage format** — A version-detection layer handles format changes gracefully.
+- **Open source (MIT)** — Developed publicly on GitHub with contribution guidelines, issue templates, CI/CD pipelines, and automated publishing.
 
 ## Open Questions
 

@@ -32,6 +32,20 @@ Planned source files for the chat-commit extension, their roles, and dependencie
 | `src/types.ts` | TypeScript interfaces: `ChatSession`, `SavedTurn`, etc. | — |
 | `src/utils.ts` | Utilities: slugify, timestamp formatting, fuzzy matching | — |
 
+### Open Source & CI Files
+
+| File | Role |
+|------|------|
+| `LICENSE` | MIT license |
+| `README.md` | Project overview, installation, usage, configuration, contributing |
+| `CONTRIBUTING.md` | Dev setup, testing, PR guidelines |
+| `CODE_OF_CONDUCT.md` | Contributor Covenant v2.1 |
+| `CHANGELOG.md` | Release history (Keep a Changelog format) |
+| `.github/ISSUE_TEMPLATE/` | Bug report and feature request templates |
+| `.github/PULL_REQUEST_TEMPLATE.md` | PR checklist |
+| `.github/workflows/ci.yml` | CI pipeline: lint, build, test, Snyk scan |
+| `.github/workflows/release.yml` | Publish to VS Code Marketplace + Open VSX on tag push |
+
 ## Dependency Graph
 
 ```mermaid

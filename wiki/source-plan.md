@@ -74,3 +74,4 @@ All gaps from the initial review have been addressed in PLAN.md:
 - ~~Fuzzy matching algorithm~~ — Added **Fuzzy Matching** section with scoring algorithm and behavior rules
 - ~~Multi-root workspace handling~~ — Added **Multi-Root Workspace Handling** section
 - ~~Extension activation events~~ — Added **Step 1.1a** with activation event strategy
+- ~~Open source project setup~~ — Added MIT license, open source project files (README, CONTRIBUTING, CODE_OF_CONDUCT, CHANGELOG), GitHub Actions CI/CD, Marketplace + Open VSX publishing

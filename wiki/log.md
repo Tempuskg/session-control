@@ -19,3 +19,7 @@ Pages touched: overview.md, architecture.md, save-system.md, resume-system.md, c
 ## [2026-04-12] update | Address Gaps in PLAN.md
 Updated PLAN.md with six new sections addressing gaps identified during initial wiki creation: testing strategy, error handling patterns, markdown summary generation, fuzzy matching algorithm, multi-root workspace handling, and extension activation events.
 Pages touched: source-plan.md
+
+## [2026-04-12] update | Open Source Project
+Updated PLAN.md to declare the project as open source (MIT). Added Step 1.1b for open source project files (LICENSE, README, CONTRIBUTING, CODE_OF_CONDUCT, CHANGELOG, GitHub issue/PR templates, CI/CD workflows). Updated Decisions & Assumptions and Risks & Mitigations. Updated file manifest with open source project files.
+Pages touched: overview.md, source-plan.md, file-manifest.md
