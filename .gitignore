@@ -1,0 +1,16 @@
+node_modules/
+dist/
+dist-test/
+*.vsix
+
+# VS Code extension host test downloads/cache
+.vscode-test/
+
+# Test and coverage artifacts
+coverage/
+.nyc_output/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp

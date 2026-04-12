@@ -1,0 +1,219 @@
+{
+  "name": "chat-commit",
+  "displayName": "Chat Commit",
+  "description": "Save and resume GitHub Copilot Chat sessions linked to git commits",
+  "version": "0.1.0",
+  "publisher": "your-publisher-id",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/chat-commit"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/chat-commit/issues"
+  },
+  "homepage": "https://github.com/your-username/chat-commit#readme",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Other",
+    "SCM Providers"
+  ],
+  "keywords": [
+    "copilot",
+    "chat",
+    "git",
+    "session",
+    "resume"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "chat-commit.saveSession",
+        "title": "Chat Commit: Save Current Chat Session",
+        "category": "Chat Commit"
+      },
+      {
+        "command": "chat-commit.listSessions",
+        "title": "Chat Commit: Browse Saved Sessions",
+        "category": "Chat Commit"
+      },
+      {
+        "command": "chat-commit.deleteSession",
+        "title": "Chat Commit: Delete Saved Session",
+        "category": "Chat Commit"
+      }
+    ],
+    "configuration": {
+      "title": "Chat Commit",
+      "properties": {
+        "chat-commit.storagePath": {
+          "type": "string",
+          "default": ".chat",
+          "description": "Folder (relative to workspace root) where chat sessions are saved.",
+          "scope": "resource"
+        },
+        "chat-commit.autoSaveOnCommit": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically save the active chat session when a git commit is made.",
+          "scope": "resource"
+        },
+        "chat-commit.includeInGitignore": {
+          "type": "boolean",
+          "default": false,
+          "description": "Add the storage folder to .gitignore. By default sessions are tracked in source control.",
+          "scope": "resource"
+        },
+        "chat-commit.resume.maxTurns": {
+          "type": "number",
+          "default": 50,
+          "minimum": 1,
+          "description": "Maximum number of turns to inject as context when resuming a saved session.",
+          "scope": "resource"
+        },
+        "chat-commit.resume.overflowStrategy": {
+          "type": "string",
+          "enum": [
+            "summarize",
+            "truncate",
+            "recent-only"
+          ],
+          "enumDescriptions": [
+            "Summarize older turns into a preamble using the LLM, then include the most recent turns verbatim.",
+            "Silently drop the oldest turns until within the limit.",
+            "Load only the most recent N turns with a note about omitted turns."
+          ],
+          "default": "summarize",
+          "description": "What to do when a session exceeds resume.maxTurns or resume.maxContextChars.",
+          "scope": "resource"
+        },
+        "chat-commit.resume.maxContextChars": {
+          "type": "number",
+          "default": 80000,
+          "minimum": 1000,
+          "description": "Hard cap on total characters injected as context when resuming. Overflow is handled by resume.overflowStrategy.",
+          "scope": "resource"
+        },
+        "chat-commit.save.maxFileSize": {
+          "type": "string",
+          "default": "1mb",
+          "pattern": "^[0-9]+(kb|mb|KB|MB)$",
+          "patternErrorMessage": "Must be a size like '500kb' or '1mb'.",
+          "description": "Maximum size per saved session file. Sessions exceeding this are handled by save.overflowStrategy.",
+          "scope": "resource"
+        },
+        "chat-commit.save.overflowStrategy": {
+          "type": "string",
+          "enum": [
+            "split",
+            "truncateOldest",
+            "warn"
+          ],
+          "enumDescriptions": [
+            "Split the session into multiple part files linked by metadata.",
+            "Drop the oldest turns until the session fits within the size limit.",
+            "Save the session as-is and show a warning notification."
+          ],
+          "default": "split",
+          "description": "What to do when a saved session file exceeds save.maxFileSize.",
+          "scope": "resource"
+        },
+        "chat-commit.save.stripToolOutput": {
+          "type": "boolean",
+          "default": false,
+          "description": "Strip verbose tool call outputs (e.g. file contents, terminal output) from saved turns to reduce file size. Tool call names and summaries are preserved.",
+          "scope": "resource"
+        },
+        "chat-commit.save.maxSavedSessions": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "description": "Maximum number of session files to keep in the storage folder. 0 means unlimited. When exceeded, the oldest sessions are handled by save.pruneAction.",
+          "scope": "resource"
+        },
+        "chat-commit.save.pruneAction": {
+          "type": "string",
+          "enum": [
+            "archive",
+            "delete"
+          ],
+          "enumDescriptions": [
+            "Move the oldest sessions to a .archive/ subfolder.",
+            "Permanently delete the oldest sessions."
+          ],
+          "default": "archive",
+          "description": "What to do with the oldest sessions when save.maxSavedSessions is exceeded.",
+          "scope": "resource"
+        }
+      }
+    },
+    "chatParticipants": [
+      {
+        "id": "chat-commit.resume",
+        "name": "chat-commit",
+        "description": "Resume a saved chat session",
+        "isSticky": false,
+        "commands": [
+          {
+            "name": "resume",
+            "description": "Resume a previously saved chat session by injecting it as context"
+          },
+          {
+            "name": "list",
+            "description": "List all saved chat sessions with metadata"
+          }
+        ]
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "chat-commit.saveSession"
+        },
+        {
+          "command": "chat-commit.listSessions"
+        },
+        {
+          "command": "chat-commit.deleteSession"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p tsconfig.test.json",
+    "watch-tests": "tsc -p tsconfig.test.json --watch",
+    "pretest": "npm run compile-tests && npm run compile",
+    "lint": "eslint src --ext ts",
+    "test": "node ./dist-test/test/runTests.js"
+  },
+  "overrides": {
+    "diff": "^8.0.3",
+    "serialize-javascript": "^7.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.24.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.93.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.0.0",
+    "mocha": "^11.7.5",
+    "ts-loader": "^9.5.1",
+    "typescript-eslint": "^8.29.0",
+    "typescript": "^5.7.0",
+    "webpack": "^5.97.0",
+    "webpack-cli": "^5.1.4"
+  }
+}

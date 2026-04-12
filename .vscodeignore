@@ -1,0 +1,11 @@
+**/.git/**
+**/.github/**
+**/.vscode/**
+**/src/**
+**/test/**
+**/*.map
+.vscodeignore
+webpack.config.js
+eslint.config.mjs
+tsconfig.json
+tsconfig.test.json
