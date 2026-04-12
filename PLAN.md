@@ -31,18 +31,18 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
   - Completed: helper exports for resume context/list rendering and selection behavior (`buildResumePrompt`, `renderSessionListMarkdown`, `trimTurnsForResume`)
   - Completed: integration-style round-trip resume coverage in `test/unit/chatParticipant.integration.test.ts`
   - Validation completed: `npm run lint`, `npm test` (35 passing)
-- [ ] **Phase 8 — Bloat Controls**
-  - In progress: save-side controls implemented in `src/sessionWriter.ts` via `applySaveBloatControls` (`stripToolOutput`, `warn`, `truncateOldest`, `split`)
-  - In progress: save flow wired to configuration in `src/extension.ts` (`save.maxFileSize`, `save.overflowStrategy`, `save.stripToolOutput`) with multi-file split writes
-  - In progress: resume overflow strategy support in `src/chatParticipant.ts` (`summarize`, `truncate`, `recent-only`) through `buildResumePrompt`
-  - In progress: multipart resume reassembly implemented in `src/chatParticipant.ts` (`loadReassembledSession`) with part-chain cycle protection
-  - In progress: expanded integration assertions in `test/unit/chatParticipant.integration.test.ts` and `test/unit/extensionSaveFlow.test.ts` (split save + reassembled resume)
-  - Validation completed: `npm run lint`, `npm test` (42 passing)
-  - Remaining: model-driven summarize overflow behavior with explicit fallback-to-truncate note on summarization failure
+- [x] **Phase 8 — Bloat Controls**
+  - Completed: save-side controls in `src/sessionWriter.ts` via `applySaveBloatControls` (`stripToolOutput`, `warn`, `truncateOldest`, `split`)
+  - Completed: save flow wired to configuration in `src/extension.ts` (`save.maxFileSize`, `save.overflowStrategy`, `save.stripToolOutput`) with multi-file split writes
+  - Completed: resume overflow strategy support in `src/chatParticipant.ts` (`summarize`, `truncate`, `recent-only`) through `buildResumePrompt`
+  - Completed: multipart resume reassembly in `src/chatParticipant.ts` (`loadReassembledSession`) with part-chain cycle protection
+  - Completed: model-driven summarize overflow behavior with explicit fallback note (`Summary generation failed - showing most recent turns only.`)
+  - Completed: expanded integration assertions in `test/unit/chatParticipant.integration.test.ts` and `test/unit/extensionSaveFlow.test.ts` (split save + reassembled resume)
+  - Validation completed: `npm run lint`, `npm test` (44 passing)
 - [ ] **Phase 9 — Auto-Save & Session Pruning**
 - [ ] **Phase 10 — Polish & Multi-Root**
 
-**Current focus:** Continue Phase 8 (model-backed summarize overflow + fallback behavior).
+**Current focus:** Start Phase 9 (auto-save on commit + session pruning policies).
 
 ---
 

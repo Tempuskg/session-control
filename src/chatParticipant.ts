@@ -10,6 +10,7 @@ const CHAT_PARTICIPANT_ID = 'chat-commit.resume';
 const MIN_AUTO_SELECT_SCORE = 60;
 
 export type ResumeOverflowStrategy = 'summarize' | 'truncate' | 'recent-only';
+const SUMMARIZE_FALLBACK_NOTE = 'Summary generation failed - showing most recent turns only.';
 
 export interface ResumeSelection {
 	session?: SessionMeta;
@@ -113,6 +114,12 @@ function summarizeTurns(omittedTurns: SavedTurn[]): string {
 	].join(' ');
 }
 
+function splitRecentAndOmittedTurns(turns: SavedTurn[], maxTurns: number): { recent: SavedTurn[]; omitted: SavedTurn[] } {
+	const recent = turns.slice(Math.max(0, turns.length - maxTurns));
+	const omitted = turns.slice(0, Math.max(0, turns.length - recent.length));
+	return { recent, omitted };
+}
+
 function applyResumeOverflowStrategy(
 	turns: SavedTurn[],
 	maxTurns: number,
@@ -120,8 +127,9 @@ function applyResumeOverflowStrategy(
 	strategy: ResumeOverflowStrategy,
 ): { turns: SavedTurn[]; note?: string } {
 	if (strategy === 'recent-only') {
-		const recent = turns.slice(Math.max(0, turns.length - maxTurns));
-		const omitted = Math.max(0, turns.length - recent.length);
+		const split = splitRecentAndOmittedTurns(turns, maxTurns);
+		const recent = split.recent;
+		const omitted = split.omitted.length;
 		const constrained = trimTurnsForResume(recent, recent.length || maxTurns, maxContextChars);
 		const note = omitted > 0 ? `Earlier turns omitted (${omitted} total).` : undefined;
 		return {
@@ -131,8 +139,9 @@ function applyResumeOverflowStrategy(
 	}
 
 	if (strategy === 'summarize') {
-		const recent = turns.slice(Math.max(0, turns.length - maxTurns));
-		const omittedTurns = turns.slice(0, Math.max(0, turns.length - recent.length));
+		const split = splitRecentAndOmittedTurns(turns, maxTurns);
+		const recent = split.recent;
+		const omittedTurns = split.omitted;
 		const constrained = trimTurnsForResume(recent, recent.length || maxTurns, maxContextChars);
 		const summary = summarizeTurns(omittedTurns);
 		return {
@@ -158,6 +167,48 @@ function turnsToContextBlock(turns: SavedTurn[]): string {
 		.join('\n\n');
 }
 
+function composeResumePrompt(turns: SavedTurn[], prompt: string, note?: string): string {
+	const contextBlock = turnsToContextBlock(turns);
+	const overflowNote = note ? `${note}\n\n` : '';
+
+	return [
+		'The following is a previous conversation that the user wants to continue.',
+		'Use it as context for the next response.',
+		'',
+		overflowNote,
+		contextBlock,
+		'',
+		`User follow-up: ${prompt}`,
+	].join('\n');
+}
+
+function turnsToSummaryInput(omittedTurns: SavedTurn[]): string {
+	return omittedTurns
+		.map((turn) => (turn.type === 'request' ? `User: ${turn.prompt}` : `Assistant: ${turn.content}`))
+		.join('\n\n');
+}
+
+export async function resolveSummarizeNoteWithFallback(
+	omittedTurns: SavedTurn[],
+	summarizer: (input: string) => Promise<string>,
+): Promise<string | undefined> {
+	if (!omittedTurns.length) {
+		return undefined;
+	}
+
+	try {
+		const summary = await summarizer(turnsToSummaryInput(omittedTurns));
+		const trimmed = summary.trim();
+		if (!trimmed) {
+			return SUMMARIZE_FALLBACK_NOTE;
+		}
+
+		return `Summary of omitted context: ${trimmed}`;
+	} catch {
+		return SUMMARIZE_FALLBACK_NOTE;
+	}
+}
+
 export function buildResumePrompt(
 	session: ChatSession,
 	prompt: string,
@@ -171,18 +222,8 @@ export function buildResumePrompt(
 		maxContextChars,
 		overflowStrategy,
 	);
-	const contextBlock = turnsToContextBlock(constrained.turns);
-	const overflowNote = constrained.note ? `${constrained.note}\n\n` : '';
 
-	return [
-		'The following is a previous conversation that the user wants to continue.',
-		'Use it as context for the next response.',
-		'',
-		overflowNote,
-		contextBlock,
-		'',
-		`User follow-up: ${prompt}`,
-	].join('\n');
+	return composeResumePrompt(constrained.turns, prompt, constrained.note);
 }
 
 export function selectSessionForResume(query: string, sessions: SessionMeta[]): ResumeSelection {
@@ -325,7 +366,38 @@ async function sendModelResponse(
 	maxContextChars: number,
  	overflowStrategy: ResumeOverflowStrategy,
 ): Promise<void> {
-	const messageText = buildResumePrompt(session, prompt, maxTurns, maxContextChars, overflowStrategy);
+	const constrained = applyResumeOverflowStrategy(session.turns, maxTurns, maxContextChars, overflowStrategy);
+	let overflowNote = constrained.note;
+
+	if (overflowStrategy === 'summarize') {
+		const split = splitRecentAndOmittedTurns(session.turns, maxTurns);
+		overflowNote = await resolveSummarizeNoteWithFallback(split.omitted, async (input) => {
+			const summaryRequest = await request.model.sendRequest(
+				[
+					vscode.LanguageModelChatMessage.User(
+						`Summarize this prior conversation context in 3 concise bullet points:\n\n${input}`,
+					),
+				],
+				{},
+				token,
+			);
+
+			let summaryText = '';
+			for await (const part of summaryRequest.stream) {
+				if (part instanceof vscode.LanguageModelTextPart) {
+					summaryText += part.value;
+				}
+			}
+
+			return summaryText;
+		});
+
+		if (overflowNote === SUMMARIZE_FALLBACK_NOTE) {
+			response.markdown(`*${SUMMARIZE_FALLBACK_NOTE}*`);
+		}
+	}
+
+	const messageText = composeResumePrompt(constrained.turns, prompt, overflowNote);
 
 	const modelResponse = await request.model.sendRequest(
 		[vscode.LanguageModelChatMessage.User(messageText)],

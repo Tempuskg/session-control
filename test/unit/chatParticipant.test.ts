@@ -1,5 +1,10 @@
 import * as assert from 'node:assert';
-import { renderSessionListMarkdown, selectSessionForResume, trimTurnsForResume } from '../../src/chatParticipant';
+import {
+	renderSessionListMarkdown,
+	resolveSummarizeNoteWithFallback,
+	selectSessionForResume,
+	trimTurnsForResume,
+} from '../../src/chatParticipant';
 import { SavedTurn, SessionMeta } from '../../src/types';
 
 function createMeta(overrides: Partial<SessionMeta> = {}): SessionMeta {
@@ -82,5 +87,52 @@ suite('chatParticipant selection', () => {
 	test('renderSessionListMarkdown returns a friendly empty message', () => {
 		const markdown = renderSessionListMarkdown([]);
 		assert.equal(markdown.includes('No saved sessions found.'), true);
+	});
+
+	test('resolveSummarizeNoteWithFallback returns model summary when available', async () => {
+		const omittedTurns: SavedTurn[] = [
+			{
+				type: 'request',
+				participant: 'copilot',
+				prompt: 'Investigate auth bug history',
+				references: [],
+				timestamp: '2026-04-12T12:00:00.000Z',
+			},
+			{
+				type: 'response',
+				participant: 'copilot',
+				content: 'Auth bug started after token refresh refactor',
+				toolCalls: [],
+				timestamp: '2026-04-12T12:01:00.000Z',
+			},
+		];
+
+		const note = await resolveSummarizeNoteWithFallback(
+			omittedTurns,
+			async () => '- Root cause around refresh token lifecycle',
+		);
+
+		assert.equal(note?.includes('Summary of omitted context:'), true);
+	});
+
+	test('resolveSummarizeNoteWithFallback falls back when summarizer fails', async () => {
+		const omittedTurns: SavedTurn[] = [
+			{
+				type: 'request',
+				participant: 'copilot',
+				prompt: 'Investigate auth bug history',
+				references: [],
+				timestamp: '2026-04-12T12:00:00.000Z',
+			},
+		];
+
+		const note = await resolveSummarizeNoteWithFallback(
+			omittedTurns,
+			async () => {
+				throw new Error('model unavailable');
+			},
+		);
+
+		assert.equal(note, 'Summary generation failed - showing most recent turns only.');
 	});
 });
