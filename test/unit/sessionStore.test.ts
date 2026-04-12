@@ -119,4 +119,50 @@ suite('sessionStore', () => {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}
 	});
+
+	test('pruneSessions archives oldest sessions when action is archive', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createSessionStore();
+
+		try {
+			await store.writeSession(storageDirectory, createSession('a', '2026-04-10T10:00:00.000Z', 'A'));
+			await store.writeSession(storageDirectory, createSession('b', '2026-04-11T10:00:00.000Z', 'B'));
+			await store.writeSession(storageDirectory, createSession('c', '2026-04-12T10:00:00.000Z', 'C'));
+
+			const result = await store.pruneSessions(storageDirectory, 2, 'archive');
+			const remaining = await store.listSessions(storageDirectory);
+			const archivedEntries = await fs.readdir(path.join(storageDirectory, '.archive'));
+
+			assert.equal(result.archived, 1);
+			assert.equal(result.deleted, 0);
+			assert.equal(remaining.length, 2);
+			assert.equal(remaining.some((session) => session.id === 'a'), false);
+			assert.equal(archivedEntries.some((entry) => entry.endsWith('.json')), true);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('pruneSessions deletes oldest sessions when action is delete', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createSessionStore();
+
+		try {
+			await store.writeSession(storageDirectory, createSession('a', '2026-04-10T10:00:00.000Z', 'A'));
+			await store.writeSession(storageDirectory, createSession('b', '2026-04-11T10:00:00.000Z', 'B'));
+			await store.writeSession(storageDirectory, createSession('c', '2026-04-12T10:00:00.000Z', 'C'));
+
+			const result = await store.pruneSessions(storageDirectory, 1, 'delete');
+			const remaining = await store.listSessions(storageDirectory);
+
+			assert.equal(result.archived, 0);
+			assert.equal(result.deleted, 2);
+			assert.equal(remaining.length, 1);
+			assert.equal(remaining[0]?.id, 'c');
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
 });

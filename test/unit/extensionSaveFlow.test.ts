@@ -137,4 +137,42 @@ suite('extension save flow', () => {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}
 	});
+
+	test('runSaveSessionFlow triggers pruning notifications when limits are exceeded', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-extension-save-flow-prune-'));
+		const workspaceRoot = path.join(tempRoot, 'workspace');
+		const storageDirectory = path.join(workspaceRoot, '.chat');
+		const infoMessages: string[] = [];
+
+		try {
+			await fs.mkdir(workspaceRoot, { recursive: true });
+
+			const workspaceFolder = {
+				uri: vscode.Uri.file(workspaceRoot),
+				name: 'workspace',
+				index: 0,
+			} as vscode.WorkspaceFolder;
+
+			await runSaveSessionFlow(
+				{} as vscode.ExtensionContext,
+				workspaceFolder,
+				storageDirectory,
+				{
+					readCopilotSessions: async () => [createCopilotSession()],
+					selectSession: async (sessions) => sessions[0],
+					promptTitle: async () => 'Auth Bug Investigation',
+					getPruneConfiguration: () => ({ maxSavedSessions: 1, pruneAction: 'archive' }),
+					pruneSessions: async () => ({ archived: 1, deleted: 0 }),
+					showInformationMessage: async (message: string) => {
+						infoMessages.push(message);
+						return undefined;
+					},
+				},
+			);
+
+			assert.equal(infoMessages.some((message) => message.includes('Archived 1 old session file(s)')), true);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
 });

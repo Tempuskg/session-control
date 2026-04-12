@@ -12,6 +12,13 @@ interface SessionStoreDeps {
 	unlink(filePath: string): Promise<void>;
 }
 
+export type SessionPruneAction = 'archive' | 'delete';
+
+export interface SessionPruneResult {
+	archived: number;
+	deleted: number;
+}
+
 function createDefaultDeps(): SessionStoreDeps {
 	return {
 		mkdir: async (directoryPath: string) => {
@@ -136,11 +143,52 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 		}
 	}
 
+	async function pruneSessions(
+		storageDirectory: string,
+		maxSavedSessions: number,
+		action: SessionPruneAction,
+	): Promise<SessionPruneResult> {
+		if (maxSavedSessions <= 0) {
+			return { archived: 0, deleted: 0 };
+		}
+
+		const sessions = await listSessions(storageDirectory);
+		if (sessions.length <= maxSavedSessions) {
+			return { archived: 0, deleted: 0 };
+		}
+
+		const toPrune = sessions.slice(maxSavedSessions);
+		if (!toPrune.length) {
+			return { archived: 0, deleted: 0 };
+		}
+
+		if (action === 'archive') {
+			const archiveDirectory = path.join(storageDirectory, '.archive');
+			await deps.mkdir(archiveDirectory);
+
+			for (const session of toPrune) {
+				await deps.rename(
+					path.join(storageDirectory, session.fileName),
+					path.join(archiveDirectory, session.fileName),
+				);
+			}
+
+			return { archived: toPrune.length, deleted: 0 };
+		}
+
+		for (const session of toPrune) {
+			await deps.unlink(path.join(storageDirectory, session.fileName));
+		}
+
+		return { archived: 0, deleted: toPrune.length };
+	}
+
 	return {
 		ensureStorageDirectory,
 		writeSession,
 		readSession,
 		listSessions,
 		deleteSession,
+		pruneSessions,
 	};
 }

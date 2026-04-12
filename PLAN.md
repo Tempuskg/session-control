@@ -40,9 +40,16 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
   - Completed: expanded integration assertions in `test/unit/chatParticipant.integration.test.ts` and `test/unit/extensionSaveFlow.test.ts` (split save + reassembled resume)
   - Validation completed: `npm run lint`, `npm test` (44 passing)
 - [ ] **Phase 9 — Auto-Save & Session Pruning**
+  - In progress: auto-save-on-commit listener wired in `src/extension.ts` using git repository `state.onDidChange` + commit SHA change detection + per-repo debounce
+  - In progress: auto-save command path reuses `runSaveSessionFlow` with non-interactive session/title selection and listener error fail-safe disablement
+  - In progress: session pruning implemented in `src/sessionStore.ts` via `pruneSessions(..., action)` with `archive` and `delete` strategies
+  - In progress: save flow now applies `save.maxSavedSessions` and `save.pruneAction` post-write with user notifications
+  - In progress: test coverage added in `test/unit/sessionStore.test.ts` and `test/unit/extensionSaveFlow.test.ts`
+  - Validation completed: `npm run lint`, `npm test` (47 passing)
+  - Remaining: integration coverage for real commit-triggered auto-save path and listener disable behavior on runtime exceptions
 - [ ] **Phase 10 — Polish & Multi-Root**
 
-**Current focus:** Start Phase 9 (auto-save on commit + session pruning policies).
+**Current focus:** Continue Phase 9 (commit-triggered integration validation + hardening).
 
 ---
 

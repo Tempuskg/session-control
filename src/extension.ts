@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { registerChatParticipant } from './chatParticipant';
 import { getGitContext } from './gitIntegration';
 import { CopilotSession, readCopilotSessions } from './sessionReader';
-import { createSessionStore } from './sessionStore';
+import { createSessionStore, SessionPruneAction } from './sessionStore';
 import { applySaveBloatControls, createChatSession, SaveOverflowStrategy } from './sessionWriter';
 import { parseFileSize } from './utils';
 
@@ -24,7 +24,9 @@ interface SaveSessionFlowDeps {
 	getGitContext: typeof getGitContext;
 	createChatSession: typeof createChatSession;
 	applySaveBloatControls: typeof applySaveBloatControls;
+	getPruneConfiguration: (workspaceFolder: vscode.WorkspaceFolder) => PruneConfiguration;
 	writeSession: (storageDirectory: string, session: ReturnType<typeof createChatSession>) => Promise<string>;
+	pruneSessions: (storageDirectory: string, maxSavedSessions: number, action: SessionPruneAction) => Promise<{ archived: number; deleted: number }>;
 	showInformationMessage: (message: string) => Thenable<unknown>;
 }
 
@@ -32,6 +34,25 @@ interface SaveConfiguration {
 	maxFileSizeBytes: number;
 	overflowStrategy: SaveOverflowStrategy;
 	stripToolOutput: boolean;
+}
+
+interface PruneConfiguration {
+	maxSavedSessions: number;
+	pruneAction: SessionPruneAction;
+}
+
+interface GitRepositoryLike {
+	rootUri: vscode.Uri;
+	state: {
+		HEAD?: {
+			commit?: string;
+		};
+		onDidChange: (listener: () => void) => vscode.Disposable;
+	};
+}
+
+interface GitApiLike {
+	repositories: GitRepositoryLike[];
 }
 
 function getStoragePath(workspaceFolder: vscode.WorkspaceFolder): string {
@@ -53,6 +74,14 @@ function getSaveConfiguration(workspaceFolder: vscode.WorkspaceFolder): SaveConf
 		maxFileSizeBytes: parsedSize,
 		overflowStrategy,
 		stripToolOutput,
+	};
+}
+
+function getPruneConfiguration(workspaceFolder: vscode.WorkspaceFolder): PruneConfiguration {
+	const config = vscode.workspace.getConfiguration('chat-commit', workspaceFolder.uri);
+	return {
+		maxSavedSessions: config.get<number>('save.maxSavedSessions', 0),
+		pruneAction: config.get<SessionPruneAction>('save.pruneAction', 'archive'),
 	};
 }
 
@@ -97,7 +126,10 @@ function createDefaultSaveFlowDeps(): SaveSessionFlowDeps {
 		getGitContext,
 		createChatSession,
 		applySaveBloatControls,
+		getPruneConfiguration,
 		writeSession: async (storageDirectory, session) => sessionStore.writeSession(storageDirectory, session),
+		pruneSessions: async (storageDirectory, maxSavedSessions, action) =>
+			sessionStore.pruneSessions(storageDirectory, maxSavedSessions, action),
 		showInformationMessage: (message: string) => vscode.window.showInformationMessage(message),
 	};
 }
@@ -153,10 +185,22 @@ export async function runSaveSessionFlow(
 
 	if (writtenFiles.length === 1) {
 		await deps.showInformationMessage(`Saved chat session to ${path.join(storageDirectory, writtenFiles[0] ?? '')}`);
-		return writtenFiles[0];
+	} else {
+		await deps.showInformationMessage(`Saved ${writtenFiles.length} session part files to ${storageDirectory}`);
 	}
 
-	await deps.showInformationMessage(`Saved ${writtenFiles.length} session part files to ${storageDirectory}`);
+	const pruneConfig = deps.getPruneConfiguration(workspaceFolder);
+	if (pruneConfig.maxSavedSessions > 0) {
+		const pruneResult = await deps.pruneSessions(storageDirectory, pruneConfig.maxSavedSessions, pruneConfig.pruneAction);
+		if (pruneResult.archived > 0) {
+			await deps.showInformationMessage(`Archived ${pruneResult.archived} old session file(s) after save.`);
+		}
+
+		if (pruneResult.deleted > 0) {
+			await deps.showInformationMessage(`Deleted ${pruneResult.deleted} old session file(s) after save.`);
+		}
+	}
+
 	return writtenFiles[0];
 }
 
@@ -244,15 +288,110 @@ async function runDeleteSessionCommand(): Promise<void> {
 	await vscode.window.showInformationMessage(`Deleted session ${pick.label}`);
 }
 
+function tryGetGitApi(): GitApiLike | null {
+	const extension = vscode.extensions.getExtension<{ getAPI(version: number): GitApiLike }>('vscode.git');
+	if (!extension) {
+		return null;
+	}
+
+	const gitExports = extension.isActive ? extension.exports : undefined;
+	if (!gitExports || typeof gitExports.getAPI !== 'function') {
+		return null;
+	}
+
+	return gitExports.getAPI(1);
+}
+
+function registerAutoSaveOnCommitListener(
+	context: vscode.ExtensionContext,
+	output: vscode.OutputChannel,
+): void {
+	const gitApi = tryGetGitApi();
+	if (!gitApi) {
+		void vscode.window.showInformationMessage('Git extension not available. Auto-save on commit is disabled.');
+		return;
+	}
+
+	const lastCommitByRepo = new Map<string, string | undefined>();
+	const debounceTimers = new Map<string, NodeJS.Timeout>();
+
+	for (const repository of gitApi.repositories) {
+		const repoKey = repository.rootUri.toString();
+		lastCommitByRepo.set(repoKey, repository.state.HEAD?.commit);
+
+		const disposable = repository.state.onDidChange(() => {
+			const currentCommit = repository.state.HEAD?.commit;
+			const previousCommit = lastCommitByRepo.get(repoKey);
+			if (!currentCommit || currentCommit === previousCommit) {
+				return;
+			}
+
+			lastCommitByRepo.set(repoKey, currentCommit);
+			const existingTimer = debounceTimers.get(repoKey);
+			if (existingTimer) {
+				clearTimeout(existingTimer);
+			}
+
+			const timer = setTimeout(() => {
+				void (async () => {
+					try {
+						const workspaceFolder = vscode.workspace.getWorkspaceFolder(repository.rootUri);
+						if (!workspaceFolder) {
+							return;
+						}
+
+						await runSaveSessionFlow(
+							context,
+							workspaceFolder,
+							getStoragePath(workspaceFolder),
+							{
+								selectSession: async (sessions) => sessions[0],
+								promptTitle: async (defaultTitle) => defaultTitle,
+								showInformationMessage: async (message) => {
+									if (/Saved\s+(chat session|\d+ session part files)/i.test(message)) {
+										return;
+									}
+
+									await vscode.window.showInformationMessage(message);
+								},
+							},
+						);
+					} catch (error) {
+						const message = error instanceof Error ? error.message : String(error);
+						output.appendLine(`[auto-save] Disabled after listener error: ${message}`);
+						void vscode.window.showWarningMessage('Chat Commit auto-save on commit encountered an error and was disabled for this session.');
+						disposable.dispose();
+					}
+				})();
+			}, 750);
+
+			debounceTimers.set(repoKey, timer);
+		});
+
+		context.subscriptions.push(disposable);
+	}
+
+	context.subscriptions.push({
+		dispose: () => {
+			for (const timer of debounceTimers.values()) {
+				clearTimeout(timer);
+			}
+			debounceTimers.clear();
+		},
+	});
+}
+
 export function activate(context: vscode.ExtensionContext): void {
 	// The onStartupFinished activation event fires here; check autoSaveOnCommit
-	// and register the git listener only if enabled (implemented in Phase 9).
+	// and register the git listener only if enabled.
 	const autoSave = vscode.workspace
 		.getConfiguration('chat-commit')
 		.get<boolean>('autoSaveOnCommit', false);
+	const output = vscode.window.createOutputChannel('Chat Commit');
+	context.subscriptions.push(output);
 
 	if (autoSave) {
-		void vscode.window.showInformationMessage('Chat Commit auto-save on commit will be wired in Phase 9.');
+		registerAutoSaveOnCommitListener(context, output);
 	}
 
 	context.subscriptions.push(
