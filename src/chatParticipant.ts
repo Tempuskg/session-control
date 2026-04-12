@@ -16,6 +16,16 @@ export interface ResumeSelection {
 	candidates?: SessionMeta[];
 }
 
+interface SessionReadDeps {
+	readSession(storageDirectory: string, fileName: string): Promise<ChatSession>;
+}
+
+export interface ReassembledSessionResult {
+	session: ChatSession;
+	rootFileName: string;
+	partFiles: string[];
+}
+
 function getStoragePath(workspaceFolder: vscode.WorkspaceFolder): string {
 	const configured = vscode.workspace
 		.getConfiguration('chat-commit', workspaceFolder.uri)
@@ -196,6 +206,87 @@ export function selectSessionForResume(query: string, sessions: SessionMeta[]): 
 	};
 }
 
+function mergeSessionParts(parts: ChatSession[]): ChatSession {
+	const first = parts[0];
+	if (!first) {
+		throw new Error('Cannot merge empty session parts.');
+	}
+
+	const mergedTurns = parts.flatMap((part) => part.turns);
+	const merged: ChatSession = {
+		...first,
+		part: null,
+		totalParts: null,
+		previousPartFile: null,
+		nextPartFile: null,
+		turns: mergedTurns,
+		totalTurns: mergedTurns.length,
+	};
+
+	return merged;
+}
+
+export async function loadReassembledSession(
+	storageDirectory: string,
+	startFileName: string,
+	depsOverrides: Partial<SessionReadDeps> = {},
+): Promise<ReassembledSessionResult> {
+	const deps: SessionReadDeps = {
+		readSession: (directory, fileName) => chatSessionStore.readSession(directory, fileName),
+		...depsOverrides,
+	};
+
+	const cache = new Map<string, ChatSession>();
+
+	const readPart = async (fileName: string): Promise<ChatSession> => {
+		const cached = cache.get(fileName);
+		if (cached) {
+			return cached;
+		}
+
+		const loaded = await deps.readSession(storageDirectory, fileName);
+		cache.set(fileName, loaded);
+		return loaded;
+	};
+
+	const visitedBackward = new Set<string>();
+	let rootFileName = startFileName;
+	let cursor = await readPart(startFileName);
+
+	while (cursor.previousPartFile) {
+		if (visitedBackward.has(rootFileName)) {
+			throw new Error('Detected cyclic previousPartFile chain while loading session parts.');
+		}
+
+		visitedBackward.add(rootFileName);
+		rootFileName = cursor.previousPartFile;
+		cursor = await readPart(rootFileName);
+	}
+
+	const partFiles: string[] = [];
+	const parts: ChatSession[] = [];
+	const visitedForward = new Set<string>();
+	let nextFileName: string | null = rootFileName;
+
+	while (nextFileName) {
+		if (visitedForward.has(nextFileName)) {
+			throw new Error('Detected cyclic nextPartFile chain while loading session parts.');
+		}
+
+		visitedForward.add(nextFileName);
+		partFiles.push(nextFileName);
+		const part = await readPart(nextFileName);
+		parts.push(part);
+		nextFileName = part.nextPartFile;
+	}
+
+	return {
+		session: mergeSessionParts(parts),
+		rootFileName,
+		partFiles,
+	};
+}
+
 function findResumedSessionMeta(history: readonly (vscode.ChatRequestTurn | vscode.ChatResponseTurn)[]): {
 	fileName: string;
 	storageDirectory: string;
@@ -273,7 +364,8 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 
 			const selection = selectSessionForResume(request.prompt, sessions);
 			if (selection.session) {
-				const resumed = await chatSessionStore.readSession(storageDirectory, selection.session.fileName);
+				const reassembled = await loadReassembledSession(storageDirectory, selection.session.fileName);
+				const resumed = reassembled.session;
 				const maxTurns = vscode.workspace
 					.getConfiguration('chat-commit', workspaceFolder.uri)
 					.get<number>('resume.maxTurns', 50);
@@ -293,7 +385,7 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 
 				return {
 					metadata: {
-						resumedSessionFile: selection.session.fileName,
+						resumedSessionFile: reassembled.rootFileName,
 						storageDirectory,
 					},
 				};
@@ -320,10 +412,11 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 			return;
 		}
 
-		const resumedSession = await chatSessionStore.readSession(
+		const reassembled = await loadReassembledSession(
 			resumedSessionMeta.storageDirectory,
 			resumedSessionMeta.fileName,
 		);
+		const resumedSession = reassembled.session;
 		const maxTurns = vscode.workspace
 			.getConfiguration('chat-commit', workspaceFolder.uri)
 			.get<number>('resume.maxTurns', 50);
@@ -337,7 +430,7 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 		await sendModelResponse(request, stream, token, resumedSession, request.prompt, maxTurns, maxContextChars, overflowStrategy);
 		return {
 			metadata: {
-				resumedSessionFile: resumedSessionMeta.fileName,
+				resumedSessionFile: reassembled.rootFileName,
 				storageDirectory: resumedSessionMeta.storageDirectory,
 			},
 		};

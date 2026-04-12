@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import { runSaveSessionFlow } from '../../src/extension';
 import { CopilotSession } from '../../src/sessionReader';
 import { createSessionStore } from '../../src/sessionStore';
+import { createChatSession } from '../../src/sessionWriter';
 import { isChatSession } from '../../src/types';
 
 function createCopilotSession(): CopilotSession {
@@ -79,6 +80,59 @@ suite('extension save flow', () => {
 			assert.equal(restored.totalTurns, 2);
 			assert.equal(restored.turns.length, 2);
 			assert.equal(infoMessages.some((message) => message.includes(fileName as string)), true);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('runSaveSessionFlow writes split sessions and emits warning', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-extension-save-flow-split-'));
+		const workspaceRoot = path.join(tempRoot, 'workspace');
+		const storageDirectory = path.join(workspaceRoot, '.chat');
+		const infoMessages: string[] = [];
+		const store = createSessionStore();
+
+		try {
+			await fs.mkdir(workspaceRoot, { recursive: true });
+
+			const workspaceFolder = {
+				uri: vscode.Uri.file(workspaceRoot),
+				name: 'workspace',
+				index: 0,
+			} as vscode.WorkspaceFolder;
+
+			const base = createChatSession(createCopilotSession(), {
+				title: 'Auth Bug Investigation',
+				savedAt: '2026-04-12T12:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			});
+
+			const partOne = { ...base, title: 'Auth Bug Investigation (Part 1/2)', part: 1, totalParts: 2 };
+			const partTwo = { ...base, title: 'Auth Bug Investigation (Part 2/2)', part: 2, totalParts: 2 };
+
+			await runSaveSessionFlow(
+				{} as vscode.ExtensionContext,
+				workspaceFolder,
+				storageDirectory,
+				{
+					readCopilotSessions: async () => [createCopilotSession()],
+					selectSession: async (sessions) => sessions[0],
+					promptTitle: async () => 'Auth Bug Investigation',
+					applySaveBloatControls: () => ({
+						sessions: [partOne, partTwo],
+						warning: 'Session exceeded save.maxFileSize and was split into 2 part files.',
+					}),
+					showInformationMessage: async (message: string) => {
+						infoMessages.push(message);
+						return undefined;
+					},
+				},
+			);
+
+			const written = await store.listSessions(storageDirectory);
+			assert.equal(written.length, 2);
+			assert.equal(infoMessages.some((message) => message.includes('split into 2 part files')), true);
+			assert.equal(infoMessages.some((message) => message.includes('Saved 2 session part files')), true);
 		} finally {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}

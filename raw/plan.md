@@ -35,13 +35,14 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
   - In progress: save-side controls implemented in `src/sessionWriter.ts` via `applySaveBloatControls` (`stripToolOutput`, `warn`, `truncateOldest`, `split`)
   - In progress: save flow wired to configuration in `src/extension.ts` (`save.maxFileSize`, `save.overflowStrategy`, `save.stripToolOutput`) with multi-file split writes
   - In progress: resume overflow strategy support in `src/chatParticipant.ts` (`summarize`, `truncate`, `recent-only`) through `buildResumePrompt`
-  - In progress: expanded test coverage in `test/unit/sessionWriter.test.ts` and `test/unit/chatParticipant.integration.test.ts`
-  - Validation completed: `npm run lint`, `npm test` (40 passing)
-  - Remaining: multipart session reassembly during resume (`nextPartFile` chain loading) and command-level integration assertions
+  - In progress: multipart resume reassembly implemented in `src/chatParticipant.ts` (`loadReassembledSession`) with part-chain cycle protection
+  - In progress: expanded integration assertions in `test/unit/chatParticipant.integration.test.ts` and `test/unit/extensionSaveFlow.test.ts` (split save + reassembled resume)
+  - Validation completed: `npm run lint`, `npm test` (42 passing)
+  - Remaining: model-driven summarize overflow behavior with explicit fallback-to-truncate note on summarization failure
 - [ ] **Phase 9 — Auto-Save & Session Pruning**
 - [ ] **Phase 10 — Polish & Multi-Root**
 
-**Current focus:** Continue Phase 8 (multipart reassembly + final integration checks).
+**Current focus:** Continue Phase 8 (model-backed summarize overflow + fallback behavior).
 
 ---
 

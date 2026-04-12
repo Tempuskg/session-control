@@ -2,9 +2,14 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { buildResumePrompt, renderSessionListMarkdown, selectSessionForResume } from '../../src/chatParticipant';
+import {
+	buildResumePrompt,
+	loadReassembledSession,
+	renderSessionListMarkdown,
+	selectSessionForResume,
+} from '../../src/chatParticipant';
 import { createSessionStore } from '../../src/sessionStore';
-import { createChatSession } from '../../src/sessionWriter';
+import { applySaveBloatControls, createChatSession } from '../../src/sessionWriter';
 import { CopilotSession } from '../../src/sessionReader';
 
 function createCopilotSession(): CopilotSession {
@@ -102,5 +107,56 @@ suite('chatParticipant integration', () => {
 
 		assert.equal(summarizePrompt.includes('Summary of omitted context:'), true);
 		assert.equal(recentOnlyPrompt.includes('Earlier turns omitted ('), true);
+	});
+
+	test('loadReassembledSession rebuilds full turns from split part chain', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-chat-participant-reassembly-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createSessionStore();
+
+		try {
+			const source = createCopilotSession();
+			for (const turn of source.turns) {
+				if (turn.type === 'request') {
+					turn.prompt = `${turn.prompt} ${'x'.repeat(240)}`;
+				} else {
+					turn.content = `${turn.content} ${'y'.repeat(240)}`;
+				}
+			}
+
+			const saved = createChatSession(source, {
+				title: 'Split Resume Session',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			});
+
+			const split = applySaveBloatControls(saved, {
+				maxFileSizeBytes: 1400,
+				overflowStrategy: 'split',
+				stripToolOutput: false,
+			});
+
+			assert.equal(split.sessions.length > 1, true);
+
+			const fileNames: string[] = [];
+			for (const part of split.sessions) {
+				fileNames.push(await store.writeSession(storageDirectory, part));
+			}
+
+			const secondPart = fileNames[1];
+			assert.ok(secondPart);
+
+			const reassembled = await loadReassembledSession(storageDirectory, secondPart as string);
+			assert.equal(reassembled.rootFileName, fileNames[0]);
+			assert.equal(reassembled.partFiles.length, fileNames.length);
+			assert.equal(reassembled.session.turns.length, saved.turns.length);
+
+			const prompt = buildResumePrompt(reassembled.session, 'Continue from merged context', 50, 30000, 'truncate');
+			assert.equal(prompt.includes('Continue from merged context'), true);
+			assert.equal(prompt.includes('First user question about auth bug.'), true);
+			assert.equal(prompt.includes('Second assistant answer proposing token refresh fix.'), true);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
 	});
 });
