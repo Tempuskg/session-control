@@ -11,7 +11,9 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 - [x] **Phase 2 — Types & Core Utilities**
   - Completed: `src/types.ts` interfaces + type guards (`isChatSession`, `isSavedTurn`, etc.), `src/utils.ts` helpers (`slugify`, `formatTimestamp`, `parseFileSize`, `fuzzyMatchSessions`), and unit tests in `test/unit/`
   - Validation completed: `npm test` (10 passing, including guard and utility scoring matrix tests)
-- [ ] **Phase 3 — Git Integration**
+- [x] **Phase 3 — Git Integration**
+  - Completed: `src/gitIntegration.ts` with repository matching by workspace URI, dirty-state detection, graceful fallback when git extension/repo are unavailable, and one-time user notification when git extension is missing
+  - Validation completed: `npm run lint`, `npm test` (14 passing, including `test/unit/gitIntegration.test.ts`)
 - [ ] **Phase 4 — Session Reader**
 - [ ] **Phase 5 — Session Writer & Store**
 - [ ] **Phase 6 — Save Command**
@@ -20,7 +22,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 - [ ] **Phase 9 — Auto-Save & Session Pruning**
 - [ ] **Phase 10 — Polish & Multi-Root**
 
-**Current focus:** Start Phase 3 (`src/gitIntegration.ts` and unit tests).
+**Current focus:** Start Phase 4 (`src/sessionReader.ts`, format detection, and fixture-based tests).
 
 ---
 
@@ -123,7 +125,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 
 ---
 
-## Phase 3: Git Integration
+## Phase 3: Git Integration (Completed)
 
 > **Goal:** A self-contained module for reading git metadata, resilient to missing repos.
 
