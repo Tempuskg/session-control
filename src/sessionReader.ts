@@ -311,7 +311,7 @@ export function createSessionReader(overrides: Partial<SessionReaderDeps> = {}):
 				} catch (error) {
 					if (error instanceof UnknownFormatError) {
 						await deps.showErrorMessage(
-							`Unrecognized Copilot session format (VS Code ${deps.vscodeVersion}). Chat-Commit may need an update.`,
+							`Unrecognized Copilot session format (VS Code ${deps.vscodeVersion}). Session Control may need an update.`,
 						);
 						return [];
 					}

@@ -58,7 +58,7 @@ sequenceDiagram
     participant Git as gitIntegration
     participant Store as sessionStore
 
-    User->>Cmd: chat-commit.saveSession
+    User->>Cmd: session-control.saveSession
     Cmd->>Reader: Read Copilot session files
     Reader-->>Cmd: List of sessions
     Cmd->>QP: Present sessions to user

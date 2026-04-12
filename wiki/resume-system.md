@@ -18,7 +18,7 @@ related:
 
 # Resume System
 
-The Resume System enables users to load a previously saved chat session and continue the conversation with full context. It operates through the [Chat Participant](chat-participant.md) (`@chat-commit`).
+The Resume System enables users to load a previously saved chat session and continue the conversation with full context. It operates through the [Chat Participant](chat-participant.md) (`@session-control`).
 
 ## Core Mechanism
 
@@ -36,11 +36,11 @@ When a user resumes a session, the system:
 sequenceDiagram
     actor User
     participant Chat as VS Code Chat
-    participant CP as @chat-commit
+    participant CP as @session-control
     participant Store as sessionStore
     participant LLM as Language Model
 
-    User->>Chat: @chat-commit /resume fix-auth-bug
+    User->>Chat: @session-control /resume fix-auth-bug
     Chat->>CP: Handle request
     CP->>Store: Search .chat/ for "fix-auth-bug"
     Store-->>CP: Matching session(s)
@@ -89,8 +89,8 @@ This ensures the LLM "remembers" the saved conversation across the entire resume
 
 ## Session Selection UX
 
-- **With argument**: `@chat-commit /resume fix-auth-bug` — fuzzy match on title/filename
+- **With argument**: `@session-control /resume fix-auth-bug` — fuzzy match on title/filename
 - **Multiple matches**: Options presented in chat response with clickable command buttons
 - **No argument**: QuickPick of all saved sessions
 - **Display metadata**: title, date, branch, commit SHA, turn count
-- **List command**: `@chat-commit /list` shows all available sessions
+- **List command**: `@session-control /list` shows all available sessions

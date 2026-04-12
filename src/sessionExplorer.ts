@@ -22,7 +22,7 @@ export class SessionExplorerWorkspaceItem extends vscode.TreeItem {
 		super(group.workspaceFolder.name, vscode.TreeItemCollapsibleState.Expanded);
 		this.description = `${group.sessions.length} session${group.sessions.length === 1 ? '' : 's'}`;
 		this.tooltip = group.workspaceFolder.uri.fsPath;
-		this.contextValue = 'chat-commit.workspace';
+		this.contextValue = 'session-control.workspace';
 		this.iconPath = vscode.ThemeIcon.Folder;
 	}
 }
@@ -40,10 +40,10 @@ export class SessionExplorerSessionItem extends vscode.TreeItem {
 		this.resourceUri = vscode.Uri.file(path.join(group.storageDirectory, session.fileName));
 		this.description = `${session.turnCount} turns`;
 		this.tooltip = `${session.savedAt}\n${session.fileName}`;
-		this.contextValue = 'chat-commit.session';
+		this.contextValue = 'session-control.session';
 		this.iconPath = new vscode.ThemeIcon('comment-discussion');
 		this.command = {
-			command: 'chat-commit.openSessionFromExplorer',
+			command: 'session-control.openSessionFromExplorer',
 			title: 'Open Saved Session',
 			arguments: [this],
 		};
@@ -54,21 +54,21 @@ export type SessionExplorerNode = SessionExplorerWorkspaceItem | SessionExplorer
 
 function getStoragePath(workspaceFolder: vscode.WorkspaceFolder): string {
 	const configured = vscode.workspace
-		.getConfiguration('chat-commit', workspaceFolder.uri)
+		.getConfiguration('session-control', workspaceFolder.uri)
 		.get<string>('storagePath', '.chat');
 
 	if (!configured.trim()) {
-		throw new Error('chat-commit.storagePath must not be empty.');
+		throw new Error('session-control.storagePath must not be empty.');
 	}
 
 	if (path.isAbsolute(configured)) {
-		throw new Error('chat-commit.storagePath must be relative to the workspace folder.');
+		throw new Error('session-control.storagePath must be relative to the workspace folder.');
 	}
 
 	const resolved = path.resolve(workspaceFolder.uri.fsPath, configured);
 	const relative = path.relative(workspaceFolder.uri.fsPath, resolved);
 	if (relative.startsWith('..') || path.isAbsolute(relative)) {
-		throw new Error('chat-commit.storagePath must stay within the workspace folder.');
+		throw new Error('session-control.storagePath must stay within the workspace folder.');
 	}
 
 	return resolved;

@@ -1,4 +1,4 @@
-# Contributing to Chat Commit
+# Contributing to Session Control
 
 Thank you for your interest in contributing! This document covers how to set up the dev environment, run tests, and submit changes.
 
@@ -11,8 +11,8 @@ Thank you for your interest in contributing! This document covers how to set up 
 ## Dev Setup
 
 ```bash
-git clone https://github.com/your-username/chat-commit.git
-cd chat-commit
+git clone https://github.com/your-username/session-control.git
+cd session-control
 npm install
 ```
 

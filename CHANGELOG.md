@@ -8,4 +8,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Initial project scaffolding for the Chat Commit VS Code extension
+- Initial project scaffolding for the Session Control VS Code extension

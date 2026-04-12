@@ -83,17 +83,17 @@ interface ManualWorkspaceSelectionDeps {
 
 export function validateStoragePath(workspaceFolder: vscode.WorkspaceFolder, configured: string): string {
 	if (!configured.trim()) {
-		throw new Error('chat-commit.storagePath must not be empty.');
+		throw new Error('session-control.storagePath must not be empty.');
 	}
 
 	if (path.isAbsolute(configured)) {
-		throw new Error('chat-commit.storagePath must be relative to the workspace folder.');
+		throw new Error('session-control.storagePath must be relative to the workspace folder.');
 	}
 
 	const resolved = path.resolve(workspaceFolder.uri.fsPath, configured);
 	const relative = path.relative(workspaceFolder.uri.fsPath, resolved);
 	if (relative.startsWith('..') || path.isAbsolute(relative)) {
-		throw new Error('chat-commit.storagePath must stay within the workspace folder.');
+		throw new Error('session-control.storagePath must stay within the workspace folder.');
 	}
 
 	return resolved;
@@ -150,14 +150,14 @@ export async function ensureStoragePathInGitignore(
 
 function getStoragePath(workspaceFolder: vscode.WorkspaceFolder): string {
 	const configured = vscode.workspace
-		.getConfiguration('chat-commit', workspaceFolder.uri)
+		.getConfiguration('session-control', workspaceFolder.uri)
 		.get<string>('storagePath', '.chat');
 
 	return validateStoragePath(workspaceFolder, configured);
 }
 
 function getSaveConfiguration(workspaceFolder: vscode.WorkspaceFolder): SaveConfiguration {
-	const config = vscode.workspace.getConfiguration('chat-commit', workspaceFolder.uri);
+	const config = vscode.workspace.getConfiguration('session-control', workspaceFolder.uri);
 	const configuredSize = config.get<string>('save.maxFileSize', '1mb');
 	const parsedSize = parseFileSize(configuredSize);
 	const overflowStrategy = config.get<SaveOverflowStrategy>('save.overflowStrategy', 'split');
@@ -174,7 +174,7 @@ export function resolveResumeConfiguration(workspaceFolder: vscode.WorkspaceFold
 	maxTurns: number;
 	maxContextChars: number;
 } {
-	const config = vscode.workspace.getConfiguration('chat-commit', workspaceFolder.uri);
+	const config = vscode.workspace.getConfiguration('session-control', workspaceFolder.uri);
 	const maxTurns = Math.max(1, config.get<number>('resume.maxTurns', 50));
 	const maxContextChars = Math.max(1000, config.get<number>('resume.maxContextChars', 80000));
 
@@ -182,7 +182,7 @@ export function resolveResumeConfiguration(workspaceFolder: vscode.WorkspaceFold
 }
 
 function getPruneConfiguration(workspaceFolder: vscode.WorkspaceFolder): PruneConfiguration {
-	const config = vscode.workspace.getConfiguration('chat-commit', workspaceFolder.uri);
+	const config = vscode.workspace.getConfiguration('session-control', workspaceFolder.uri);
 	return {
 		maxSavedSessions: config.get<number>('save.maxSavedSessions', 0),
 		pruneAction: config.get<SessionPruneAction>('save.pruneAction', 'archive'),
@@ -288,7 +288,7 @@ function createDefaultSaveFlowDeps(): SaveSessionFlowDeps {
 		createChatSession,
 		applySaveBloatControls,
 		getIncludeInGitignore: (workspaceFolder) => vscode.workspace
-			.getConfiguration('chat-commit', workspaceFolder.uri)
+			.getConfiguration('session-control', workspaceFolder.uri)
 			.get<boolean>('includeInGitignore', false),
 		ensureGitignoreEntry: ensureStoragePathInGitignore,
 		getPruneConfiguration,
@@ -532,7 +532,7 @@ export function registerAutoSaveOnCommitListener(
 					} catch (error) {
 						const message = error instanceof Error ? error.message : String(error);
 						output.appendLine(`[auto-save] Disabled after listener error: ${message}`);
-						void deps.showWarningMessage('Chat Commit auto-save on commit encountered an error and was disabled for this session.');
+						void deps.showWarningMessage('Session Control auto-save on commit encountered an error and was disabled for this session.');
 						disposable.dispose();
 					}
 				})();
@@ -578,7 +578,7 @@ function getImplicitWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
 
 function isAnyWorkspaceAutoSaveEnabled(): boolean {
 	return (vscode.workspace.workspaceFolders ?? []).some((workspaceFolder) => vscode.workspace
-		.getConfiguration('chat-commit', workspaceFolder.uri)
+		.getConfiguration('session-control', workspaceFolder.uri)
 		.get<boolean>('autoSaveOnCommit', false));
 }
 
@@ -590,27 +590,27 @@ function updateAutoSaveStatusBar(item: vscode.StatusBarItem): void {
 	}
 
 	const enabled = vscode.workspace
-		.getConfiguration('chat-commit', workspaceFolder.uri)
+		.getConfiguration('session-control', workspaceFolder.uri)
 		.get<boolean>('autoSaveOnCommit', false);
-	item.text = `$(history) Chat Commit ${enabled ? 'Auto-Save On' : 'Auto-Save Off'}`;
+	item.text = `$(history) Session Control ${enabled ? 'Auto-Save On' : 'Auto-Save Off'}`;
 	item.tooltip = `${workspaceFolder.name}: click to ${enabled ? 'disable' : 'enable'} auto-save on commit`;
 	item.show();
 }
 
 export function activate(context: vscode.ExtensionContext): void {
 	const sessionExplorerProvider = new SessionExplorerProvider();
-	const sessionExplorerView = vscode.window.createTreeView('chat-commit.sessionExplorer', {
+	const sessionExplorerView = vscode.window.createTreeView('session-control.sessionExplorer', {
 		treeDataProvider: sessionExplorerProvider,
 		showCollapseAll: true,
 	});
 	context.subscriptions.push(sessionExplorerView);
 	const autoSaveStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-	autoSaveStatusBar.command = 'chat-commit.toggleAutoSaveOnCommit';
+	autoSaveStatusBar.command = 'session-control.toggleAutoSaveOnCommit';
 	context.subscriptions.push(autoSaveStatusBar);
 
 	// The onStartupFinished activation event fires here; check autoSaveOnCommit
 	// and register the git listener only if enabled.
-	const output = vscode.window.createOutputChannel('Chat Commit');
+	const output = vscode.window.createOutputChannel('Session Control');
 	context.subscriptions.push(output);
 	let autoSaveListener: vscode.Disposable | undefined;
 	const syncAutoSaveListener = () => {
@@ -630,20 +630,20 @@ export function activate(context: vscode.ExtensionContext): void {
 	updateAutoSaveStatusBar(autoSaveStatusBar);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('chat-commit.saveSession', async () => {
+		vscode.commands.registerCommand('session-control.saveSession', async () => {
 			await runSaveSessionCommand(context);
 			sessionExplorerProvider.refresh();
 		}),
-		vscode.commands.registerCommand('chat-commit.listSessions', async () => runListSessionsCommand()),
-		vscode.commands.registerCommand('chat-commit.deleteSession', async () => {
+		vscode.commands.registerCommand('session-control.listSessions', async () => runListSessionsCommand()),
+		vscode.commands.registerCommand('session-control.deleteSession', async () => {
 			await runDeleteSessionCommand();
 			sessionExplorerProvider.refresh();
 		}),
-		vscode.commands.registerCommand('chat-commit.refreshSessionExplorer', () => sessionExplorerProvider.refresh()),
-		vscode.commands.registerCommand('chat-commit.openSessionFromExplorer', async (item: SessionExplorerSessionItem) => {
+		vscode.commands.registerCommand('session-control.refreshSessionExplorer', () => sessionExplorerProvider.refresh()),
+		vscode.commands.registerCommand('session-control.openSessionFromExplorer', async (item: SessionExplorerSessionItem) => {
 			await vscode.commands.executeCommand('vscode.open', item.resourceUri);
 		}),
-		vscode.commands.registerCommand('chat-commit.deleteSessionFromExplorer', async (item: SessionExplorerSessionItem) => {
+		vscode.commands.registerCommand('session-control.deleteSessionFromExplorer', async (item: SessionExplorerSessionItem) => {
 			const confirmation = await vscode.window.showWarningMessage(
 				`Delete session '${item.label}'?`,
 				{ modal: true },
@@ -664,7 +664,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			await vscode.window.showInformationMessage(`Deleted session ${item.label}`);
 			sessionExplorerProvider.refresh();
 		}),
-		vscode.commands.registerCommand('chat-commit.toggleAutoSaveOnCommit', async () => {
+		vscode.commands.registerCommand('session-control.toggleAutoSaveOnCommit', async () => {
 			const workspaceFolder = await resolveManualWorkspaceFolder({
 				getActiveEditorUri: () => vscode.window.activeTextEditor?.document.uri,
 			});
@@ -673,7 +673,7 @@ export function activate(context: vscode.ExtensionContext): void {
 				return;
 			}
 
-			const configuration = vscode.workspace.getConfiguration('chat-commit', workspaceFolder.uri);
+			const configuration = vscode.workspace.getConfiguration('session-control', workspaceFolder.uri);
 			const current = configuration.get<boolean>('autoSaveOnCommit', false);
 			await configuration.update('autoSaveOnCommit', !current, vscode.ConfigurationTarget.WorkspaceFolder);
 			updateAutoSaveStatusBar(autoSaveStatusBar);
@@ -690,12 +690,12 @@ export function activate(context: vscode.ExtensionContext): void {
 		updateAutoSaveStatusBar(autoSaveStatusBar);
 	}));
 	context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
-		if (event.affectsConfiguration('chat-commit.autoSaveOnCommit')) {
+		if (event.affectsConfiguration('session-control.autoSaveOnCommit')) {
 			syncAutoSaveListener();
 			updateAutoSaveStatusBar(autoSaveStatusBar);
 		}
 
-		if (event.affectsConfiguration('chat-commit.storagePath')) {
+		if (event.affectsConfiguration('session-control.storagePath')) {
 			sessionExplorerProvider.refresh();
 		}
 	}));

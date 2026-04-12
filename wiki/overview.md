@@ -16,15 +16,15 @@ related:
 
 # Project Overview
 
-**Chat-Commit** is an open source (MIT-licensed) VS Code extension that saves GitHub Copilot Chat sessions as structured JSON files into a configurable `.chat/` folder in the repo, linked to git commits and branches. Users can resume saved chats via a `@chat-commit` chat participant that loads prior conversation as LLM context. Published to the VS Code Marketplace and Open VSX Registry.
+**Session Control** is an open source (MIT-licensed) VS Code extension that saves GitHub Copilot Chat sessions as structured JSON files into a configurable `.chat/` folder in the repo, linked to git commits and branches. Users can resume saved chats via a `@session-control` chat participant that loads prior conversation as LLM context. Published to the VS Code Marketplace and Open VSX Registry.
 
 ## Core Value Proposition
 
-Chat sessions with Copilot are ephemeral — they disappear when VS Code is closed or when context is lost. Chat-Commit bridges this gap by:
+Chat sessions with Copilot are ephemeral — they disappear when VS Code is closed or when context is lost. Session Control bridges this gap by:
 
 1. **Persisting conversations** — Saving chat sessions as JSON files alongside the code they relate to.
 2. **Linking to git context** — Each saved session captures the branch, commit SHA, and dirty state, tying the conversation to a point in the codebase's history.
-3. **Enabling resumption** — A chat participant (`@chat-commit`) can reload a saved session and inject it as context into a new conversation, allowing the LLM to "remember" prior work.
+3. **Enabling resumption** — A chat participant (`@session-control`) can reload a saved session and inject it as context into a new conversation, allowing the LLM to "remember" prior work.
 4. **Living in source control** — Sessions are stored as files in the repo (`.chat/`), meaning they can be reviewed in PRs, shared with teammates, and versioned alongside code.
 
 ## Two Subsystems
@@ -32,7 +32,7 @@ Chat sessions with Copilot are ephemeral — they disappear when VS Code is clos
 The extension has two main subsystems:
 
 - **[Save System](save-system.md)** — Reads Copilot's internal session storage, transforms it, and writes structured JSON to `.chat/`.
-- **[Resume System](resume-system.md)** — A registered [Chat Participant](chat-participant.md) (`@chat-commit`) that loads saved sessions and injects them as LLM context.
+- **[Resume System](resume-system.md)** — A registered [Chat Participant](chat-participant.md) (`@session-control`) that loads saved sessions and injects them as LLM context.
 
 ## Implementation Phases
 
@@ -46,10 +46,10 @@ The plan is organized into ten incremental phases, each delivering a testable mi
 | 4 | Session Reader | Read Copilot internal storage with version detection |
 | 5 | Session Writer & Store | Transform to JSON, write to `.chat/`, atomic writes |
 | 6 | Save Command | End-to-end save flow — first user-facing feature |
-| 7 | Chat Participant & Resume | `@chat-commit /resume` and `/list` commands |
+| 7 | Chat Participant & Resume | `@session-control /resume` and `/list` commands |
 | 8 | Bloat Controls | Split files, strip output, context overflow strategies |
 | 9 | Auto-Save & Pruning | Auto-save on commit, session archival/deletion |
-| 10 | Polish & Multi-Root | Config validation, multi-root support, tree view, status bar |
+| 10 | Polish & Multi-Root | Multi-root support, config validation, tree view, status bar ✓ |
 
 ## Key Design Decisions
 

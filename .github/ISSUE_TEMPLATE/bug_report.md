@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a reproducible problem in Chat Commit
+about: Report a reproducible problem in Session Control
 labels: bug
 ---
 
@@ -25,7 +25,7 @@ Describe what actually happened.
 ## Environment
 
 - VS Code version:
-- Chat Commit version:
+- Session Control version:
 - OS:
 - GitHub Copilot version:
 

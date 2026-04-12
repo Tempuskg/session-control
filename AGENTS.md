@@ -1,13 +1,13 @@
-# Chat-Commit Wiki — Schema & Conventions
+# Session Control Wiki — Schema & Conventions
 
-This file defines how the LLM maintains the wiki for the **chat-commit** VS Code extension project. It is the authoritative reference for structure, workflows, and conventions.
+This file defines how the LLM maintains the wiki for the **session-control** VS Code extension project. It is the authoritative reference for structure, workflows, and conventions.
 
 ---
 
 ## Directory Layout
 
 ```
-chat-commit/
+session-control/
 ├── AGENTS.md          # This file — wiki schema & LLM instructions
 ├── PLAN.md            # Original project plan (reference, not wiki-managed)
 ├── raw/               # Raw source documents (immutable, LLM reads only)

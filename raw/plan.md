@@ -1,7 +1,7 @@
-# Plan: Chat-Commit — VS Code Extension
+# Plan: Session-Control — VS Code Extension
 
 ## TL;DR
-An **open source** VS Code extension that saves GitHub Copilot Chat sessions as structured JSON files into a configurable `.chat/` folder in the repo, linked to git commits/branches. Users resume saved chats via a `@chat-commit` chat participant that loads prior conversation as LLM context. Manual save + optional auto-save on commit. Licensed under MIT and published to the VS Code Marketplace and Open VSX Registry.
+An **open source** VS Code extension that saves GitHub Copilot Chat sessions as structured JSON files into a configurable `.chat/` folder in the repo, linked to git commits/branches. Users resume saved chats via a `@Session-Control` chat participant that loads prior conversation as LLM context. Manual save + optional auto-save on commit. Licensed under MIT and published to the VS Code Marketplace and Open VSX Registry.
 
 ## Implementation Progress (Updated: 2026-04-12)
 
@@ -26,7 +26,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
   - Completed: dedicated save round-trip integration-style coverage in `test/unit/extensionSaveFlow.test.ts`
   - Validation completed: `npm run lint`, `npm test` (29 passing)
 - [x] **Phase 7 — Chat Participant & Resume**
-  - Completed: `src/chatParticipant.ts` with participant registration (`chat-commit.resume`) and command handling for `/list` and `/resume`
+  - Completed: `src/chatParticipant.ts` with participant registration (`Session-Control.resume`) and command handling for `/list` and `/resume`
   - Completed: resume follow-up flow via chat history metadata + `request.model.sendRequest(...)` context injection
   - Completed: helper exports for resume context/list rendering and selection behavior (`buildResumePrompt`, `renderSessionListMarkdown`, `trimTurnsForResume`)
   - Completed: integration-style round-trip resume coverage in `test/unit/chatParticipant.integration.test.ts`
@@ -51,7 +51,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
   - Completed: configuration validation helpers in `src/extension.ts` and `src/chatParticipant.ts` for safe relative `storagePath` resolution and bounded resume settings
   - Completed: multi-root manual save/list/delete handling in `src/extension.ts` with active-editor workspace preference, QuickPick folder selection, and cross-workspace session browsing
   - Completed: multi-root resume/list handling in `src/chatParticipant.ts` with cross-workspace session discovery, folder-prefixed disambiguation, and resume config lookup based on the originating workspace folder
-  - Completed: `.gitignore` management in `src/extension.ts` for `chat-commit.includeInGitignore`, including idempotent workspace-relative entry creation during save flow
+  - Completed: `.gitignore` management in `src/extension.ts` for `Session-Control.includeInGitignore`, including idempotent workspace-relative entry creation during save flow
   - Completed: session explorer tree view in `src/sessionExplorer.ts` with workspace-grouped saved sessions, open-in-editor, refresh, and delete actions
   - Completed: status bar auto-save indicator/toggle in `src/extension.ts` with dynamic listener sync on configuration changes
   - Completed: Phase 10 coverage in `test/unit/extensionPhase10.test.ts`, `test/unit/extensionSaveFlow.test.ts`, `test/unit/sessionExplorer.test.ts`, and expanded multi-root selection coverage in `test/unit/chatParticipant.integration.test.ts`
@@ -65,7 +65,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 
 **Two main subsystems:**
 1. **Save System** — Reads Copilot's internal session storage files and copies/transforms them into the repo's `.chat/` folder with git metadata.
-2. **Resume System** — A registered VS Code Chat Participant (`@chat-commit`) that loads a saved session and injects its history as context into a new conversation.
+2. **Resume System** — A registered VS Code Chat Participant (`@Session-Control`) that loads a saved session and injects its history as context into a new conversation.
 
 **Storage format:** JSON (primary, machine-parseable for resume) with a rendered Markdown summary embedded in the JSON for human review in diffs/PRs.
 
@@ -95,31 +95,31 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 
 ### Step 1.3 — package.json contributions
 - **Commands:**
-  - `chat-commit.saveSession` — "Chat Commit: Save Current Chat Session"
-  - `chat-commit.listSessions` — "Chat Commit: Browse Saved Sessions"
-  - `chat-commit.deleteSession` — "Chat Commit: Delete Saved Session"
+  - `Session-Control.saveSession` — "Session Control: Save Current Chat Session"
+  - `Session-Control.listSessions` — "Session Control: Browse Saved Sessions"
+  - `Session-Control.deleteSession` — "Session Control: Delete Saved Session"
 - **Configuration settings:**
-  - `chat-commit.storagePath` (string, default: `.chat`) — folder relative to workspace root
-  - `chat-commit.autoSaveOnCommit` (boolean, default: false) — auto-save active session on git commit
-  - `chat-commit.includeInGitignore` (boolean, default: false) — optionally gitignore the .chat folder
+  - `Session-Control.storagePath` (string, default: `.chat`) — folder relative to workspace root
+  - `Session-Control.autoSaveOnCommit` (boolean, default: false) — auto-save active session on git commit
+  - `Session-Control.includeInGitignore` (boolean, default: false) — optionally gitignore the .chat folder
   - **Resume context settings:**
-    - `chat-commit.resume.maxTurns` (number, default: 50) — max turns to inject when resuming
-    - `chat-commit.resume.overflowStrategy` (enum, default: `summarize`) — `summarize`, `truncate`, `recent-only`
-    - `chat-commit.resume.maxContextChars` (number, default: 80000) — hard cap on total injected characters
+    - `Session-Control.resume.maxTurns` (number, default: 50) — max turns to inject when resuming
+    - `Session-Control.resume.overflowStrategy` (enum, default: `summarize`) — `summarize`, `truncate`, `recent-only`
+    - `Session-Control.resume.maxContextChars` (number, default: 80000) — hard cap on total injected characters
   - **Save bloat settings:**
-    - `chat-commit.save.maxFileSize` (string, default: `1mb`) — max size per saved session file
-    - `chat-commit.save.overflowStrategy` (enum, default: `split`) — `split`, `truncateOldest`, `warn`
-    - `chat-commit.save.stripToolOutput` (boolean, default: false) — strip verbose tool call outputs
-    - `chat-commit.save.maxSavedSessions` (number, default: 0 = unlimited) — max session files in `.chat/`
-    - `chat-commit.save.pruneAction` (enum, default: `archive`) — `archive` or `delete`
+    - `Session-Control.save.maxFileSize` (string, default: `1mb`) — max size per saved session file
+    - `Session-Control.save.overflowStrategy` (enum, default: `split`) — `split`, `truncateOldest`, `warn`
+    - `Session-Control.save.stripToolOutput` (boolean, default: false) — strip verbose tool call outputs
+    - `Session-Control.save.maxSavedSessions` (number, default: 0 = unlimited) — max session files in `.chat/`
+    - `Session-Control.save.pruneAction` (enum, default: `archive`) — `archive` or `delete`
 - **Chat Participant:**
-  - id: `chat-commit.resume`, name: `chat-commit`, description: "Resume a saved chat session"
+  - id: `Session-Control.resume`, name: `Session-Control`, description: "Resume a saved chat session"
   - commands: `resume`, `list`
 - **Menus:** Add "Save Chat Session" to `chat/context` menu or command palette
 
 ### Step 1.4 — Extension activation events
 - Activate lazily via `onCommand` for each command
-- The chat participant (`chat-commit.resume`) automatically activates the extension when invoked — no explicit event needed in VS Code ≥1.93
+- The chat participant (`Session-Control.resume`) automatically activates the extension when invoked — no explicit event needed in VS Code ≥1.93
 - **No `*` activation** — the extension has no reason to run until the user interacts with it
 - Add `onStartupFinished` for `autoSaveOnCommit` — in `activate()`, check the setting and only register the git listener if enabled; otherwise return immediately
 
@@ -279,7 +279,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 > **Goal:** The user can save a chat session end-to-end. First user-facing feature.
 
 ### Step 6.1 — Register the save command
-- Wire `chat-commit.saveSession` in `src/extension.ts`
+- Wire `Session-Control.saveSession` in `src/extension.ts`
 - Call `sessionReader` → present QuickPick → call `sessionWriter` → call `sessionStore`
 
 ### Step 6.2 — QuickPick session selection
@@ -288,23 +288,23 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 - Allow user to rename the title before saving
 
 ### Step 6.3 — Register list and delete commands
-- `chat-commit.listSessions` — QuickPick showing all saved sessions with metadata (title, date, branch, commit SHA, turn count)
-- `chat-commit.deleteSession` — soft-delete (move to `.chat/.trash/`) or hard-delete with confirmation
+- `Session-Control.listSessions` — QuickPick showing all saved sessions with metadata (title, date, branch, commit SHA, turn count)
+- `Session-Control.deleteSession` — soft-delete (move to `.chat/.trash/`) or hard-delete with confirmation
 
 ### Step 6.4 — Integration test: save round-trip
 - Save a mock session → read back → verify JSON structure matches schema
 - Verify git metadata captured correctly (using real git repo in temp dir)
 
-**Deliverable:** User can run "Chat Commit: Save Current Chat Session" from the command palette and see the JSON file appear in `.chat/`. Can browse and delete sessions.
+**Deliverable:** User can run "Session Control: Save Current Chat Session" from the command palette and see the JSON file appear in `.chat/`. Can browse and delete sessions.
 
 ---
 
 ## Phase 7: Chat Participant & Resume
 
-> **Goal:** The user can resume a saved session via `@chat-commit /resume`.
+> **Goal:** The user can resume a saved session via `@Session-Control /resume`.
 
 ### Step 7.1 — Register the chat participant (`src/chatParticipant.ts`)
-- Register `@chat-commit` via `vscode.chat.createChatParticipant()`
+- Register `@Session-Control` via `vscode.chat.createChatParticipant()`
 - Route `/resume` and `/list` commands to handlers
 
 ### Step 7.2 — `/list` command
@@ -330,7 +330,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 - Save a session → resume via chat participant → verify context prompt format
 - Test fuzzy matching with various query inputs
 
-**Deliverable:** User can type `@chat-commit /resume fix-auth-bug` and get the saved conversation injected as context. Follow-up messages retain context.
+**Deliverable:** User can type `@Session-Control /resume fix-auth-bug` and get the saved conversation injected as context. Follow-up messages retain context.
 
 ---
 
@@ -399,7 +399,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 > **Goal:** Configuration validation, multi-root support, and final polish.
 
 ### Step 10.1 — Configuration validation
-- Read settings via `vscode.workspace.getConfiguration('chat-commit')`
+- Read settings via `vscode.workspace.getConfiguration('Session-Control')`
 - Validate `storagePath` (must be relative, within workspace)
 - Validate numeric settings (positive integers)
 - Validate `maxFileSize` format (`500kb`, `1mb`, etc.)
@@ -422,7 +422,7 @@ Status: Implemented for manual save, auto-save, list/delete, and chat resume/lis
 Status: Implemented in the save flow with idempotent workspace-relative `.gitignore` updates.
 
 ### Step 10.4 — Session explorer tree view (stretch)
-- `chat-commit.sessionExplorer` — sidebar panel listing saved sessions
+- `Session-Control.sessionExplorer` — sidebar panel listing saved sessions
 - Click to preview session metadata; double-click to resume
 
 Status: Implemented as a dedicated activity-bar view with workspace-grouped saved sessions, open-in-editor, refresh, and delete actions.
@@ -442,7 +442,7 @@ Error handling strategy across all subsystems. The principle: never silently fai
 ### Copilot Storage Errors (Session Reader)
 - **Storage directory not found**: The `chatSessions/` directory may not exist if Copilot hasn't been used in this workspace. Show an info message: *"No Copilot chat sessions found in this workspace. Start a Copilot chat first."* Do not throw.
 - **Unreadable/corrupt session files**: If a `.json` or `.jsonl` file fails to parse, skip it with a warning in the output channel: *"Skipped corrupt session file: {filename}"*. Continue processing remaining files. Never crash on a single bad file.
-- **Unknown format version**: If the session data structure doesn't match any known format, show an error: *"Unrecognized Copilot session format (VS Code {version}). Chat-Commit may need an update."* Include a link to file an issue. Return an empty session list rather than throwing.
+- **Unknown format version**: If the session data structure doesn't match any known format, show an error: *"Unrecognized Copilot session format (VS Code {version}). Session-Control may need an update."* Include a link to file an issue. Return an empty session list rather than throwing.
 - **Permission errors**: If files can't be read due to OS permissions, surface the OS error message directly.
 
 ### Save Errors (Session Writer / Session Store)
@@ -451,7 +451,7 @@ Error handling strategy across all subsystems. The principle: never silently fai
 - **JSON serialization errors**: Should not happen with well-formed data, but catch and log with full context if it does.
 
 ### Resume Errors (Chat Participant)
-- **No matching session**: If fuzzy match returns zero results, respond in chat: *"No saved session matching '{query}'. Use @chat-commit /list to see available sessions."*
+- **No matching session**: If fuzzy match returns zero results, respond in chat: *"No saved session matching '{query}'. Use @Session-Control /list to see available sessions."*
 - **Corrupt saved session file**: If a `.chat/*.json` file fails to parse, respond in chat: *"Session file is corrupt: {filename}. Try re-saving the session."*
 - **Summarization failure**: If the `summarize` overflow strategy fails (LLM error), fall back to `truncate` silently and note in the context summary: *"Summary generation failed — showing most recent turns only."*
 
@@ -501,7 +501,7 @@ The `markdownSummary` field in the session JSON provides a human-readable render
 
 ## Fuzzy Matching
 
-Used by the resume system to find sessions matching a user's query (e.g., `@chat-commit /resume fix-auth`).
+Used by the resume system to find sessions matching a user's query (e.g., `@Session-Control /resume fix-auth`).
 
 ### Algorithm
 - Input: user query string, list of session files in `.chat/`
@@ -531,7 +531,7 @@ Used by the resume system to find sessions matching a user's query (e.g., `@chat
 
 ## Multi-Root Workspace Handling
 
-VS Code supports multi-root workspaces where multiple folders are open simultaneously. Chat-Commit must handle this correctly.
+VS Code supports multi-root workspaces where multiple folders are open simultaneously. Session-Control must handle this correctly.
 
 ### Which workspace folder gets the `.chat/` directory?
 - **On manual save**: Use the workspace folder of the **active editor's file**. If no file is open, prompt the user to select a workspace folder via QuickPick.
@@ -539,7 +539,7 @@ VS Code supports multi-root workspaces where multiple folders are open simultane
 - **On resume/list**: Search `.chat/` folders across **all** workspace folders. Present results with the workspace folder name as a prefix for disambiguation (e.g., *"[backend] fix-auth-bug"*, *"[frontend] add-navbar"*).
 
 ### Settings scope
-- `chat-commit.*` settings can be configured at the workspace-folder level (VS Code supports this natively via `.vscode/settings.json` per folder)
+- `Session-Control.*` settings can be configured at the workspace-folder level (VS Code supports this natively via `.vscode/settings.json` per folder)
 - `storagePath` is always relative to the workspace folder root, not the multi-root workspace file
 - Example: workspace with `backend/` and `frontend/` → sessions save to `backend/.chat/` or `frontend/.chat/`
 
@@ -612,7 +612,7 @@ Run inside VS Code extension host via `@vscode/test-electron`.
 - `src/extension.ts` — Entry point, registers commands and chat participant
 - `src/sessionReader.ts` — Reads Copilot internal session files, handles format versioning
 - `src/sessionWriter.ts` — Transforms and writes sessions to `.chat/` folder
-- `src/chatParticipant.ts` — `@chat-commit` chat participant handler (resume logic)
+- `src/chatParticipant.ts` — `@Session-Control` chat participant handler (resume logic)
 - `src/gitIntegration.ts` — Git extension API wrapper (branch, SHA, commit listener)
 - `src/sessionStore.ts` — CRUD operations on saved session files in `.chat/`
 - `src/types.ts` — TypeScript interfaces for `ChatSession`, `SavedTurn`, etc.
@@ -636,9 +636,9 @@ Run inside VS Code extension host via `@vscode/test-electron`.
 
 1. **Unit tests** — Test session parsing, JSON schema validation, slugification, git metadata extraction (mock git API)
 2. **Integration test** — Save a session, verify JSON structure, load it back, verify round-trip fidelity
-3. **Manual test: Save flow** — Open Copilot Chat, have a conversation, run "Chat Commit: Save Current Chat Session", verify `.chat/` folder contains valid JSON with correct git metadata
-4. **Manual test: Resume flow** — Type `@chat-commit /resume <saved-session>`, verify the conversation context is loaded, ask a follow-up question referencing earlier context, verify LLM responds coherently
-5. **Manual test: Auto-save** — Enable `chat-commit.autoSaveOnCommit`, make a commit, verify a new session JSON appears in `.chat/`
+3. **Manual test: Save flow** — Open Copilot Chat, have a conversation, run "Session Control: Save Current Chat Session", verify `.chat/` folder contains valid JSON with correct git metadata
+4. **Manual test: Resume flow** — Type `@Session-Control /resume <saved-session>`, verify the conversation context is loaded, ask a follow-up question referencing earlier context, verify LLM responds coherently
+5. **Manual test: Auto-save** — Enable `Session-Control.autoSaveOnCommit`, make a commit, verify a new session JSON appears in `.chat/`
 6. **Manual test: Git diff** — Save a session, `git diff` and verify the JSON/Markdown is readable
 7. **Snyk scan** — Run `snyk_code_scan` on all source files per project rules
 8. **Extension packaging** — `vsce package` succeeds, `.vsix` installs cleanly
@@ -651,7 +651,7 @@ Run inside VS Code extension host via `@vscode/test-electron`.
 ## Decisions & Assumptions
 
 - **Internal storage dependency:** Reading Copilot's internal session files is fragile — format may change across VS Code versions. Mitigated by version detection and graceful error handling. This is the only way to access full Copilot session history (public API only exposes history for your own participant).
-- **Resume via chat participant, not native restore:** No public API exists to restore a native Copilot session. The `@chat-commit` participant approach is stable and uses public APIs.
+- **Resume via chat participant, not native restore:** No public API exists to restore a native Copilot session. The `@Session-Control` participant approach is stable and uses public APIs.
 - **JSON as primary format:** Chosen because the user wants resume capability. Markdown is embedded in the JSON for human readability in diffs.
 - **Open source (MIT):** The extension is developed and published as an open source project. Contributions welcome via GitHub PRs. Published to the VS Code Marketplace and Open VSX Registry.
 - **Personal-use origin, community-maintained:** Started as a personal tool. No complex collaboration features like conflict resolution or merge strategies for `.chat/` files — sessions are append-only snapshots. Community contributions may expand scope over time.

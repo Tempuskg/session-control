@@ -49,7 +49,7 @@ suite('sessionStore', () => {
 	});
 
 	test('writeSession persists session atomically and readSession restores it', async () => {
-		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-session-store-'));
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
 		const storageDirectory = path.join(tempRoot, '.chat');
 		const store = createSessionStore();
 
@@ -69,7 +69,7 @@ suite('sessionStore', () => {
 	});
 
 	test('listSessions returns metadata sorted by newest first', async () => {
-		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-session-store-'));
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
 		const storageDirectory = path.join(tempRoot, '.chat');
 		const store = createSessionStore();
 
@@ -87,7 +87,7 @@ suite('sessionStore', () => {
 	});
 
 	test('listSessions returns empty when directory does not exist', async () => {
-		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-session-store-'));
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
 		const storageDirectory = path.join(tempRoot, '.chat');
 		const store = createSessionStore();
 
@@ -100,7 +100,7 @@ suite('sessionStore', () => {
 	});
 
 	test('deleteSession removes an existing file and returns false when missing', async () => {
-		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-session-store-'));
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
 		const storageDirectory = path.join(tempRoot, '.chat');
 		const store = createSessionStore();
 
@@ -121,7 +121,7 @@ suite('sessionStore', () => {
 	});
 
 	test('pruneSessions archives oldest sessions when action is archive', async () => {
-		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-session-store-'));
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
 		const storageDirectory = path.join(tempRoot, '.chat');
 		const store = createSessionStore();
 
@@ -145,7 +145,7 @@ suite('sessionStore', () => {
 	});
 
 	test('pruneSessions deletes oldest sessions when action is delete', async () => {
-		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-session-store-'));
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
 		const storageDirectory = path.join(tempRoot, '.chat');
 		const store = createSessionStore();
 

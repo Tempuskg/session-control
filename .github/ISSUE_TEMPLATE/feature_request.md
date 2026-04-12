@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea or enhancement for Chat Commit
+about: Suggest an idea or enhancement for Session Control
 labels: enhancement
 ---
 

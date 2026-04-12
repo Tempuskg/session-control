@@ -17,7 +17,7 @@ function createFakeRepository(initialCommit: string): FakeRepository {
 	let disposed = false;
 
 	return {
-		rootUri: vscode.Uri.file('e:/chat-commit'),
+		rootUri: vscode.Uri.file('e:/session-control'),
 		state: {
 			HEAD: { commit: initialCommit },
 			onDidChange: (nextListener: () => void) => {

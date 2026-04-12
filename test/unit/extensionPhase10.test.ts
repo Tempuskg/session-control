@@ -87,7 +87,7 @@ suite('extension phase 10', () => {
 	});
 
 	test('listSessionsAcrossWorkspaceFolders aggregates saved sessions from all folders', async () => {
-		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-phase10-'));
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-phase10-'));
 		const store = createSessionStore();
 
 		try {
@@ -128,7 +128,7 @@ suite('extension phase 10', () => {
 	});
 
 	test('ensureStoragePathInGitignore appends the relative storage path once', async () => {
-		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-gitignore-'));
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-gitignore-'));
 
 		try {
 			const workspaceFolder = createWorkspaceFolder(tempRoot, 'repo', 0);

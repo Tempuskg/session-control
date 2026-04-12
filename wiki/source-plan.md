@@ -34,11 +34,11 @@ related:
 
 ## Summary
 
-The founding document for the chat-commit VS Code extension. Defines the complete project architecture, implementation phases, data formats, and configuration options.
+The founding document for the session-control VS Code extension. Defines the complete project architecture, implementation phases, data formats, and configuration options.
 
 ## Key Takeaways
 
-1. **Two subsystems**: Save System (reads Copilot internals, writes JSON to `.chat/`) and Resume System (`@chat-commit` chat participant that injects saved context).
+1. **Two subsystems**: Save System (reads Copilot internals, writes JSON to `.chat/`) and Resume System (`@session-control` chat participant that injects saved context).
 
 2. **Storage format is JSON** with an embedded markdown summary. Files named `{timestamp}-{slug}.json` in `.chat/`.
 

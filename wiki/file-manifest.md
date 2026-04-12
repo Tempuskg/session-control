@@ -16,7 +16,7 @@ related:
 
 # File Manifest
 
-Planned source files for the chat-commit extension, their roles, and dependencies.
+Planned source files for the session-control extension, their roles, and dependencies.
 
 ## Source Files
 
@@ -26,7 +26,7 @@ Planned source files for the chat-commit extension, their roles, and dependencie
 | `src/extension.ts` | Entry point: registers commands and chat participant | All modules |
 | `src/sessionReader.ts` | Reads Copilot internal session files; handles format versioning | VS Code internal API |
 | `src/sessionWriter.ts` | Transforms raw sessions to [Session Format](session-format.md); writes to disk | `types.ts`, `gitIntegration.ts`, `utils.ts` |
-| `src/chatParticipant.ts` | `@chat-commit` chat participant handler (resume logic) | `sessionStore.ts`, `types.ts` |
+| `src/chatParticipant.ts` | `@session-control` chat participant handler (resume logic) | `sessionStore.ts`, `types.ts` |
 | `src/gitIntegration.ts` | Git extension API wrapper: branch, SHA, commit listener | `vscode.git` extension API |
 | `src/sessionStore.ts` | CRUD operations on saved session files in `.chat/` | `types.ts`, `utils.ts` |
 | `src/types.ts` | TypeScript interfaces: `ChatSession`, `SavedTurn`, etc. | — |
@@ -72,13 +72,13 @@ graph TD
 ## Package.json Contributions
 
 ### Commands
-- `chat-commit.saveSession` — "Chat Commit: Save Current Chat Session"
-- `chat-commit.listSessions` — "Chat Commit: Browse Saved Sessions"
-- `chat-commit.deleteSession` — "Chat Commit: Delete Saved Session"
+- `session-control.saveSession` — "Session Control: Save Current Chat Session"
+- `session-control.listSessions` — "Session Control: Browse Saved Sessions"
+- `session-control.deleteSession` — "Session Control: Delete Saved Session"
 
 ### Chat Participant
-- **ID**: `chat-commit.resume`
-- **Name**: `chat-commit`
+- **ID**: `session-control.resume`
+- **Name**: `session-control`
 - **Description**: "Resume a saved chat session"
 - **Commands**: `resume`, `list`
 
@@ -86,4 +86,4 @@ graph TD
 - "Save Chat Session" in `chat/context` menu or command palette
 
 ### Tree View (Phase 4 stretch)
-- `chat-commit.sessionExplorer` — Sidebar panel listing saved sessions
+- `session-control.sessionExplorer` — Sidebar panel listing saved sessions

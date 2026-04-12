@@ -15,7 +15,7 @@ related:
 
 # Configuration
 
-All user-facing settings under the `chat-commit` namespace, accessed via `vscode.workspace.getConfiguration('chat-commit')`.
+All user-facing settings under the `session-control` namespace, accessed via `vscode.workspace.getConfiguration('session-control')`.
 
 ## General Settings
 

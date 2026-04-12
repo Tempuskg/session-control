@@ -5,14 +5,14 @@ created: 2026-04-12
 updated: 2026-04-12
 ---
 
-# Chat-Commit Wiki Index
+# Session Control Wiki Index
 
-Master catalog of all wiki pages for the **chat-commit** VS Code extension.
+Master catalog of all wiki pages for the **session-control** VS Code extension.
 
 ---
 
 ## Overview
-- [Project Overview](overview.md) — High-level summary of what chat-commit is and why it exists
+- [Project Overview](overview.md) — High-level summary of what session-control is and why it exists
 
 ## Architecture
 - [Architecture](architecture.md) — System design: save system, resume system, storage format, and how they connect
@@ -21,7 +21,7 @@ Master catalog of all wiki pages for the **chat-commit** VS Code extension.
 ## Entities
 - [Save System](save-system.md) — Subsystem for reading, transforming, and persisting Copilot chat sessions
 - [Resume System](resume-system.md) — Chat participant that loads saved sessions as LLM context
-- [Chat Participant](chat-participant.md) — The `@chat-commit` VS Code chat participant: registration, commands, UX
+- [Chat Participant](chat-participant.md) — The `@session-control` VS Code chat participant: registration, commands, UX
 - [Git Integration](git-integration.md) — Git metadata capture, auto-save on commit, branch/SHA tracking
 
 ## Concepts

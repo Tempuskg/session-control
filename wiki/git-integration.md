@@ -21,7 +21,7 @@ Git integration provides commit metadata for saved sessions and optional auto-sa
 
 ## VS Code Git Extension API
 
-Chat-Commit uses the built-in VS Code Git extension API (not the git CLI):
+Session Control uses the built-in VS Code Git extension API (not the git CLI):
 
 ```typescript
 const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;

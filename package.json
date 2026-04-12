@@ -1,18 +1,18 @@
 {
-  "name": "chat-commit",
-  "displayName": "Chat Commit",
+  "name": "session-control",
+  "displayName": "Session Control",
   "description": "Save and resume GitHub Copilot Chat sessions linked to git commits",
   "version": "0.1.0",
   "publisher": "your-publisher-id",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/chat-commit"
+    "url": "https://github.com/your-username/session-control"
   },
   "bugs": {
-    "url": "https://github.com/your-username/chat-commit/issues"
+    "url": "https://github.com/your-username/session-control/issues"
   },
-  "homepage": "https://github.com/your-username/chat-commit#readme",
+  "homepage": "https://github.com/your-username/session-control#readme",
   "engines": {
     "vscode": "^1.93.0"
   },
@@ -34,72 +34,72 @@
   "contributes": {
     "commands": [
       {
-        "command": "chat-commit.saveSession",
-        "title": "Chat Commit: Save Current Chat Session",
-        "category": "Chat Commit"
+        "command": "session-control.saveSession",
+        "title": "Session Control: Save Current Chat Session",
+        "category": "Session Control"
       },
       {
-        "command": "chat-commit.listSessions",
-        "title": "Chat Commit: Browse Saved Sessions",
-        "category": "Chat Commit"
+        "command": "session-control.listSessions",
+        "title": "Session Control: Browse Saved Sessions",
+        "category": "Session Control"
       },
       {
-        "command": "chat-commit.deleteSession",
-        "title": "Chat Commit: Delete Saved Session",
-        "category": "Chat Commit"
+        "command": "session-control.deleteSession",
+        "title": "Session Control: Delete Saved Session",
+        "category": "Session Control"
       },
       {
-        "command": "chat-commit.refreshSessionExplorer",
+        "command": "session-control.refreshSessionExplorer",
         "title": "Refresh Session Explorer",
-        "category": "Chat Commit",
+        "category": "Session Control",
         "icon": "$(refresh)"
       },
       {
-        "command": "chat-commit.openSessionFromExplorer",
+        "command": "session-control.openSessionFromExplorer",
         "title": "Open Saved Session",
-        "category": "Chat Commit"
+        "category": "Session Control"
       },
       {
-        "command": "chat-commit.deleteSessionFromExplorer",
+        "command": "session-control.deleteSessionFromExplorer",
         "title": "Delete Saved Session",
-        "category": "Chat Commit",
+        "category": "Session Control",
         "icon": "$(trash)"
       },
       {
-        "command": "chat-commit.toggleAutoSaveOnCommit",
+        "command": "session-control.toggleAutoSaveOnCommit",
         "title": "Toggle Auto-Save On Commit",
-        "category": "Chat Commit"
+        "category": "Session Control"
       }
     ],
     "configuration": {
-      "title": "Chat Commit",
+      "title": "Session Control",
       "properties": {
-        "chat-commit.storagePath": {
+        "session-control.storagePath": {
           "type": "string",
           "default": ".chat",
           "description": "Folder (relative to workspace root) where chat sessions are saved.",
           "scope": "resource"
         },
-        "chat-commit.autoSaveOnCommit": {
+        "session-control.autoSaveOnCommit": {
           "type": "boolean",
           "default": false,
           "description": "Automatically save the active chat session when a git commit is made.",
           "scope": "resource"
         },
-        "chat-commit.includeInGitignore": {
+        "session-control.includeInGitignore": {
           "type": "boolean",
           "default": false,
           "description": "Add the storage folder to .gitignore. By default sessions are tracked in source control.",
           "scope": "resource"
         },
-        "chat-commit.resume.maxTurns": {
+        "session-control.resume.maxTurns": {
           "type": "number",
           "default": 50,
           "minimum": 1,
           "description": "Maximum number of turns to inject as context when resuming a saved session.",
           "scope": "resource"
         },
-        "chat-commit.resume.overflowStrategy": {
+        "session-control.resume.overflowStrategy": {
           "type": "string",
           "enum": [
             "summarize",
@@ -115,14 +115,14 @@
           "description": "What to do when a session exceeds resume.maxTurns or resume.maxContextChars.",
           "scope": "resource"
         },
-        "chat-commit.resume.maxContextChars": {
+        "session-control.resume.maxContextChars": {
           "type": "number",
           "default": 80000,
           "minimum": 1000,
           "description": "Hard cap on total characters injected as context when resuming. Overflow is handled by resume.overflowStrategy.",
           "scope": "resource"
         },
-        "chat-commit.save.maxFileSize": {
+        "session-control.save.maxFileSize": {
           "type": "string",
           "default": "1mb",
           "pattern": "^[0-9]+(kb|mb|KB|MB)$",
@@ -130,7 +130,7 @@
           "description": "Maximum size per saved session file. Sessions exceeding this are handled by save.overflowStrategy.",
           "scope": "resource"
         },
-        "chat-commit.save.overflowStrategy": {
+        "session-control.save.overflowStrategy": {
           "type": "string",
           "enum": [
             "split",
@@ -146,20 +146,20 @@
           "description": "What to do when a saved session file exceeds save.maxFileSize.",
           "scope": "resource"
         },
-        "chat-commit.save.stripToolOutput": {
+        "session-control.save.stripToolOutput": {
           "type": "boolean",
           "default": false,
           "description": "Strip verbose tool call outputs (e.g. file contents, terminal output) from saved turns to reduce file size. Tool call names and summaries are preserved.",
           "scope": "resource"
         },
-        "chat-commit.save.maxSavedSessions": {
+        "session-control.save.maxSavedSessions": {
           "type": "number",
           "default": 0,
           "minimum": 0,
           "description": "Maximum number of session files to keep in the storage folder. 0 means unlimited. When exceeded, the oldest sessions are handled by save.pruneAction.",
           "scope": "resource"
         },
-        "chat-commit.save.pruneAction": {
+        "session-control.save.pruneAction": {
           "type": "string",
           "enum": [
             "archive",
@@ -177,8 +177,8 @@
     },
     "chatParticipants": [
       {
-        "id": "chat-commit.resume",
-        "name": "chat-commit",
+        "id": "session-control.resume",
+        "name": "session-control",
         "description": "Resume a saved chat session",
         "isSticky": false,
         "commands": [
@@ -196,16 +196,16 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "chat-commit",
-          "title": "Chat Commit",
-          "icon": "media/chat-commit.svg"
+          "id": "session-control",
+          "title": "Session Control",
+          "icon": "media/session-control.svg"
         }
       ]
     },
     "views": {
-      "chat-commit": [
+      "session-control": [
         {
-          "id": "chat-commit.sessionExplorer",
+          "id": "session-control.sessionExplorer",
           "name": "Saved Sessions"
         }
       ]
@@ -213,34 +213,34 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "chat-commit.saveSession"
+          "command": "session-control.saveSession"
         },
         {
-          "command": "chat-commit.listSessions"
+          "command": "session-control.listSessions"
         },
         {
-          "command": "chat-commit.deleteSession"
+          "command": "session-control.deleteSession"
         },
         {
-          "command": "chat-commit.toggleAutoSaveOnCommit"
+          "command": "session-control.toggleAutoSaveOnCommit"
         }
       ],
       "view/title": [
         {
-          "command": "chat-commit.refreshSessionExplorer",
-          "when": "view == chat-commit.sessionExplorer",
+          "command": "session-control.refreshSessionExplorer",
+          "when": "view == session-control.sessionExplorer",
           "group": "navigation"
         }
       ],
       "view/item/context": [
         {
-          "command": "chat-commit.openSessionFromExplorer",
-          "when": "view == chat-commit.sessionExplorer && viewItem == chat-commit.session",
+          "command": "session-control.openSessionFromExplorer",
+          "when": "view == session-control.sessionExplorer && viewItem == session-control.session",
           "group": "inline"
         },
         {
-          "command": "chat-commit.deleteSessionFromExplorer",
-          "when": "view == chat-commit.sessionExplorer && viewItem == chat-commit.session",
+          "command": "session-control.deleteSessionFromExplorer",
+          "when": "view == session-control.sessionExplorer && viewItem == session-control.session",
           "group": "inline"
         }
       ]

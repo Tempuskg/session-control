@@ -16,7 +16,7 @@ related:
 
 # Chat Participant
 
-The `@chat-commit` chat participant is the user-facing interface for the Resume System. It's registered via the VS Code Chat Participant API.
+The `@session-control` chat participant is the user-facing interface for the Resume System. It's registered via the VS Code Chat Participant API.
 
 ## Registration
 
@@ -24,8 +24,8 @@ The `@chat-commit` chat participant is the user-facing interface for the Resume 
 // Defined in package.json
 {
   "chatParticipants": [{
-    "id": "chat-commit.resume",
-    "name": "chat-commit",
+    "id": "session-control.resume",
+    "name": "session-control",
     "description": "Resume a saved chat session"
   }]
 }
@@ -39,8 +39,8 @@ Registered at activation via `vscode.chat.createChatParticipant()` in `src/chatP
 
 | Command | Usage | Description |
 |---------|-------|-------------|
-| `/resume` | `@chat-commit /resume <name>` | Load and inject a saved session as context |
-| `/list` | `@chat-commit /list` | Show available saved sessions in chat response |
+| `/resume` | `@session-control /resume <name>` | Load and inject a saved session as context |
+| `/list` | `@session-control /list` | Show available saved sessions in chat response |
 
 ### `/resume` Behavior
 1. Fuzzy match `<name>` against session titles and filenames in `.chat/`
@@ -60,7 +60,7 @@ Handler is registered in `src/chatParticipant.ts`:
 
 ```typescript
 // Pseudocode
-const participant = vscode.chat.createChatParticipant('chat-commit.resume', handler);
+const participant = vscode.chat.createChatParticipant('session-control.resume', handler);
 
 async function handler(
   request: vscode.ChatRequest,
@@ -94,4 +94,4 @@ On follow-up turns, this context is re-injected via `context.history` and the co
 ## Menu Integration
 
 - "Save Chat Session" added to the `chat/context` menu (if available) or command palette
-- Future: Tree View sidebar panel (`chat-commit.sessionExplorer`) for browsing sessions (Phase 4 stretch goal)
+- Future: Tree View sidebar panel (`session-control.sessionExplorer`) for browsing sessions (Phase 4 stretch goal)

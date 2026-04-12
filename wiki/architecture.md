@@ -17,7 +17,7 @@ related:
 
 # Architecture
 
-Chat-Commit is structured around two independent subsystems connected by a shared storage layer.
+Session Control is structured around two independent subsystems connected by a shared storage layer.
 
 ## System Diagram
 
@@ -28,9 +28,9 @@ graph TB
         ChatUI["VS Code Chat UI"]
     end
 
-    subgraph "Chat-Commit Extension"
+    subgraph "Session Control Extension"
         SaveSystem["Save System<br/>(sessionReader → sessionWriter)"]
-        ResumeSystem["Resume System<br/>(@chat-commit participant)"]
+        ResumeSystem["Resume System<br/>(@session-control participant)"]
         GitIntegration["Git Integration<br/>(branch, SHA, commit hooks)"]
         SessionStore["Session Store<br/>(CRUD on .chat/)"]
     end
@@ -55,7 +55,7 @@ graph TB
 Reads Copilot's internal session storage files, transforms them into the [Session Format](session-format.md), enriches with git metadata via [Git Integration](git-integration.md), and writes to `.chat/`. Applies bloat controls (size limits, splitting, stripping) before writing. See [Save System](save-system.md).
 
 ### Resume System
-A registered VS Code chat participant (`@chat-commit`) that reads saved sessions from `.chat/`, applies context limits (max turns, max chars), and injects prior conversation as LLM context. See [Resume System](resume-system.md) and [Chat Participant](chat-participant.md).
+A registered VS Code chat participant (`@session-control`) that reads saved sessions from `.chat/`, applies context limits (max turns, max chars), and injects prior conversation as LLM context. See [Resume System](resume-system.md) and [Chat Participant](chat-participant.md).
 
 ### Session Store
 CRUD layer for saved session files in `.chat/`. Handles file naming, searching, fuzzy matching, archival, and deletion. Used by both Save and Resume systems.
@@ -73,7 +73,7 @@ Wraps the VS Code Git extension API. Provides branch name, commit SHA, dirty sta
 5. `sessionStore` writes JSON file to `.chat/` with git metadata from `gitIntegration`
 
 ### Resume Flow
-1. User types `@chat-commit /resume fix-auth-bug` in chat
+1. User types `@session-control /resume fix-auth-bug` in chat
 2. `chatParticipant` handler receives the request
 3. `sessionStore` searches `.chat/` for matching session (fuzzy match)
 4. Session JSON loaded, reassembled if split across parts

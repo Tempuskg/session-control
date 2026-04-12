@@ -53,7 +53,7 @@ function createCopilotSession(): CopilotSession {
 
 suite('chatParticipant integration', () => {
 	test('resume round-trip persists, matches, reloads, and builds constrained prompt', async () => {
-		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-chat-participant-'));
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-chat-participant-'));
 		const storageDirectory = path.join(tempRoot, '.chat');
 		const store = createSessionStore();
 
@@ -110,7 +110,7 @@ suite('chatParticipant integration', () => {
 	});
 
 	test('loadReassembledSession rebuilds full turns from split part chain', async () => {
-		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-chat-participant-reassembly-'));
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-chat-participant-reassembly-'));
 		const storageDirectory = path.join(tempRoot, '.chat');
 		const store = createSessionStore();
 

@@ -9,8 +9,8 @@ async function setupWorkspaceStorageRoot(): Promise<{
 	storageUriPath: string;
 	sessionsDirectory: string;
 }> {
-	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-session-reader-'));
-	const storageUriPath = path.join(root, 'workspaceStorage', 'workspace-1', 'chat-commit');
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-reader-'));
+	const storageUriPath = path.join(root, 'workspaceStorage', 'workspace-1', 'session-control');
 	const sessionsDirectory = deriveChatSessionsPath(storageUriPath);
 
 	await fs.mkdir(storageUriPath, { recursive: true });
@@ -27,7 +27,7 @@ async function copyFixture(fixtureName: string, destinationDirectory: string): P
 
 suite('sessionReader', () => {
 	test('deriveChatSessionsPath maps workspace storage extension path to chatSessions', () => {
-		const result = deriveChatSessionsPath(path.join('tmp', 'workspaceStorage', 'abc', 'chat-commit'));
+		const result = deriveChatSessionsPath(path.join('tmp', 'workspaceStorage', 'abc', 'session-control'));
 		assert.equal(result.endsWith(path.join('workspaceStorage', 'abc', 'chatSessions')), true);
 	});
 
@@ -117,7 +117,7 @@ suite('sessionReader', () => {
 			assert.equal(sessions.length, 0);
 			assert.equal(
 				errorMessages[0],
-				'Unrecognized Copilot session format (VS Code 1.115.0). Chat-Commit may need an update.',
+				'Unrecognized Copilot session format (VS Code 1.115.0). Session Control may need an update.',
 			);
 		} finally {
 			await fs.rm(setup.root, { recursive: true, force: true });

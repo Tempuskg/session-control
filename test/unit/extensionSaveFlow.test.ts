@@ -36,7 +36,7 @@ function createCopilotSession(): CopilotSession {
 
 suite('extension save flow', () => {
 	test('runSaveSessionFlow saves and round-trips a valid chat session', async () => {
-		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-extension-save-flow-'));
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-extension-save-flow-'));
 		const workspaceRoot = path.join(tempRoot, 'workspace');
 		const storageDirectory = path.join(workspaceRoot, '.chat');
 		const infoMessages: string[] = [];
@@ -86,7 +86,7 @@ suite('extension save flow', () => {
 	});
 
 	test('runSaveSessionFlow writes split sessions and emits warning', async () => {
-		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-extension-save-flow-split-'));
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-extension-save-flow-split-'));
 		const workspaceRoot = path.join(tempRoot, 'workspace');
 		const storageDirectory = path.join(workspaceRoot, '.chat');
 		const infoMessages: string[] = [];
@@ -139,7 +139,7 @@ suite('extension save flow', () => {
 	});
 
 	test('runSaveSessionFlow triggers pruning notifications when limits are exceeded', async () => {
-		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-extension-save-flow-prune-'));
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-extension-save-flow-prune-'));
 		const workspaceRoot = path.join(tempRoot, 'workspace');
 		const storageDirectory = path.join(workspaceRoot, '.chat');
 		const infoMessages: string[] = [];
@@ -177,7 +177,7 @@ suite('extension save flow', () => {
 	});
 
 	test('runSaveSessionFlow adds the storage folder to .gitignore when configured', async () => {
-		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-extension-save-flow-gitignore-'));
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-extension-save-flow-gitignore-'));
 		const workspaceRoot = path.join(tempRoot, 'workspace');
 		const storageDirectory = path.join(workspaceRoot, '.chat');
 

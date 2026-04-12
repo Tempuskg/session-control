@@ -6,7 +6,7 @@ import { fuzzyMatchSessions } from './utils';
 
 const chatSessionStore = createSessionStore();
 
-const CHAT_PARTICIPANT_ID = 'chat-commit.resume';
+const CHAT_PARTICIPANT_ID = 'session-control.resume';
 const MIN_AUTO_SELECT_SCORE = 60;
 
 export type ResumeOverflowStrategy = 'summarize' | 'truncate' | 'recent-only';
@@ -35,21 +35,21 @@ interface WorkspaceSessionMeta extends SessionMeta {
 
 function getStoragePath(workspaceFolder: vscode.WorkspaceFolder): string {
 	const configured = vscode.workspace
-		.getConfiguration('chat-commit', workspaceFolder.uri)
+		.getConfiguration('session-control', workspaceFolder.uri)
 		.get<string>('storagePath', '.chat');
 
 	if (!configured.trim()) {
-		throw new Error('chat-commit.storagePath must not be empty.');
+		throw new Error('session-control.storagePath must not be empty.');
 	}
 
 	if (path.isAbsolute(configured)) {
-		throw new Error('chat-commit.storagePath must be relative to the workspace folder.');
+		throw new Error('session-control.storagePath must be relative to the workspace folder.');
 	}
 
 	const resolved = path.resolve(workspaceFolder.uri.fsPath, configured);
 	const relative = path.relative(workspaceFolder.uri.fsPath, resolved);
 	if (relative.startsWith('..') || path.isAbsolute(relative)) {
-		throw new Error('chat-commit.storagePath must stay within the workspace folder.');
+		throw new Error('session-control.storagePath must stay within the workspace folder.');
 	}
 
 	return resolved;
@@ -104,7 +104,7 @@ async function listSessionsAcrossWorkspaceFolders(
 
 export function renderSessionListMarkdown(sessions: SessionMeta[]): string {
 	if (!sessions.length) {
-		return 'No saved sessions found. Use Command Palette: Chat Commit: Save Current Chat Session.';
+		return 'No saved sessions found. Use Command Palette: Session Control: Save Current Chat Session.';
 	}
 
 	return ['## Saved Sessions', '', ...sessions.map((session) => asMarkdownListItem(session))].join('\n');
@@ -112,7 +112,7 @@ export function renderSessionListMarkdown(sessions: SessionMeta[]): string {
 
 function renderWorkspaceSessionListMarkdown(sessions: WorkspaceSessionMeta[]): string {
 	if (!sessions.length) {
-		return 'No saved sessions found. Use Command Palette: Chat Commit: Save Current Chat Session.';
+		return 'No saved sessions found. Use Command Palette: Session Control: Save Current Chat Session.';
 	}
 
 	return ['## Saved Sessions', '', ...sessions.map((session) => asWorkspaceMarkdownListItem(session))].join('\n');
@@ -505,7 +505,7 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 	const participant = vscode.chat.createChatParticipant(CHAT_PARTICIPANT_ID, async (request, chatContext, stream, token) => {
 		const workspaceFolders = vscode.workspace.workspaceFolders;
 		if (!workspaceFolders?.length) {
-			stream.markdown('Open a workspace folder before using @chat-commit.');
+			stream.markdown('Open a workspace folder before using @session-control.');
 			return;
 		}
 		const workspaceSessions = await listSessionsAcrossWorkspaceFolders(workspaceFolders);
@@ -527,19 +527,19 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 				const reassembled = await loadReassembledSession(selection.session.storageDirectory, selection.session.fileName);
 				const resumed = reassembled.session;
 				const maxTurns = vscode.workspace
-					.getConfiguration('chat-commit', selection.session.workspaceFolder.uri)
+					.getConfiguration('session-control', selection.session.workspaceFolder.uri)
 					.get<number>('resume.maxTurns', 50);
 				const maxContextChars = vscode.workspace
-					.getConfiguration('chat-commit', selection.session.workspaceFolder.uri)
+					.getConfiguration('session-control', selection.session.workspaceFolder.uri)
 					.get<number>('resume.maxContextChars', 80000);
 				const overflowStrategy = vscode.workspace
-					.getConfiguration('chat-commit', selection.session.workspaceFolder.uri)
+					.getConfiguration('session-control', selection.session.workspaceFolder.uri)
 					.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize');
 				const constrained = applyResumeOverflowStrategy(resumed.turns, maxTurns, maxContextChars, overflowStrategy);
 				stream.markdown(
 					[
 						`Loaded **${resumed.title}** (${constrained.turns.length}/${resumed.turns.length} turns).`,
-						'Reply in this thread with @chat-commit and your follow-up question to continue with this context.',
+						'Reply in this thread with @session-control and your follow-up question to continue with this context.',
 					].join('\n\n'),
 				);
 
@@ -562,13 +562,13 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 				return;
 			}
 
-			stream.markdown(`No saved session matching '${request.prompt}'. Try @chat-commit /list.`);
+			stream.markdown(`No saved session matching '${request.prompt}'. Try @session-control /list.`);
 			return;
 		}
 
 		const resumedSessionMeta = findResumedSessionMeta(chatContext.history);
 		if (!resumedSessionMeta) {
-			stream.markdown('Use @chat-commit /resume <session name> first, then ask your follow-up.');
+			stream.markdown('Use @session-control /resume <session name> first, then ask your follow-up.');
 			return;
 		}
 
@@ -581,17 +581,17 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 			?? workspaceFolder
 			?? workspaceFolders[0];
 		if (!resumedWorkspaceFolder) {
-			stream.markdown('Open a workspace folder before using @chat-commit.');
+			stream.markdown('Open a workspace folder before using @session-control.');
 			return;
 		}
 		const maxTurns = vscode.workspace
-			.getConfiguration('chat-commit', resumedWorkspaceFolder.uri)
+			.getConfiguration('session-control', resumedWorkspaceFolder.uri)
 			.get<number>('resume.maxTurns', 50);
 		const maxContextChars = vscode.workspace
-			.getConfiguration('chat-commit', resumedWorkspaceFolder.uri)
+			.getConfiguration('session-control', resumedWorkspaceFolder.uri)
 			.get<number>('resume.maxContextChars', 80000);
 		const overflowStrategy = vscode.workspace
-			.getConfiguration('chat-commit', resumedWorkspaceFolder.uri)
+			.getConfiguration('session-control', resumedWorkspaceFolder.uri)
 			.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize');
 
 		await sendModelResponse(request, stream, token, resumedSession, request.prompt, maxTurns, maxContextChars, overflowStrategy);
