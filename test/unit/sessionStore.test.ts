@@ -98,4 +98,25 @@ suite('sessionStore', () => {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}
 	});
+
+	test('deleteSession removes an existing file and returns false when missing', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'chat-commit-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createSessionStore();
+
+		try {
+			const fileName = await store.writeSession(
+				storageDirectory,
+				createSession('delete-me', '2026-04-12T12:00:00.000Z', 'Delete me'),
+			);
+
+			const firstDelete = await store.deleteSession(storageDirectory, fileName);
+			const secondDelete = await store.deleteSession(storageDirectory, fileName);
+
+			assert.equal(firstDelete, true);
+			assert.equal(secondDelete, false);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
 });

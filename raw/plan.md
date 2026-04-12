@@ -21,6 +21,9 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
   - Completed: `src/sessionWriter.ts` (`createChatSession`, markdown summary generation with turn/size limits) and `src/sessionStore.ts` (file naming, atomic writes, read/list metadata)
   - Validation completed: `npm run lint`, `npm test` (27 passing, including `test/unit/sessionWriter.test.ts` and `test/unit/sessionStore.test.ts`)
 - [ ] **Phase 6 — Save Command**
+  - In progress: command wiring completed in `src/extension.ts` (`saveSession`, `listSessions`, `deleteSession`) using `sessionReader` → QuickPick/InputBox → `sessionWriter` → `sessionStore`
+  - In progress: `sessionStore.deleteSession` added and covered by tests; full suite currently passes (`npm run lint`, `npm test` with 28 passing)
+  - Remaining: add dedicated integration coverage for Phase 6 save round-trip command flow
 - [ ] **Phase 7 — Chat Participant & Resume**
 - [ ] **Phase 8 — Bloat Controls**
 - [ ] **Phase 9 — Auto-Save & Session Pruning**

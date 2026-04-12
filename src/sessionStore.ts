@@ -121,10 +121,26 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 			.sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt));
 	}
 
+	async function deleteSession(storageDirectory: string, fileName: string): Promise<boolean> {
+		const filePath = path.join(storageDirectory, fileName);
+		try {
+			await deps.unlink(filePath);
+			return true;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			if (/no such file|cannot find|enoent/i.test(message)) {
+				return false;
+			}
+
+			throw error;
+		}
+	}
+
 	return {
 		ensureStorageDirectory,
 		writeSession,
 		readSession,
 		listSessions,
+		deleteSession,
 	};
 }
