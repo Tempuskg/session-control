@@ -23,6 +23,15 @@ A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON f
 - Set up webpack bundling
 - Configure `.vscodeignore`
 
+### Step 1.1a — Extension activation events
+- **`activationEvents`**: The extension should activate lazily. Define activation events in `package.json`:
+  - `onCommand:chat-commit.saveSession` — activate when the user runs the save command
+  - `onCommand:chat-commit.listSessions` — activate when the user browses sessions
+  - `onCommand:chat-commit.deleteSession` — activate when the user deletes a session
+  - The chat participant (`chat-commit.resume`) automatically activates the extension when invoked — no explicit activation event needed for chat participants in VS Code ≥1.93
+- **No `*` activation**: Do not use `"*"` (activate on startup). The extension has no reason to run until the user interacts with it.
+- **`autoSaveOnCommit` re-activation**: When `autoSaveOnCommit` is enabled, the extension must activate on workspace open to register the git state listener. Add `onStartupFinished` as a conditional activation event — in `activate()`, check the setting and only register the git listener if enabled. If disabled, the activation is effectively a no-op and returns immediately.
+
 ### Step 1.2 — Define package.json contributions
 - **Commands:**
   - `chat-commit.saveSession` — "Chat Commit: Save Current Chat Session"
@@ -136,7 +145,7 @@ A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON f
 
 ### Step 3.2 — Implement resume flow
 - When user types `@chat-commit /resume fix-auth-bug`:
-  1. Search `.chat/` folder for matching session file (fuzzy match on title/filename)
+  1. Search `.chat/` folder for matching session file (fuzzy match on title/filename — see **Fuzzy Matching** section below)
   2. Parse the JSON session file (if split across parts, load all parts and reassemble)
   3. **Apply large session limits:** check turn count against `resume.maxTurns` and total character length against `resume.maxContextChars`. If either limit is exceeded, apply `resume.overflowStrategy`:
      - `summarize`: Send older turns to the LLM with a "summarize this conversation so far" prompt, use the summary as a preamble, then include the most recent turns verbatim
@@ -166,7 +175,7 @@ A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON f
 ### Step 4.1 — Configuration handling
 - Read settings via `vscode.workspace.getConfiguration('chat-commit')`
 - Validate storage path (must be relative, within workspace)
-- Handle multi-root workspaces (save to the workspace folder of the active file)
+- Handle multi-root workspaces (see **Multi-Root Workspace Handling** section below)
 
 ### Step 4.2 — .gitignore management
 - If `includeInGitignore` is true, add `.chat/` to `.gitignore`
@@ -182,6 +191,177 @@ A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON f
 
 ---
 
+## Error Handling
+
+Error handling strategy across all subsystems. The principle: never silently fail, always give the user actionable information.
+
+### Copilot Storage Errors (Session Reader)
+- **Storage directory not found**: The `chatSessions/` directory may not exist if Copilot hasn't been used in this workspace. Show an info message: *"No Copilot chat sessions found in this workspace. Start a Copilot chat first."* Do not throw.
+- **Unreadable/corrupt session files**: If a `.json` or `.jsonl` file fails to parse, skip it with a warning in the output channel: *"Skipped corrupt session file: {filename}"*. Continue processing remaining files. Never crash on a single bad file.
+- **Unknown format version**: If the session data structure doesn't match any known format, show an error: *"Unrecognized Copilot session format (VS Code {version}). Chat-Commit may need an update."* Include a link to file an issue. Return an empty session list rather than throwing.
+- **Permission errors**: If files can't be read due to OS permissions, surface the OS error message directly.
+
+### Save Errors (Session Writer / Session Store)
+- **`.chat/` directory creation fails**: Surface the OS error. Common cause: workspace is read-only.
+- **Disk full / write failure**: Catch write errors, show *"Failed to save session: {error}"*, and do not leave partial files. Use write-to-temp-then-rename to ensure atomicity.
+- **JSON serialization errors**: Should not happen with well-formed data, but catch and log with full context if it does.
+
+### Resume Errors (Chat Participant)
+- **No matching session**: If fuzzy match returns zero results, respond in chat: *"No saved session matching '{query}'. Use @chat-commit /list to see available sessions."*
+- **Corrupt saved session file**: If a `.chat/*.json` file fails to parse, respond in chat: *"Session file is corrupt: {filename}. Try re-saving the session."*
+- **Summarization failure**: If the `summarize` overflow strategy fails (LLM error), fall back to `truncate` silently and note in the context summary: *"Summary generation failed — showing most recent turns only."*
+
+### Git Integration Errors
+- **Git extension not available**: If `vscode.git` extension isn't installed/active, save sessions without git metadata (set `git` field to `null`). Show an info message on first occurrence: *"Git extension not available. Sessions will be saved without git metadata."*
+- **No repository**: If workspace has no git repo, same as above — save without git metadata.
+- **Auto-save listener failure**: If the `onDidChange` listener throws, log to output channel and disable auto-save for the session with a warning notification.
+
+---
+
+## Markdown Summary Generation
+
+The `markdownSummary` field in the session JSON provides a human-readable rendering of the conversation for git diffs and PR reviews.
+
+### Format
+```markdown
+# Chat: {title}
+
+**Branch:** {branch} | **Commit:** {short-sha} | **Saved:** {date}
+**Turns:** {count}
+
+---
+
+### Turn 1 — User
+{prompt text}
+
+### Turn 1 — Copilot
+{response text}
+
+> **Tool calls:** read_file (src/login.ts), run_in_terminal (npm test)
+
+### Turn 2 — User
+...
+```
+
+### Rules
+- Each turn is a `### Turn N — {role}` heading
+- User turns show the prompt text verbatim
+- Copilot turns show the response content (markdown preserved as-is)
+- Tool calls are listed in a blockquote below the response: tool name + summary only (not full output)
+- If `stripToolOutput` is enabled, tool call output is already stripped — the summary reflects this
+- File references from user turns are listed as a bullet list below the prompt
+- The summary is truncated to the first 50 turns if the session is very long, with a note: *"... {N} additional turns not shown in summary"*
+- Total summary target: ≤100KB. If it exceeds this, truncate from the middle (keep first 10 and last 10 turns, replace middle with *"... {N} turns omitted ..."*)
+
+---
+
+## Fuzzy Matching
+
+Used by the resume system to find sessions matching a user's query (e.g., `@chat-commit /resume fix-auth`).
+
+### Algorithm
+- Input: user query string, list of session files in `.chat/`
+- **Match candidates**: For each session, extract the title (from JSON) and the filename slug
+- **Scoring**: Use a simple substring + word-boundary scoring approach:
+  1. **Exact match** (query equals title or filename slug) → score 100
+  2. **Prefix match** (title or slug starts with query) → score 80
+  3. **Substring match** (query appears as substring in title or slug) → score 60
+  4. **Word-boundary match** (each word in query appears at a word boundary in title) → score 40
+  5. **Includes all characters in order** (fuzzy) → score 20
+  6. **No match** → score 0
+- Return candidates with score > 0, sorted by score descending, then by `savedAt` descending (most recent first)
+- All matching is case-insensitive
+
+### Behavior
+- **Single match (score ≥ 60)**: Auto-select and load
+- **Multiple matches**: Present sorted list with clickable buttons in chat
+- **No matches**: Show error with suggestion to use `/list`
+- **No query provided**: Skip fuzzy match, show QuickPick of all sessions
+
+### Implementation
+- Implement in `src/utils.ts` as a pure function: `fuzzyMatchSessions(query: string, sessions: SessionMeta[]): ScoredSession[]`
+- No external fuzzy-matching library needed — the algorithm is simple enough to implement inline
+- If a more sophisticated approach is needed later (e.g., Levenshtein distance), it can be swapped in behind the same interface
+
+---
+
+## Multi-Root Workspace Handling
+
+VS Code supports multi-root workspaces where multiple folders are open simultaneously. Chat-Commit must handle this correctly.
+
+### Which workspace folder gets the `.chat/` directory?
+- **On manual save**: Use the workspace folder of the **active editor's file**. If no file is open, prompt the user to select a workspace folder via QuickPick.
+- **On auto-save (commit)**: Use the workspace folder of the **repository that just committed**. The git extension provides the repository object, which maps to a workspace folder.
+- **On resume/list**: Search `.chat/` folders across **all** workspace folders. Present results with the workspace folder name as a prefix for disambiguation (e.g., *"[backend] fix-auth-bug"*, *"[frontend] add-navbar"*).
+
+### Settings scope
+- `chat-commit.*` settings can be configured at the workspace-folder level (VS Code supports this natively via `.vscode/settings.json` per folder)
+- `storagePath` is always relative to the workspace folder root, not the multi-root workspace file
+- Example: workspace with `backend/` and `frontend/` → sessions save to `backend/.chat/` or `frontend/.chat/`
+
+### Git integration
+- `vscode.git` exposes `git.repositories` as an array — one per repo in the workspace
+- Match the active file's URI to the correct repository via `repo.rootUri`
+- If a workspace folder has no git repo, save sessions without git metadata (same as single-root behavior)
+
+---
+
+## Testing Strategy
+
+Testing is split into unit tests, integration tests, and manual tests. Use the VS Code testing infrastructure (`@vscode/test-electron` or `@vscode/test-cli`).
+
+### Unit Tests
+Run without VS Code — pure logic, mocked dependencies.
+
+| Module | What to Test | Mock |
+|--------|-------------|------|
+| `sessionWriter.ts` | JSON schema output, title generation, bloat controls (split/truncate/strip) | File system, git API |
+| `sessionStore.ts` | File naming, CRUD operations, pruning logic, archive behavior | File system |
+| `utils.ts` | Slugify, timestamp formatting, fuzzy matching scoring | None (pure functions) |
+| `types.ts` | Type guards, validation functions | None |
+| `gitIntegration.ts` | Metadata extraction, null handling when git unavailable | `vscode.git` extension API |
+
+**Fuzzy matching** deserves dedicated test cases:
+- Exact match: `"fix-auth-bug"` → `fix-auth-bug.json` → score 100
+- Prefix match: `"fix"` → `fix-auth-bug.json` → score 80
+- Substring: `"auth"` → `fix-auth-bug.json` → score 60
+- Word-boundary: `"fix bug"` → `fix-auth-bug.json` → score 40
+- Fuzzy: `"fab"` → `fix-auth-bug.json` → score 20
+- No match: `"deploy"` → `fix-auth-bug.json` → score 0
+
+**Bloat controls** test matrix:
+- `split`: Session of 1.5MB with `maxFileSize=1mb` → 2 part files, linked correctly
+- `truncateOldest`: 100 turns, `maxFileSize=500kb` → oldest turns dropped, remaining fit
+- `warn`: Oversized session saved as-is, warning returned
+- `stripToolOutput`: Tool output replaced with `"[output stripped — N chars]"`
+
+### Integration Tests
+Run inside VS Code extension host via `@vscode/test-electron`.
+
+| Test | Description |
+|------|-------------|
+| Save round-trip | Save a mock session → read back → verify JSON structure matches schema |
+| Resume context injection | Save a session → resume via chat participant → verify context prompt format |
+| Multi-part reassembly | Save a large session that splits → resume → verify all parts loaded and ordered |
+| Git metadata | With a real git repo in temp dir → save → verify branch/SHA/dirty captured |
+| Pruning | Set `maxSavedSessions=2`, save 4 → verify 2 archived/deleted |
+| Auto-save trigger | Enable `autoSaveOnCommit`, make a commit in test repo → verify session saved |
+
+### Mocking Copilot Internals
+- **Do not mock the actual Copilot session files in unit tests** — the format is undocumented and may change.
+- Instead, create **fixture files** based on observed real session structures. Store these in `test/fixtures/`.
+- The `sessionReader.ts` version-detection layer is tested by providing fixture files for each known format version.
+- When a new VS Code version changes the format, add a new fixture file and update the reader.
+- Integration tests can write known JSON to a temp `chatSessions/` directory to simulate Copilot storage.
+
+### Test Infrastructure
+- **Framework**: Mocha (VS Code extension standard) with `@vscode/test-electron` for integration tests
+- **Fixture directory**: `test/fixtures/` — sample session files in various formats
+- **Temp directories**: Integration tests use `os.tmpdir()` for isolation; cleaned up in `afterEach`
+- **CI**: Tests run in GitHub Actions via `xvfb-run` (Linux) for the extension host tests
+
+---
+
 ## Relevant Files (to create)
 
 - `package.json` — Extension manifest with commands, settings, chat participant, menus
@@ -193,6 +373,9 @@ A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON f
 - `src/sessionStore.ts` — CRUD operations on saved session files in `.chat/`
 - `src/types.ts` — TypeScript interfaces for `ChatSession`, `SavedTurn`, etc.
 - `src/utils.ts` — Slugify, timestamp formatting, fuzzy matching
+- `test/fixtures/` — Sample Copilot session files for testing the session reader
+- `test/unit/` — Unit tests (pure logic, mocked dependencies)
+- `test/integration/` — Integration tests (run in VS Code extension host)
 
 ---
 

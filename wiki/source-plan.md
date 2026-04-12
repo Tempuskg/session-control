@@ -67,9 +67,10 @@ This source provided the basis for all initial wiki pages:
 
 ## Gaps & Open Questions
 
-- No discussion of **testing strategy** — unit tests, integration tests, mocking Copilot internals
-- No mention of **error handling** patterns — what happens when Copilot storage is missing or corrupt
-- No detail on **markdown summary generation** — how turns are formatted for the `markdownSummary` field
-- No specification for **fuzzy matching** algorithm for session search
-- **Multi-root workspace** handling is mentioned but not detailed
-- No discussion of **extension activation events** — when does the extension activate
+All gaps from the initial review have been addressed in PLAN.md:
+- ~~Testing strategy~~ — Added **Testing Strategy** section with unit/integration test matrix, mocking approach, and CI setup
+- ~~Error handling patterns~~ — Added **Error Handling** section covering all subsystems
+- ~~Markdown summary generation~~ — Added **Markdown Summary Generation** section with format spec and truncation rules
+- ~~Fuzzy matching algorithm~~ — Added **Fuzzy Matching** section with scoring algorithm and behavior rules
+- ~~Multi-root workspace handling~~ — Added **Multi-Root Workspace Handling** section
+- ~~Extension activation events~~ — Added **Step 1.1a** with activation event strategy
