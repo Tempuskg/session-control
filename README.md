@@ -1,8 +1,8 @@
 # Session Control
 
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/your-publisher-id.session-control?label=VS%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=your-publisher-id.session-control)
-[![Open VSX](https://img.shields.io/open-vsx/v/your-publisher-id/session-control)](https://open-vsx.org/extension/your-publisher-id/session-control)
-[![CI](https://github.com/your-username/session-control/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/session-control/actions/workflows/ci.yml)
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/darrenjmcleod.session-control?label=VS%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
+[![Open VSX](https://img.shields.io/open-vsx/v/darrenjmcleod/session-control)](https://open-vsx.org/extension/darrenjmcleod/session-control)
+[![CI](https://github.com/darrenjmcleod/session-control/actions/workflows/ci.yml/badge.svg)](https://github.com/darrenjmcleod/session-control/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON files in your repository, linked to git commits and branches. Resume saved conversations via the `@session-control` chat participant.
@@ -23,7 +23,7 @@ A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON f
 
 ## Installation
 
-Search for **Session Control** in the VS Code Extensions view, or install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=your-publisher-id.session-control).
+Search for **Session Control** in the VS Code Extensions view, or install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control).
 
 ## Usage
 

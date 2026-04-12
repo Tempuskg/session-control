@@ -11,7 +11,7 @@ Thank you for your interest in contributing! This document covers how to set up 
 ## Dev Setup
 
 ```bash
-git clone https://github.com/your-username/session-control.git
+git clone https://github.com/tempuskg/session-control.git
 cd session-control
 npm install
 ```

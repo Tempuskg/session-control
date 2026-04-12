@@ -3,16 +3,16 @@
   "displayName": "Session Control",
   "description": "Save and resume GitHub Copilot Chat sessions linked to git commits",
   "version": "0.1.0",
-  "publisher": "your-publisher-id",
+  "publisher": "darrenjmcleod",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/session-control"
+    "url": "https://github.com/darrenjmcleod/session-control"
   },
   "bugs": {
-    "url": "https://github.com/your-username/session-control/issues"
+    "url": "https://github.com/darrenjmcleod/session-control/issues"
   },
-  "homepage": "https://github.com/your-username/session-control#readme",
+  "homepage": "https://github.com/darrenjmcleod/session-control#readme",
   "engines": {
     "vscode": "^1.93.0"
   },
