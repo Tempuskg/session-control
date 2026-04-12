@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { registerChatParticipant } from './chatParticipant';
 import { getGitContext } from './gitIntegration';
 import { CopilotSession, readCopilotSessions } from './sessionReader';
 import { createSessionStore } from './sessionStore';
@@ -217,7 +218,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand('chat-commit.deleteSession', async () => runDeleteSessionCommand()),
 	);
 
-	// Chat participant registered in Phase 7 (src/chatParticipant.ts).
+	registerChatParticipant(context);
 }
 
 export function deactivate(): void {
