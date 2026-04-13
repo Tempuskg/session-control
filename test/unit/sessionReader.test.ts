@@ -168,4 +168,55 @@ suite('sessionReader', () => {
 			await fs.rm(setup.root, { recursive: true, force: true });
 		}
 	});
+
+	test('applies kind:1 scalar patches to resolve customTitle', async () => {
+		const setup = await setupWorkspaceStorageRoot();
+
+		try {
+			// Simulate a session where customTitle starts null and is later patched via kind:1
+			const snapshotRecord = {
+				kind: 0,
+				v: {
+					version: 3,
+					creationDate: 1776060000000,
+					customTitle: null,
+					sessionId: 'session-patch-title',
+					initialLocation: 'panel',
+					responderUsername: 'GitHub Copilot',
+					requests: [
+						{
+							requestId: 'req-1',
+							timestamp: 1776060001000,
+							agent: { name: 'copilot' },
+							modelId: 'copilot/auto',
+							responseId: 'resp-1',
+							contentReferences: [],
+							message: { text: 'Hello', parts: [{ text: 'Hello', kind: 'text' }] },
+							response: [{ value: 'Hi there.', supportThemeIcons: false, supportHtml: false }],
+						},
+					],
+				},
+			};
+			const patchRecord = { kind: 1, k: ['customTitle'], v: 'My Patched Title' };
+			const jsonl = [JSON.stringify(snapshotRecord), JSON.stringify(patchRecord)].join('\n');
+			await fs.writeFile(
+				path.join(setup.sessionsDirectory, 'patch-title-session.jsonl'),
+				jsonl,
+				'utf8',
+			);
+
+			const reader = createSessionReader({
+				showInformationMessage: async () => undefined,
+				showErrorMessage: async () => undefined,
+				logWarning: () => undefined,
+				vscodeVersion: '1.115.0',
+			});
+
+			const sessions = await reader.readCopilotSessions({ storageUri: { fsPath: setup.storageUriPath } });
+			assert.equal(sessions.length, 1);
+			assert.equal(sessions[0]?.title, 'My Patched Title');
+		} finally {
+			await fs.rm(setup.root, { recursive: true, force: true });
+		}
+	});
 });

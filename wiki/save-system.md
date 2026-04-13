@@ -96,14 +96,6 @@ When enabled, tool call output bodies are replaced with:
 `"[output stripped — N chars]"`  
 Tool call names and summaries are preserved. Applied before the size check.
 
-## Auto-Save on Commit
-
-Optional feature (Phase 2, Step 2.5). When `autoSaveOnCommit` is enabled:
-- Watches `git.repositories[0].state.onDidChange` for HEAD changes
-- Debounced to avoid saving on micro-state changes
-- Only saves if new turns exist since last save (tracked via turn count or hash)
-- See [Git Integration](git-integration.md) for details
-
 ## Auto-Save on Chat Response
 
 Optional feature controlled by the `session-control.autoSaveOnChatResponse` setting (default `false`). When enabled, the extension watches VS Code's internal Copilot chat session storage directory for file changes and automatically saves the session after each new response.
@@ -115,7 +107,19 @@ Optional feature controlled by the `session-control.autoSaveOnChatResponse` sett
 4. It compares the current turn count against the last-saved turn count for that session ID
 5. If the turn count increased, it performs an automatic save via `sessionWriter` and `sessionStore`
 6. It tracks the previous auto-save file path per session ID and **deletes the old file** when a new version is saved, preventing file accumulation
-7. The listener is **disabled after errors** (same pattern as the commit-based auto-save) to avoid repeated failures
+7. The listener is **disabled after errors** to avoid repeated failures
+
+### Diagnostics
+All lifecycle events are logged to the **Session Control** output channel with `[auto-save]` prefix:
+- `Watching: <path>` — confirms the directory being watched
+- `File change detected, debouncing 5 s…` — watcher fired
+- `Read N session(s).` — how many Copilot sessions were parsed
+- `No sessions found — nothing to save.` — format unrecognized or directory empty
+- `Latest: "<title>" id=<id> turns=<n>` — session picked for save consideration
+- `Skipped — turn count unchanged` — no new turns since last save
+- `Skipped — no workspace folder is open.` — no folder active
+- `Saving to <path>…` — save is executing
+- `Saved "<title>" (<n> turns) after chat response.` — success
 
 ### Implementation Details
 - Exported as `registerAutoSaveOnChatResponseListener` from `src/extension.ts`
@@ -123,6 +127,6 @@ Optional feature controlled by the `session-control.autoSaveOnChatResponse` sett
 - 4 dedicated tests in `test/unit/extensionAutoSave.test.ts` cover the listener lifecycle, debounce behavior, old-file cleanup, and error disabling
 
 ### Status Bar Integration
-The status bar item reflects **both** `autoSaveOnCommit` and `autoSaveOnChatResponse` settings. The toggle command (`session-control.toggleAutoSaveOnCommit`) now toggles `autoSaveOnChatResponse` instead of `autoSaveOnCommit`, since chat-response auto-save is the more commonly used auto-save mode.
+The status bar item reflects the `autoSaveOnChatResponse` setting. The toggle command (`session-control.toggleAutoSave`) toggles `autoSaveOnChatResponse` for the current workspace folder.
 
-> ⚠️ Note: Like the commit-based auto-save, this feature relies on the internal Copilot storage directory structure. If VS Code changes where or how chat sessions are stored, the file watcher path will need updating.
+> ⚠️ Note: This feature relies on the internal Copilot storage directory structure. If VS Code changes where or how chat sessions are stored, the file watcher path will need updating.

@@ -2,7 +2,7 @@
 title: "Git Integration"
 type: entity
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-04-13
 sources:
   - raw/plan.md
 tags:

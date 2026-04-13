@@ -2,8 +2,9 @@
   "name": "session-control",
   "displayName": "Session Control",
   "description": "Save and resume GitHub Copilot Chat sessions linked to git commits",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "publisher": "darrenjmcleod",
+  "icon": "media/session-control.png",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -78,8 +79,8 @@
         "icon": "$(trash)"
       },
       {
-        "command": "session-control.toggleAutoSaveOnCommit",
-        "title": "Toggle Auto-Save On Commit",
+        "command": "session-control.toggleAutoSave",
+        "title": "Toggle Auto-Save on Chat Response",
         "category": "Session Control"
       }
     ],
@@ -90,12 +91,6 @@
           "type": "string",
           "default": ".chat",
           "description": "Folder (relative to workspace root) where chat sessions are saved.",
-          "scope": "resource"
-        },
-        "session-control.autoSaveOnCommit": {
-          "type": "boolean",
-          "default": false,
-          "description": "Automatically save the active chat session when a git commit is made.",
           "scope": "resource"
         },
         "session-control.autoSaveOnChatResponse": {
@@ -240,7 +235,7 @@
           "command": "session-control.deleteSession"
         },
         {
-          "command": "session-control.toggleAutoSaveOnCommit"
+          "command": "session-control.toggleAutoSave"
         }
       ],
       "view/title": [

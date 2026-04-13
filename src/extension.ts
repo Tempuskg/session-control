@@ -57,30 +57,6 @@ interface PruneConfiguration {
 	pruneAction: SessionPruneAction;
 }
 
-interface GitRepositoryLike {
-	rootUri: vscode.Uri;
-	state: {
-		HEAD?: {
-			commit?: string;
-		};
-		onDidChange: (listener: () => void) => vscode.Disposable;
-	};
-}
-
-interface GitApiLike {
-	repositories: GitRepositoryLike[];
-}
-
-interface AutoSaveListenerDeps {
-	getGitApi: () => GitApiLike | null;
-	getWorkspaceFolder: (uri: vscode.Uri) => vscode.WorkspaceFolder | undefined;
-	runSaveSessionFlow: typeof runSaveSessionFlow;
-	showInformationMessage: (message: string) => Thenable<unknown>;
-	showWarningMessage: (message: string) => Thenable<unknown>;
-	schedule: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
-	clearSchedule: (handle: ReturnType<typeof setTimeout>) => void;
-}
-
 interface ChatResponseFileWatcher {
 	onDidChange: (listener: () => void) => vscode.Disposable;
 	onDidCreate: (listener: () => void) => vscode.Disposable;
@@ -487,32 +463,6 @@ async function runDeleteSessionCommand(): Promise<void> {
 	await vscode.window.showInformationMessage(`Deleted session ${pick.label}`);
 }
 
-function tryGetGitApi(): GitApiLike | null {
-	const extension = vscode.extensions.getExtension<{ getAPI(version: number): GitApiLike }>('vscode.git');
-	if (!extension) {
-		return null;
-	}
-
-	const gitExports = extension.isActive ? extension.exports : undefined;
-	if (!gitExports || typeof gitExports.getAPI !== 'function') {
-		return null;
-	}
-
-	return gitExports.getAPI(1);
-}
-
-function createDefaultAutoSaveDeps(): AutoSaveListenerDeps {
-	return {
-		getGitApi: tryGetGitApi,
-		getWorkspaceFolder: (uri: vscode.Uri) => vscode.workspace.getWorkspaceFolder(uri),
-		runSaveSessionFlow,
-		showInformationMessage: (message: string) => vscode.window.showInformationMessage(message),
-		showWarningMessage: (message: string) => vscode.window.showWarningMessage(message),
-		schedule: (callback: () => void, delayMs: number) => setTimeout(callback, delayMs),
-		clearSchedule: (handle: ReturnType<typeof setTimeout>) => clearTimeout(handle),
-	};
-}
-
 function createDefaultOpenSavedSessionDeps(): OpenSavedSessionDeps {
 	return {
 		getWorkspaceFolders: () => vscode.workspace.workspaceFolders,
@@ -618,102 +568,6 @@ function parseSessionDocument(text: string): ParsedSessionDocument {
 	}
 
 	return { kind: 'ok', session: parsed };
-}
-
-export function registerAutoSaveOnCommitListener(
-	context: vscode.ExtensionContext,
-	output: vscode.OutputChannel,
- 	depsOverrides: Partial<AutoSaveListenerDeps> = {},
-): vscode.Disposable | undefined {
-	const deps = {
-		...createDefaultAutoSaveDeps(),
-		...depsOverrides,
-	};
-	const disposables: vscode.Disposable[] = [];
-
-	const gitApi = deps.getGitApi();
-	if (!gitApi) {
-		void deps.showInformationMessage('Git extension not available. Auto-save on commit is disabled.');
-		return undefined;
-	}
-
-	const lastCommitByRepo = new Map<string, string | undefined>();
-	const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
-
-	for (const repository of gitApi.repositories) {
-		const repoKey = repository.rootUri.toString();
-		lastCommitByRepo.set(repoKey, repository.state.HEAD?.commit);
-
-		const disposable = repository.state.onDidChange(() => {
-			const currentCommit = repository.state.HEAD?.commit;
-			const previousCommit = lastCommitByRepo.get(repoKey);
-			if (!currentCommit || currentCommit === previousCommit) {
-				return;
-			}
-
-			lastCommitByRepo.set(repoKey, currentCommit);
-			const existingTimer = debounceTimers.get(repoKey);
-			if (existingTimer) {
-				deps.clearSchedule(existingTimer);
-			}
-
-			const timer = deps.schedule(() => {
-				void (async () => {
-					try {
-						const workspaceFolder = deps.getWorkspaceFolder(repository.rootUri);
-						if (!workspaceFolder) {
-							return;
-						}
-
-						await deps.runSaveSessionFlow(
-							context,
-							workspaceFolder,
-							getStoragePath(workspaceFolder),
-							{
-								selectSession: async (sessions) => sessions[0],
-								promptTitle: async (defaultTitle) => defaultTitle,
-								showInformationMessage: async (message) => {
-									if (/Saved\s+(chat session|\d+ session part files)/i.test(message)) {
-										return;
-									}
-
-									await deps.showInformationMessage(message);
-								},
-							},
-						);
-					} catch (error) {
-						const message = error instanceof Error ? error.message : String(error);
-						output.appendLine(`[auto-save] Disabled after listener error: ${message}`);
-						void deps.showWarningMessage('Session Control auto-save on commit encountered an error and was disabled for this session.');
-						disposable.dispose();
-					}
-				})();
-			}, 750);
-
-			debounceTimers.set(repoKey, timer);
-		});
-
-		disposables.push(disposable);
-	}
-
-	disposables.push({
-		dispose: () => {
-			for (const timer of debounceTimers.values()) {
-				deps.clearSchedule(timer);
-			}
-			debounceTimers.clear();
-		},
-	});
-
-	const registration = {
-		dispose: () => {
-			for (const disposable of disposables) {
-				disposable.dispose();
-			}
-		},
-	};
-	context.subscriptions.push(registration);
-	return registration;
 }
 
 function createDefaultAutoSaveOnChatResponseDeps(context: vscode.ExtensionContext): AutoSaveOnChatResponseDeps {
@@ -878,12 +732,6 @@ function getImplicitWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
 	return vscode.workspace.workspaceFolders?.[0];
 }
 
-function isAnyWorkspaceAutoSaveEnabled(): boolean {
-	return (vscode.workspace.workspaceFolders ?? []).some((workspaceFolder) => vscode.workspace
-		.getConfiguration('session-control', workspaceFolder.uri)
-		.get<boolean>('autoSaveOnCommit', false));
-}
-
 function isAnyWorkspaceAutoSaveOnChatResponseEnabled(): boolean {
 	return (vscode.workspace.workspaceFolders ?? []).some((workspaceFolder) => vscode.workspace
 		.getConfiguration('session-control', workspaceFolder.uri)
@@ -898,16 +746,10 @@ function updateAutoSaveStatusBar(item: vscode.StatusBarItem): void {
 	}
 
 	const config = vscode.workspace.getConfiguration('session-control', workspaceFolder.uri);
-	const commitEnabled = config.get<boolean>('autoSaveOnCommit', false);
 	const chatResponseEnabled = config.get<boolean>('autoSaveOnChatResponse', false);
-	const anyEnabled = commitEnabled || chatResponseEnabled;
-	item.text = `$(history) Session Control ${anyEnabled ? 'Auto-Save On' : 'Auto-Save Off'}`;
+	item.text = `$(history) Session Control ${chatResponseEnabled ? 'Auto-Save On' : 'Auto-Save Off'}`;
 
-	if (commitEnabled && chatResponseEnabled) {
-		item.tooltip = `${workspaceFolder.name}: auto-save on commit + chat response`;
-	} else if (commitEnabled) {
-		item.tooltip = `${workspaceFolder.name}: auto-save on commit`;
-	} else if (chatResponseEnabled) {
+	if (chatResponseEnabled) {
 		item.tooltip = `${workspaceFolder.name}: auto-save on chat response`;
 	} else {
 		item.tooltip = `${workspaceFolder.name}: click to enable auto-save`;
@@ -948,26 +790,11 @@ export function activate(context: vscode.ExtensionContext): void {
 	});
 	context.subscriptions.push(sessionExplorerView);
 	const autoSaveStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-	autoSaveStatusBar.command = 'session-control.toggleAutoSaveOnCommit';
+	autoSaveStatusBar.command = 'session-control.toggleAutoSave';
 	context.subscriptions.push(autoSaveStatusBar);
 
-	// The onStartupFinished activation event fires here; check auto-save settings
-	// and register listeners only if enabled.
 	const output = vscode.window.createOutputChannel('Session Control');
 	context.subscriptions.push(output);
-	let autoSaveListener: vscode.Disposable | undefined;
-	const syncAutoSaveListener = () => {
-		const enabled = isAnyWorkspaceAutoSaveEnabled();
-		if (enabled && !autoSaveListener) {
-			autoSaveListener = registerAutoSaveOnCommitListener(context, output);
-			return;
-		}
-
-		if (!enabled && autoSaveListener) {
-			autoSaveListener.dispose();
-			autoSaveListener = undefined;
-		}
-	};
 
 	let autoSaveOnChatResponseListener: vscode.Disposable | undefined;
 	const syncAutoSaveOnChatResponseListener = () => {
@@ -983,7 +810,6 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	};
 
-	syncAutoSaveListener();
 	syncAutoSaveOnChatResponseListener();
 	updateAutoSaveStatusBar(autoSaveStatusBar);
 	const updateSessionFileContext = (editor: vscode.TextEditor | undefined) => {
@@ -1041,7 +867,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			await vscode.window.showInformationMessage(`Deleted session ${item.label}`);
 			sessionExplorerProvider.refresh();
 		}),
-		vscode.commands.registerCommand('session-control.toggleAutoSaveOnCommit', async () => {
+		vscode.commands.registerCommand('session-control.toggleAutoSave', async () => {
 			const workspaceFolder = await resolveManualWorkspaceFolder({
 				getActiveEditorUri: () => vscode.window.activeTextEditor?.document.uri,
 			});
@@ -1063,16 +889,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
 		sessionExplorerProvider.refresh();
-		syncAutoSaveListener();
 		syncAutoSaveOnChatResponseListener();
 		updateAutoSaveStatusBar(autoSaveStatusBar);
 	}));
 	context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
-		if (event.affectsConfiguration('session-control.autoSaveOnCommit')) {
-			syncAutoSaveListener();
-			updateAutoSaveStatusBar(autoSaveStatusBar);
-		}
-
 		if (event.affectsConfiguration('session-control.autoSaveOnChatResponse')) {
 			syncAutoSaveOnChatResponseListener();
 			updateAutoSaveStatusBar(autoSaveStatusBar);

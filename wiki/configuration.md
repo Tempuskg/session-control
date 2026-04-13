@@ -3,7 +3,6 @@ title: "Configuration"
 type: concept
 created: 2026-04-12
 updated: 2026-04-13
-sources:
   - raw/plan.md
 tags:
   - configuration
@@ -22,7 +21,6 @@ All user-facing settings under the `session-control` namespace, accessed via `vs
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `storagePath` | `string` | `.chat` | Folder relative to workspace root for saved sessions |
-| `autoSaveOnCommit` | `boolean` | `false` | Auto-save active session when a git commit is detected |
 | `autoSaveOnChatResponse` | `boolean` | `false` | Auto-save active session when a new chat response is detected (watches Copilot storage directory, debounced 5s) |
 | `includeInGitignore` | `boolean` | `false` | Add `.chat/` to `.gitignore` (default: tracked in git) |
 

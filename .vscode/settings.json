@@ -1,3 +1,11 @@
 {
-    "snyk.advanced.autoSelectOrganization": true
+    "snyk.advanced.autoSelectOrganization": true,
+    "session-control.autoSaveOnChatResponse": true,
+    "cSpell.words": [
+        "checkpointing",
+        "darrenjmcleod",
+        "slugification",
+        "slugified",
+        "vscodeignore"
+    ]
 }

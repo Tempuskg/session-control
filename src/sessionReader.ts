@@ -403,6 +403,24 @@ function normalizeSnapshotPatchPayload(records: unknown[], sourceFile: string): 
 
 	const requests: unknown[] = JSON.parse(JSON.stringify(snapshot.requests));
 
+	// Apply kind:1 scalar patches to a mutable copy of the snapshot top-level properties.
+	// These records set fields like `customTitle` after the initial snapshot is written.
+	const snapshotOverrides: Record<string, unknown> = {};
+	for (const record of records) {
+		if (
+			!isRecord(record)
+			|| record.kind !== 1
+			|| !Array.isArray(record.k)
+			|| record.k.length !== 1
+			|| typeof record.k[0] !== 'string'
+		) {
+			continue;
+		}
+
+		snapshotOverrides[record.k[0] as string] = record.v;
+	}
+	const effectiveSnapshot = { ...snapshot, ...snapshotOverrides };
+
 	for (const record of records) {
 		if (!isRecord(record) || record.kind !== 2 || !Array.isArray(record.k) || !Array.isArray(record.v)) {
 			continue;
@@ -538,15 +556,15 @@ function normalizeSnapshotPatchPayload(records: unknown[], sourceFile: string): 
 		return null;
 	}
 
-	const id = typeof snapshot.sessionId === 'string' ? snapshot.sessionId : sourceFile;
-	const title = typeof snapshot.customTitle === 'string'
-		? snapshot.customTitle
-		: typeof snapshot.title === 'string'
-			? snapshot.title
+	const id = typeof effectiveSnapshot.sessionId === 'string' ? effectiveSnapshot.sessionId : sourceFile;
+	const title = typeof effectiveSnapshot.customTitle === 'string'
+		? effectiveSnapshot.customTitle
+		: typeof effectiveSnapshot.title === 'string'
+			? effectiveSnapshot.title
 			: id;
 	const lastMessageDate = turns[turns.length - 1]?.timestamp
-		?? (typeof snapshot.creationDate === 'number'
-			? new Date(snapshot.creationDate).toISOString()
+		?? (typeof effectiveSnapshot.creationDate === 'number'
+			? new Date(effectiveSnapshot.creationDate).toISOString()
 			: new Date().toISOString());
 
 	return {
