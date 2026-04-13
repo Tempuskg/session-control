@@ -2,7 +2,7 @@
   "name": "session-control",
   "displayName": "Session Control",
   "description": "Save and resume GitHub Copilot Chat sessions linked to git commits",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "publisher": "darrenjmcleod",
   "icon": "media/session-control.png",
   "license": "MIT",
@@ -219,7 +219,8 @@
       "session-control": [
         {
           "id": "session-control.sessionExplorer",
-          "name": "Saved Sessions"
+          "name": "Saved Sessions",
+          "icon": "$(history)"
         }
       ]
     },
