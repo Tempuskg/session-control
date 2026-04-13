@@ -3,6 +3,7 @@ title: "Configuration"
 type: concept
 created: 2026-04-12
 updated: 2026-04-13
+sources:
   - raw/plan.md
 tags:
   - configuration
@@ -22,7 +23,7 @@ All user-facing settings under the `session-control` namespace, accessed via `vs
 |---------|------|---------|-------------|
 | `storagePath` | `string` | `.chat` | Folder relative to workspace root for saved sessions |
 | `autoSaveOnChatResponse` | `boolean` | `false` | Auto-save active session when a new chat response is detected (watches Copilot storage directory, debounced 5s) |
-| `includeInGitignore` | `boolean` | `false` | Add `.chat/` to `.gitignore` (default: tracked in git) |
+| `includeInGitignore` | `boolean` | `false` | Add `.chat/` to `.gitignore`. **Recommended for public repos** — see [Privacy Warning](#privacy-warning) below. |
 
 ## Resume Settings (`resume.*`)
 
@@ -59,6 +60,16 @@ Control session file size and storage limits.
 - `resume.maxContextChars` must be a positive integer
 - `save.maxFileSize` accepts human-readable sizes: `500kb`, `1mb`, `2mb`
 - `save.maxSavedSessions` of `0` means unlimited
+
+## Privacy Warning
+
+> **⚠️ Do not commit session files to a public repository without reviewing them first.**
+>
+> Saved session JSON files record the full conversation between codertand Copilot, including all agent tool call inputs and outputs. These files routinely contain:
+> - **Local filesystem paths** (e.g. `C:\Users\yourname\...`) that expose your OS username and machine layout
+> - **Workspace-internal details** captured during agentic tool calls (file contents, terminal output, search results)
+>
+> Enable `session-control.includeInGitignore: true` (or add your `storagePath` folder to `.gitignore` manually) to prevent sessions from being staged and committed.
 
 ## Multi-Root Workspace Behavior
 

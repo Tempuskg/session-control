@@ -106,6 +106,22 @@ This command opens the web viewer for the active JSON file when it matches Sessi
 | `session-control.save.maxSavedSessions` | `0` | Max sessions to keep (0 = unlimited) |
 | `session-control.save.pruneAction` | `archive` | `archive` or `delete` when pruning old sessions |
 
+## Privacy Warning — Public Repositories
+
+> **⚠️ Do not commit `.chat/` sessions to a public repository without reviewing them first.**
+>
+> Saved session files are plain JSON that records the full conversation between you and Copilot, including all tool call inputs and outputs. These files routinely contain:
+> - **Local filesystem paths** (e.g. `C:\Users\yourname\...`) that expose your OS username and machine layout
+> - **Workspace-internal details** captured by agent tool calls (file contents, terminal output, search results)
+>
+> To keep sessions private, enable the built-in setting:
+>
+> ```json
+> "session-control.includeInGitignore": true
+> ```
+>
+> This automatically adds your storage folder to `.gitignore` so sessions are never staged. Alternatively, add `.chat/` (or your configured `storagePath`) to `.gitignore` manually.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, testing instructions, and PR guidelines.

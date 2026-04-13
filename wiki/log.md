@@ -55,3 +55,7 @@ Pages touched: (implementation only; wiki docs already current)
 ## [2026-04-13] update | Remove Auto-Save on Commit
 Removed the `autoSaveOnCommit` feature entirely. The feature relied on the VS Code Git extension API to watch for HEAD changes and was superseded by the more reliable `autoSaveOnChatResponse` feature. Removed: `autoSaveOnCommit` setting, `toggleAutoSaveOnCommit` command (replaced by `toggleAutoSave`), `registerAutoSaveOnCommitListener` function, `GitRepositoryLike`/`GitApiLike`/`AutoSaveListenerDeps` interfaces, all related tests. Added diagnostic logging to `registerAutoSaveOnChatResponseListener` for all lifecycle events. Added marketplace icon (`media/session-control.png`). Wiki updated to remove commit-based auto-save docs from configuration and git-integration pages.
 Pages touched: save-system.md, configuration.md, git-integration.md, log.md
+
+## [2026-04-13] update | Privacy Warning for Public Repos
+Documented privacy risks of committing `.chat/` session files to public repositories. Session files record full Copilot conversations including agent tool call I/O, which routinely captures local filesystem paths (exposing OS usernames) and workspace-internal details. Added Privacy Warning section to `configuration.md` (with cross-reference from `includeInGitignore` setting) and a Privacy Considerations section to `save-system.md`. Mirrors the new warning added to README.md.
+Pages touched: configuration.md, save-system.md, log.md

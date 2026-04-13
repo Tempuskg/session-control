@@ -9,6 +9,7 @@ tags:
   - save-system
   - architecture
   - phase-2
+  - privacy
 related:
   - wiki/architecture.md
   - wiki/session-format.md
@@ -130,3 +131,12 @@ All lifecycle events are logged to the **Session Control** output channel with `
 The status bar item reflects the `autoSaveOnChatResponse` setting. The toggle command (`session-control.toggleAutoSave`) toggles `autoSaveOnChatResponse` for the current workspace folder.
 
 > ⚠️ Note: This feature relies on the internal Copilot storage directory structure. If VS Code changes where or how chat sessions are stored, the file watcher path will need updating.
+
+## Privacy Considerations
+
+Saved session JSON files are plain text and record the full conversation, including all agent tool call inputs and outputs. **This makes them unsuitable for public repositories without review**, as they commonly contain:
+
+- **Local filesystem paths** (e.g. `C:\Users\yourname\...`) exposing OS username and machine layout
+- **Workspace-internal details** captured by agentic tool calls: file contents, terminal output, search results
+
+The `session-control.includeInGitignore` setting (default `false`) adds the storage folder to `.gitignore` automatically. **This setting is strongly recommended for any repo that will be made public.** Users can also add `.chat/` (or their configured `storagePath`) to `.gitignore` manually.
