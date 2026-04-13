@@ -49,14 +49,14 @@ The plan is organized into ten incremental phases, each delivering a testable mi
 | 6 | Save Command | End-to-end save flow — first user-facing feature |
 | 7 | Chat Participant & Resume | `@session-control /resume` and `/list` commands |
 | 8 | Bloat Controls | Split files, strip output, context overflow strategies |
-| 9 | Auto-Save & Pruning | Auto-save on commit, session archival/deletion |
+| 9 | Auto-Save & Pruning | Auto-save on chat response, session archival/deletion |
 | 10 | Polish & Multi-Root | Multi-root support, config validation, tree view, status bar ✓ |
 
 ## Key Design Decisions
 
 - **JSON as primary format** — Machine-parseable for resume; markdown summary embedded for human review.
 - **Minimum VS Code `^1.93.0`** — Chat participant API stabilized at this version.
-- **Manual save + optional auto-save** — Auto-save on commit and auto-save on chat response are both opt-in; manual save is the primary workflow. Chat-response auto-save watches the Copilot storage directory for new turns and saves automatically with old-file cleanup.
+- **Manual save + optional auto-save** — Auto-save on chat response is opt-in; manual save is the primary workflow. The auto-save feature watches the Copilot storage directory for new turns and saves automatically with old-file cleanup.
 - **Relies on internal Copilot storage format** — A version-detection layer handles format changes gracefully.
 - **Open source (MIT)** — Developed publicly on GitHub with contribution guidelines, issue templates, CI/CD pipelines, and automated publishing.
 

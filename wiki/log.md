@@ -59,3 +59,7 @@ Pages touched: save-system.md, configuration.md, git-integration.md, log.md
 ## [2026-04-13] update | Privacy Warning for Public Repos
 Documented privacy risks of committing `.chat/` session files to public repositories. Session files record full Copilot conversations including agent tool call I/O, which routinely captures local filesystem paths (exposing OS usernames) and workspace-internal details. Added Privacy Warning section to `configuration.md` (with cross-reference from `includeInGitignore` setting) and a Privacy Considerations section to `save-system.md`. Mirrors the new warning added to README.md.
 Pages touched: configuration.md, save-system.md, log.md
+
+## [2026-04-13] update | Finish Removing Auto-Save on Commit Docs
+Completed removal of all `autoSaveOnCommit` references missed in the previous cleanup. Removed the "Auto-save on commit" feature bullet and settings table row from README.md. Removed the "Auto-Save on Commit" section and its sequence diagram from git-integration.md. Updated overview.md phase table and key design decision. Updated file-manifest.md command to `toggleAutoSave`. Updated index.md git-integration summary.
+Pages touched: README.md, wiki/git-integration.md, wiki/overview.md, wiki/file-manifest.md, wiki/index.md, wiki/log.md

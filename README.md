@@ -13,7 +13,6 @@ A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON f
 - **Resume sessions** — Use `@session-control /resume <name>` to reload a saved conversation as LLM context in a new chat.
 - **Browse, preview, delete** — Manage saved sessions via the Session Explorer and command palette.
 - **Resume from viewer** — When viewing a saved session, click the ▶ icon in the editor title bar to resume it directly in chat.
-- **Auto-save on commit** — Optionally save the active session automatically when you make a git commit.
 - **Auto-save on chat response** — Optionally save the active session automatically after every Copilot chat response.
 - **Lives in source control** — Sessions are plain JSON files tracked alongside your code, reviewable in diffs and PRs.
 - **Bloat controls** — Configurable file size limits, session splitting, tool output stripping, and automatic pruning of old sessions.
@@ -94,7 +93,6 @@ This command opens the web viewer for the active JSON file when it matches Sessi
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `session-control.storagePath` | `.chat` | Folder (relative to workspace root) where sessions are saved |
-| `session-control.autoSaveOnCommit` | `false` | Auto-save active session on git commit |
 | `session-control.autoSaveOnChatResponse` | `false` | Auto-save active session after every Copilot chat response |
 | `session-control.includeInGitignore` | `false` | Add storage folder to `.gitignore` |
 | `session-control.resume.maxTurns` | `50` | Max turns injected when resuming |

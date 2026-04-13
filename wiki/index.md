@@ -22,7 +22,7 @@ Master catalog of all wiki pages for the **session-control** VS Code extension.
 - [Save System](save-system.md) — Subsystem for reading, transforming, and persisting Copilot chat sessions
 - [Resume System](resume-system.md) — Chat participant that loads saved sessions as LLM context
 - [Chat Participant](chat-participant.md) — The `@session-control` VS Code chat participant: registration, commands, UX
-- [Git Integration](git-integration.md) — Git metadata capture, auto-save on commit, branch/SHA tracking
+- [Git Integration](git-integration.md) — Git metadata capture, branch/SHA tracking
 
 ## Concepts
 - [Configuration](configuration.md) — All user-facing settings: storage path, bloat controls, resume limits, pruning

@@ -87,7 +87,7 @@ graph TD
 - `session-control.openSessionFromExplorer` — "Open Saved Session" (Session Explorer inline action)
 - `session-control.deleteSessionFromExplorer` — "Delete Saved Session" (Session Explorer inline action)
 - `session-control.refreshSessionExplorer` — "Refresh Session Explorer"
-- `session-control.toggleAutoSaveOnCommit` — "Toggle Auto-Save On Commit" (now toggles `autoSaveOnChatResponse`)
+- `session-control.toggleAutoSave` — "Toggle Auto-Save" (toggles `autoSaveOnChatResponse`)
 
 ### Chat Participant
 - **ID**: `session-control.resume`
