@@ -136,4 +136,36 @@ suite('sessionReader', () => {
 			await fs.rm(setup.root, { recursive: true, force: true });
 		}
 	});
+
+	test('skips unknown format files when other valid sessions exist', async () => {
+		const errorMessages: string[] = [];
+		const warnings: string[] = [];
+		const setup = await setupWorkspaceStorageRoot();
+
+		try {
+			await copyFixture('v1-session.json', setup.sessionsDirectory);
+			await copyFixture('unknown-format.json', setup.sessionsDirectory);
+
+			const reader = createSessionReader({
+				showInformationMessage: async () => undefined,
+				showErrorMessage: async (message: string) => {
+					errorMessages.push(message);
+				},
+				logWarning: (message: string) => {
+					warnings.push(message);
+				},
+				vscodeVersion: '1.115.0',
+			});
+
+			const sessions = await reader.readCopilotSessions({ storageUri: { fsPath: setup.storageUriPath } });
+			// Valid session should still be returned; unknown-format file should be skipped
+			assert.equal(sessions.length, 1);
+			// No error popup shown because at least one session loaded OK
+			assert.equal(errorMessages.length, 0);
+			// Warning logged for the skipped file
+			assert.ok(warnings.some((w) => w.includes('unknown-format.json')));
+		} finally {
+			await fs.rm(setup.root, { recursive: true, force: true });
+		}
+	});
 });

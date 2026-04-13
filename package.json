@@ -2,7 +2,7 @@
   "name": "session-control",
   "displayName": "Session Control",
   "description": "Save and resume GitHub Copilot Chat sessions linked to git commits",
-  "version": "0.1.8",
+  "version": "0.1.11",
   "publisher": "darrenjmcleod",
   "license": "MIT",
   "repository": {

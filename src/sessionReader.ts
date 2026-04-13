@@ -677,6 +677,7 @@ export function createSessionReader(overrides: Partial<SessionReaderDeps> = {}):
 
 			const sessionFiles = files.filter((file) => /\.jsonl?$/i.test(file));
 			const sessions: CopilotSession[] = [];
+			let unknownFormatCount = 0;
 
 			for (const fileName of sessionFiles) {
 				const filePath = path.join(sessionsDirectory, fileName);
@@ -691,10 +692,9 @@ export function createSessionReader(overrides: Partial<SessionReaderDeps> = {}):
 					sessions.push({ ...session, sourceFile });
 				} catch (error) {
 					if (error instanceof UnknownFormatError) {
-						await deps.showErrorMessage(
-							`Unrecognized Copilot session format (VS Code ${deps.vscodeVersion}). Session Control may need an update.`,
-						);
-						return [];
+						unknownFormatCount++;
+						deps.logWarning(`Skipped unrecognized session format: ${fileName} (VS Code ${deps.vscodeVersion})`);
+						continue;
 					}
 
 					if (error instanceof SyntaxError) {
@@ -704,6 +704,13 @@ export function createSessionReader(overrides: Partial<SessionReaderDeps> = {}):
 
 					throw error;
 				}
+			}
+
+			if (!sessions.length && unknownFormatCount > 0) {
+				await deps.showErrorMessage(
+					`Unrecognized Copilot session format (VS Code ${deps.vscodeVersion}). Session Control may need an update.`,
+				);
+				return [];
 			}
 
 			return sessions.sort(
