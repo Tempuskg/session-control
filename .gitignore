@@ -14,3 +14,6 @@ coverage/
 *.log
 *.tmp
 *.temp
+
+# Chat session logs (contain local paths — not for public repos)
+.chat/
