@@ -388,7 +388,182 @@ function normalizeObjectPayload(payload: Record<string, unknown>, sourceFile: st
 	return null;
 }
 
+function normalizeSnapshotPatchPayload(records: unknown[], sourceFile: string): CopilotSession | null {
+	const snapshotRecord = records.find(
+		(r) => isRecord(r) && r.kind === 0 && isRecord(r.v),
+	);
+	if (!snapshotRecord || !isRecord(snapshotRecord)) {
+		return null;
+	}
+
+	const snapshot = snapshotRecord.v;
+	if (!isRecord(snapshot) || !Array.isArray(snapshot.requests)) {
+		return null;
+	}
+
+	const requests: unknown[] = JSON.parse(JSON.stringify(snapshot.requests));
+
+	for (const record of records) {
+		if (!isRecord(record) || record.kind !== 2 || !Array.isArray(record.k) || !Array.isArray(record.v)) {
+			continue;
+		}
+
+		const pathKeys = record.k as unknown[];
+		const patchValues = record.v as unknown[];
+		const spliceIndex = typeof record.i === 'number' ? record.i : undefined;
+
+		if (pathKeys.length === 1 && pathKeys[0] === 'requests') {
+			if (spliceIndex !== undefined) {
+				requests.splice(spliceIndex, requests.length - spliceIndex, ...patchValues);
+			} else {
+				requests.push(...patchValues);
+			}
+			continue;
+		}
+
+		if (
+			pathKeys.length === 3
+			&& pathKeys[0] === 'requests'
+			&& typeof pathKeys[1] === 'number'
+			&& pathKeys[2] === 'response'
+		) {
+			const req = requests[pathKeys[1]];
+			if (isRecord(req) && Array.isArray(req.response)) {
+				if (spliceIndex !== undefined) {
+					(req.response as unknown[]).splice(spliceIndex, req.response.length - spliceIndex, ...patchValues);
+				} else {
+					(req.response as unknown[]).push(...patchValues);
+				}
+			}
+		}
+	}
+
+	const turns: SavedTurn[] = [];
+	for (const request of requests) {
+		if (!isRecord(request)) {
+			continue;
+		}
+
+		const msgObj = isRecord(request.message) ? request.message : undefined;
+		const userText = msgObj && typeof msgObj.text === 'string' ? msgObj.text.trim() : '';
+
+		if (userText) {
+			const references: string[] = [];
+			if (Array.isArray(request.contentReferences)) {
+				for (const ref of request.contentReferences) {
+					if (!isRecord(ref)) {
+						continue;
+					}
+					const refObj = isRecord(ref.reference) ? ref.reference : ref;
+					const refPath = typeof refObj.fsPath === 'string'
+						? refObj.fsPath
+						: typeof refObj.path === 'string'
+							? refObj.path
+							: undefined;
+					if (typeof refPath === 'string') {
+						references.push(refPath);
+					}
+				}
+			}
+
+			const agentName = isRecord(request.agent) && typeof request.agent.name === 'string'
+				? request.agent.name
+				: 'copilot';
+
+			turns.push({
+				type: 'request',
+				participant: agentName,
+				prompt: userText,
+				references,
+				timestamp: typeof request.timestamp === 'number'
+					? new Date(request.timestamp).toISOString()
+					: toIsoTimestamp(request.timestamp),
+			});
+		}
+
+		if (Array.isArray(request.response)) {
+			const textParts: string[] = [];
+			const toolCalls: ToolCall[] = [];
+
+			for (const part of request.response) {
+				if (!isRecord(part)) {
+					continue;
+				}
+
+				if (part.kind === 'toolInvocationSerialized') {
+					const name = typeof part.toolId === 'string'
+						? part.toolId
+						: typeof part.toolCallId === 'string'
+							? part.toolCallId
+							: 'unknown';
+					const toolCall: ToolCall = { name };
+					if (isRecord(part.pastTenseMessage) && typeof part.pastTenseMessage.value === 'string') {
+						toolCall.summary = String(part.pastTenseMessage.value);
+					} else if (isRecord(part.invocationMessage) && typeof part.invocationMessage.value === 'string') {
+						toolCall.summary = String(part.invocationMessage.value);
+					}
+					toolCalls.push(toolCall);
+					continue;
+				}
+
+				if (typeof part.kind === 'string' || typeof part.kind === 'number') {
+					continue;
+				}
+
+				if (typeof part.value === 'string' && part.value.trim()) {
+					textParts.push(part.value.trim());
+				}
+			}
+
+			const content = textParts.join('\n\n').trim();
+			if (content) {
+				const agentName = isRecord(request.agent) && typeof request.agent.name === 'string'
+					? request.agent.name
+					: 'copilot';
+
+				turns.push({
+					type: 'response',
+					participant: agentName,
+					content,
+					toolCalls,
+					timestamp: typeof request.timestamp === 'number'
+						? new Date(request.timestamp + 1).toISOString()
+						: toIsoTimestamp(request.timestamp),
+				});
+			}
+		}
+	}
+
+	if (!turns.length) {
+		return null;
+	}
+
+	const id = typeof snapshot.sessionId === 'string' ? snapshot.sessionId : sourceFile;
+	const title = typeof snapshot.customTitle === 'string'
+		? snapshot.customTitle
+		: typeof snapshot.title === 'string'
+			? snapshot.title
+			: id;
+	const lastMessageDate = turns[turns.length - 1]?.timestamp
+		?? (typeof snapshot.creationDate === 'number'
+			? new Date(snapshot.creationDate).toISOString()
+			: new Date().toISOString());
+
+	return {
+		id,
+		title,
+		lastMessageDate,
+		turns,
+		sourceFile,
+	};
+}
+
 function normalizeJsonlPayload(records: unknown[], sourceFile: string): CopilotSession | null {
+	const snapshotResult = normalizeSnapshotPatchPayload(records, sourceFile);
+	if (snapshotResult) {
+		return snapshotResult;
+	}
+
 	const meta = records.find((record) => isRecord(record) && (record.kind === 'meta' || record.type === 'meta'));
 	const turns = normalizeTurns(records);
 	if (!turns.length) {

@@ -7,6 +7,7 @@ import {
 	createStorageGitignoreEntry,
 	ensureStoragePathInGitignore,
 	listSessionsAcrossWorkspaceFolders,
+	runOpenSavedSessionCommand,
 	resolveManualWorkspaceFolder,
 	validateStoragePath,
 } from '../../src/extension';
@@ -147,5 +148,58 @@ suite('extension phase 10', () => {
 		} finally {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}
+	});
+
+	test('runOpenSavedSessionCommand prompts for a session when no explorer item is provided', async () => {
+		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
+		const opened: Array<{ storageDirectory: string; fileName: string; extensionUri: vscode.Uri }> = [];
+
+		await runOpenSavedSessionCommand(
+			{ extensionUri: vscode.Uri.file('C:/extension') } as vscode.ExtensionContext,
+			undefined,
+			{
+				getWorkspaceFolders: () => [workspaceFolder],
+				listSessionsAcrossWorkspaceFolders: async () => [
+					{
+						label: '[repo] Session 1',
+						description: '2 turns',
+						detail: '2026-04-13T00:00:00.000Z | saved.json',
+						fileName: 'saved.json',
+						storageDirectory: 'C:/repo/.chat',
+						workspaceFolder,
+					},
+				],
+				pickSession: async (sessions) => sessions[0],
+				readSession: async () => ({ id: 's1' } as ReturnType<typeof createChatSession>),
+				showSession: (_session, extensionUri, storageDirectory, fileName) => {
+					opened.push({ extensionUri, storageDirectory, fileName });
+				},
+				showInformationMessage: async () => undefined,
+			},
+		);
+
+		assert.equal(opened.length, 1);
+		assert.equal(opened[0]?.storageDirectory, 'C:/repo/.chat');
+		assert.equal(opened[0]?.fileName, 'saved.json');
+		assert.equal(opened[0]?.extensionUri.fsPath.toLowerCase(), vscode.Uri.file('C:/extension').fsPath.toLowerCase());
+	});
+
+	test('runOpenSavedSessionCommand shows guidance when no workspace is open', async () => {
+		const infoMessages: string[] = [];
+
+		await runOpenSavedSessionCommand(
+			{ extensionUri: vscode.Uri.file('C:/extension') } as vscode.ExtensionContext,
+			undefined,
+			{
+				getWorkspaceFolders: () => undefined,
+				showInformationMessage: async (message: string) => {
+					infoMessages.push(message);
+					return undefined;
+				},
+			},
+		);
+
+		assert.equal(infoMessages.length, 1);
+		assert.equal(infoMessages[0], 'Open a workspace folder before opening saved sessions.');
 	});
 });

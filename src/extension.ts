@@ -5,6 +5,7 @@ import { registerChatParticipant } from './chatParticipant';
 import { getGitContext } from './gitIntegration';
 import { CopilotSession, readCopilotSessions } from './sessionReader';
 import { SessionExplorerProvider, SessionExplorerSessionItem } from './sessionExplorer';
+import { SessionViewerPanel } from './sessionViewer';
 import { createSessionStore, SessionPruneAction } from './sessionStore';
 import { applySaveBloatControls, createChatSession, SaveOverflowStrategy } from './sessionWriter';
 import { parseFileSize } from './utils';
@@ -21,6 +22,11 @@ interface CopilotSessionPickItem extends vscode.QuickPickItem {
 }
 
 interface SavedSessionPickItem extends vscode.QuickPickItem {
+	fileName: string;
+}
+
+interface OpenSessionTarget {
+	storageDirectory: string;
 	fileName: string;
 }
 
@@ -72,6 +78,15 @@ interface AutoSaveListenerDeps {
 	showWarningMessage: (message: string) => Thenable<unknown>;
 	schedule: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
 	clearSchedule: (handle: ReturnType<typeof setTimeout>) => void;
+}
+
+interface OpenSavedSessionDeps {
+	getWorkspaceFolders: () => readonly vscode.WorkspaceFolder[] | undefined;
+	listSessionsAcrossWorkspaceFolders: (workspaceFolders: readonly vscode.WorkspaceFolder[] | undefined) => Promise<WorkspaceSessionMeta[]>;
+	pickSession: (sessions: WorkspaceSessionMeta[]) => Promise<WorkspaceSessionMeta | undefined>;
+	readSession: (storageDirectory: string, fileName: string) => Promise<ReturnType<typeof createChatSession>>;
+	showSession: (session: ReturnType<typeof createChatSession>, extensionUri: vscode.Uri, storageDirectory: string, fileName: string) => void;
+	showInformationMessage: (message: string) => Thenable<unknown>;
 }
 
 interface ManualWorkspaceSelectionDeps {
@@ -468,6 +483,58 @@ function createDefaultAutoSaveDeps(): AutoSaveListenerDeps {
 	};
 }
 
+function createDefaultOpenSavedSessionDeps(): OpenSavedSessionDeps {
+	return {
+		getWorkspaceFolders: () => vscode.workspace.workspaceFolders,
+		listSessionsAcrossWorkspaceFolders,
+		pickSession: async (sessions: WorkspaceSessionMeta[]) => vscode.window.showQuickPick<WorkspaceSessionMeta>(
+			sessions,
+			{ title: 'Select saved session to open' },
+		),
+		readSession: async (storageDirectory: string, fileName: string) => sessionStore.readSession(storageDirectory, fileName),
+		showSession: (session, extensionUri, storageDirectory, fileName) => {
+			SessionViewerPanel.createOrShow(session, extensionUri, storageDirectory, fileName);
+		},
+		showInformationMessage: (message: string) => vscode.window.showInformationMessage(message),
+	};
+}
+
+export async function runOpenSavedSessionCommand(
+	context: vscode.ExtensionContext,
+	target: OpenSessionTarget | undefined,
+	depsOverrides: Partial<OpenSavedSessionDeps> = {},
+): Promise<void> {
+	const deps = {
+		...createDefaultOpenSavedSessionDeps(),
+		...depsOverrides,
+	};
+
+	let selectedTarget = target;
+	if (!selectedTarget) {
+		const workspaceFolders = deps.getWorkspaceFolders();
+		if (!workspaceFolders?.length) {
+			await deps.showInformationMessage('Open a workspace folder before opening saved sessions.');
+			return;
+		}
+
+		const sessions = await deps.listSessionsAcrossWorkspaceFolders(workspaceFolders);
+		if (!sessions.length) {
+			await deps.showInformationMessage('No saved sessions found.');
+			return;
+		}
+
+		const pick = await deps.pickSession(sessions);
+		if (!pick) {
+			return;
+		}
+
+		selectedTarget = pick;
+	}
+
+	const session = await deps.readSession(selectedTarget.storageDirectory, selectedTarget.fileName);
+	deps.showSession(session, context.extensionUri, selectedTarget.storageDirectory, selectedTarget.fileName);
+}
+
 export function registerAutoSaveOnCommitListener(
 	context: vscode.ExtensionContext,
 	output: vscode.OutputChannel,
@@ -640,8 +707,13 @@ export function activate(context: vscode.ExtensionContext): void {
 			sessionExplorerProvider.refresh();
 		}),
 		vscode.commands.registerCommand('session-control.refreshSessionExplorer', () => sessionExplorerProvider.refresh()),
-		vscode.commands.registerCommand('session-control.openSessionFromExplorer', async (item: SessionExplorerSessionItem) => {
-			await vscode.commands.executeCommand('vscode.open', item.resourceUri);
+		vscode.commands.registerCommand('session-control.openSessionFromExplorer', async (item: SessionExplorerSessionItem | undefined) => {
+			try {
+				await runOpenSavedSessionCommand(context, item);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				await vscode.window.showErrorMessage(`Failed to open session: ${message}`);
+			}
 		}),
 		vscode.commands.registerCommand('session-control.deleteSessionFromExplorer', async (item: SessionExplorerSessionItem) => {
 			const confirmation = await vscode.window.showWarningMessage(

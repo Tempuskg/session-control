@@ -3,9 +3,23 @@
 **/.vscode/**
 **/src/**
 **/test/**
+**/dist-test/**
 **/*.map
 .vscodeignore
 webpack.config.js
 eslint.config.mjs
 tsconfig.json
 tsconfig.test.json
+
+# Project documentation / planning not required at runtime
+AGENTS.md
+PLAN.md
+raw/**
+wiki/**
+
+# Local workspace/session data
+.chat/**
+
+# Build / development only
+scripts/**
+node_modules/**

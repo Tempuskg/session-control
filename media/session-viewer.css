@@ -1,0 +1,351 @@
+/* Session Viewer — uses VS Code theme variables for automatic light/dark support */
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	color: var(--vscode-editor-foreground);
+	background-color: var(--vscode-editor-background);
+	padding: 0 20px 48px;
+	max-width: 920px;
+	margin: 0 auto;
+}
+
+/* ---- Header ---- */
+
+.session-header {
+	padding: 16px 0 12px;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	margin-bottom: 16px;
+}
+
+.header-title-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 8px;
+}
+
+.session-title {
+	margin: 0;
+	font-size: 1.35em;
+	font-weight: 600;
+	color: var(--vscode-editor-foreground);
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.open-json-btn {
+	font-family: var(--vscode-font-family);
+	font-size: 12px;
+	color: var(--vscode-button-secondaryForeground);
+	background-color: var(--vscode-button-secondaryBackground);
+	border: none;
+	border-radius: 3px;
+	padding: 4px 10px;
+	cursor: pointer;
+	white-space: nowrap;
+	flex-shrink: 0;
+}
+
+.open-json-btn:hover {
+	background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.header-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 14px;
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.meta-item code {
+	font-family: var(--vscode-editor-font-family);
+	font-size: 11px;
+	background-color: var(--vscode-textCodeBlock-background);
+	padding: 1px 4px;
+	border-radius: 2px;
+}
+
+.dirty-badge {
+	background-color: var(--vscode-statusBarItem-warningBackground, #ca5010);
+	color: var(--vscode-statusBarItem-warningForeground, #fff);
+	font-size: 10px;
+	padding: 1px 5px;
+	border-radius: 2px;
+	font-weight: 600;
+}
+
+/* ---- Multi-part indicator ---- */
+
+.part-indicator {
+	background-color: var(--vscode-editor-inactiveSelectionBackground);
+	border: 1px solid var(--vscode-panel-border);
+	padding: 6px 12px;
+	border-radius: 4px;
+	margin-bottom: 12px;
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* ---- Collapsible sections ---- */
+
+.section {
+	margin-bottom: 10px;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+.section-header {
+	display: block;
+	padding: 8px 14px;
+	background-color: var(--vscode-sideBarSectionHeader-background);
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 600;
+	user-select: none;
+	list-style: none;
+}
+
+.section-header::-webkit-details-marker {
+	display: none;
+}
+
+.section-header::before {
+	display: inline-block;
+	content: '▶';
+	font-size: 10px;
+	margin-right: 8px;
+	transition: transform 0.15s;
+	color: var(--vscode-descriptionForeground);
+}
+
+details[open] > .section-header::before {
+	transform: rotate(90deg);
+}
+
+.section-body {
+	padding: 12px 16px;
+}
+
+/* ---- Turns ---- */
+
+.turn {
+	margin-bottom: 14px;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 5px;
+	overflow: hidden;
+}
+
+.turn:last-child {
+	margin-bottom: 0;
+}
+
+.turn-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 5px 12px;
+	font-size: 12px;
+}
+
+.turn-request > .turn-header {
+	background-color: var(--vscode-inputOption-activeBackground, var(--vscode-editor-selectionBackground));
+}
+
+.turn-response > .turn-header {
+	background-color: var(--vscode-editor-inactiveSelectionBackground);
+}
+
+.turn-icon {
+	font-size: 13px;
+	flex-shrink: 0;
+}
+
+.turn-participant {
+	font-weight: 600;
+	flex: 1;
+}
+
+.turn-timestamp {
+	color: var(--vscode-descriptionForeground);
+	font-size: 11px;
+}
+
+.turn-content {
+	padding: 8px 14px;
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+.turn-content p:first-child {
+	margin-top: 0;
+}
+
+.turn-content p:last-child {
+	margin-bottom: 0;
+}
+
+/* ---- Reference chips ---- */
+
+.references {
+	padding: 2px 14px 8px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.ref-chip {
+	background-color: var(--vscode-badge-background);
+	color: var(--vscode-badge-foreground);
+	font-size: 11px;
+	padding: 2px 7px;
+	border-radius: 10px;
+	font-family: var(--vscode-editor-font-family);
+	max-width: 320px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ---- Tool calls ---- */
+
+.tool-calls {
+	padding: 4px 14px 8px;
+}
+
+.tool-call {
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 4px;
+	margin-bottom: 5px;
+	font-size: 12px;
+}
+
+.tool-call-summary {
+	padding: 5px 10px;
+	cursor: pointer;
+	background-color: var(--vscode-sideBar-background);
+	list-style: none;
+	display: flex;
+	gap: 6px;
+	align-items: center;
+}
+
+.tool-call-summary::-webkit-details-marker {
+	display: none;
+}
+
+.tool-call-summary::before {
+	content: '▶';
+	font-size: 9px;
+	color: var(--vscode-descriptionForeground);
+	flex-shrink: 0;
+	transition: transform 0.12s;
+}
+
+details[open] > .tool-call-summary::before {
+	transform: rotate(90deg);
+}
+
+.tool-name {
+	font-family: var(--vscode-editor-font-family);
+	font-weight: 600;
+	color: var(--vscode-symbolIcon-functionForeground, var(--vscode-editor-foreground));
+}
+
+.tool-summary-text {
+	color: var(--vscode-descriptionForeground);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tool-section {
+	padding: 6px 10px;
+	border-top: 1px solid var(--vscode-panel-border);
+}
+
+.tool-label {
+	display: block;
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: var(--vscode-descriptionForeground);
+	margin-bottom: 4px;
+}
+
+/* ---- Code blocks ---- */
+
+pre {
+	background-color: var(--vscode-textCodeBlock-background);
+	border-radius: 4px;
+	padding: 8px 10px;
+	overflow-x: auto;
+	margin: 4px 0 0;
+	font-size: 12px;
+}
+
+code {
+	font-family: var(--vscode-editor-font-family);
+	font-size: 12px;
+}
+
+p code,
+li code {
+	background-color: var(--vscode-textCodeBlock-background);
+	padding: 1px 4px;
+	border-radius: 2px;
+}
+
+/* ---- Summary markdown ---- */
+
+.section-body h1,
+.section-body h2,
+.section-body h3 {
+	margin-top: 12px;
+	margin-bottom: 6px;
+}
+
+.section-body hr {
+	border: none;
+	border-top: 1px solid var(--vscode-panel-border);
+	margin: 12px 0;
+}
+
+.section-body blockquote {
+	border-left: 3px solid var(--vscode-textBlockQuote-border, var(--vscode-panel-border));
+	margin: 8px 0;
+	padding: 4px 12px;
+	color: var(--vscode-descriptionForeground);
+}
+
+/* ---- Footer ---- */
+
+.session-footer {
+	margin-top: 24px;
+	padding-top: 12px;
+	border-top: 1px solid var(--vscode-panel-border);
+	display: flex;
+	justify-content: space-between;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	font-family: var(--vscode-editor-font-family);
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+/* ---- Empty state ---- */
+
+.empty-state {
+	color: var(--vscode-descriptionForeground);
+	font-style: italic;
+}

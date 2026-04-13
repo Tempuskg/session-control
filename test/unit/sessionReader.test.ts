@@ -42,6 +42,7 @@ suite('sessionReader', () => {
 			await copyFixture('v2-session.json', setup.sessionsDirectory);
 			await copyFixture('v3-session.json', setup.sessionsDirectory);
 			await copyFixture('jsonl-session.jsonl', setup.sessionsDirectory);
+			await copyFixture('snapshot-session.jsonl', setup.sessionsDirectory);
 			await copyFixture('corrupt.json', setup.sessionsDirectory);
 
 			const reader = createSessionReader({
@@ -59,14 +60,21 @@ suite('sessionReader', () => {
 
 			const sessions = await reader.readCopilotSessions({ storageUri: { fsPath: setup.storageUriPath } });
 
-			assert.equal(sessions.length, 4);
-			assert.equal(sessions[0]?.id, 'session-v3');
-			assert.equal(sessions[1]?.id, 'session-v2');
-			assert.equal(sessions[2]?.id, 'session-jsonl');
-			assert.equal(sessions[3]?.id, 'session-v1');
+			assert.equal(sessions.length, 5);
+			assert.equal(sessions[0]?.id, 'session-snapshot');
+			assert.equal(sessions[0]?.title, 'Snapshot patch session');
 			assert.equal(sessions[0]?.turns.length, 2);
 			assert.equal(sessions[0]?.turns[0]?.type, 'request');
+			assert.equal((sessions[0]?.turns[0] as { prompt: string }).prompt, 'How do I fix the login bug?');
 			assert.equal(sessions[0]?.turns[1]?.type, 'response');
+			const responseTurn = sessions[0]?.turns[1] as { content: string; toolCalls: unknown[] };
+			assert.ok(responseTurn.content.includes('null check'));
+			assert.ok(responseTurn.content.includes('validated before use'));
+			assert.equal(responseTurn.toolCalls.length, 1);
+			assert.equal(sessions[1]?.id, 'session-v3');
+			assert.equal(sessions[2]?.id, 'session-v2');
+			assert.equal(sessions[3]?.id, 'session-jsonl');
+			assert.equal(sessions[4]?.id, 'session-v1');
 			assert.equal(warnings.some((message) => message.includes('corrupt.json')), true);
 			assert.equal(infoMessages.length, 0);
 			assert.equal(errorMessages.length, 0);
