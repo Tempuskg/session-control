@@ -2,7 +2,7 @@
   "name": "session-control",
   "displayName": "Session Control",
   "description": "Save and resume GitHub Copilot Chat sessions linked to git commits",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "publisher": "darrenjmcleod",
   "license": "MIT",
   "repository": {
@@ -58,6 +58,12 @@
         "command": "session-control.openSessionFromExplorer",
         "title": "Open Saved Session",
         "category": "Session Control"
+      },
+      {
+        "command": "session-control.viewSessionFile",
+        "title": "Session Control: View Session",
+        "category": "Session Control",
+        "icon": "$(open-preview)"
       },
       {
         "command": "session-control.deleteSessionFromExplorer",
@@ -229,6 +235,13 @@
         {
           "command": "session-control.refreshSessionExplorer",
           "when": "view == session-control.sessionExplorer",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "session-control.viewSessionFile",
+          "when": "(resourceExtname == .json || resourceExtname == .jsonl) && session-control.isSessionFile",
           "group": "navigation"
         }
       ],

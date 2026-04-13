@@ -11,7 +11,7 @@ A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON f
 
 - **Save sessions** — Capture the active Copilot Chat session as a JSON file in `.chat/`, enriched with branch and commit metadata.
 - **Resume sessions** — Use `@session-control /resume <name>` to reload a saved conversation as LLM context in a new chat.
-- **Browse & delete** — Manage saved sessions via the command palette.
+- **Browse, preview, delete** — Manage saved sessions via the Session Explorer and command palette.
 - **Auto-save on commit** — Optionally save the active session automatically when you make a git commit.
 - **Lives in source control** — Sessions are plain JSON files tracked alongside your code, reviewable in diffs and PRs.
 - **Bloat controls** — Configurable file size limits, session splitting, tool output stripping, and automatic pruning of old sessions.
@@ -58,6 +58,30 @@ or via the Command Palette:
 ```
 Session Control: Browse Saved Sessions
 ```
+
+### View a saved session in the web viewer
+
+You can open the HTML session viewer in two ways:
+
+1. **From Session Explorer**
+	- Open the **Session Control** activity bar view.
+	- Under **Saved Sessions**, click a session row (or use the inline open action).
+
+2. **From an open JSON file**
+	- Open a saved session file (for example in `.chat/`).
+	- Use the **View Session** preview icon in the editor title bar.
+
+The editor title action is shown only when the active file is a valid Session Control session document. If your JSON does not match the Session Control schema, the viewer action is hidden and the command reports that the format is not recognized.
+
+### Viewer command
+
+You can also run this from the command palette:
+
+```
+Session Control: View Session
+```
+
+This command opens the web viewer for the active JSON file when it matches Session Control's saved session format.
 
 ## Configuration
 

@@ -2,7 +2,7 @@
 title: "File Manifest"
 type: entity
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-04-13
 sources:
   - raw/plan.md
 tags:
@@ -30,7 +30,10 @@ Planned source files for the session-control extension, their roles, and depende
 | `src/gitIntegration.ts` | Git extension API wrapper: branch, SHA, commit listener | `vscode.git` extension API |
 | `src/sessionStore.ts` | CRUD operations on saved session files in `.chat/` | `types.ts`, `utils.ts` |
 | `src/types.ts` | TypeScript interfaces: `ChatSession`, `SavedTurn`, etc. | — |
+| `src/sessionViewer.ts` | HTML webview panel for viewing saved sessions as formatted conversations | `types.ts`, `marked` |
+| `src/sessionExplorer.ts` | Tree data provider for the Session Explorer sidebar view | `sessionStore.ts` |
 | `src/utils.ts` | Utilities: slugify, timestamp formatting, fuzzy matching | — |
+| `media/session-viewer.css` | Stylesheet for the session viewer webview | — |
 
 ### Open Source & CI Files
 
@@ -54,7 +57,12 @@ graph TD
     ext --> writer["sessionWriter.ts"]
     ext --> cp["chatParticipant.ts"]
     ext --> git["gitIntegration.ts"]
+    ext --> viewer["sessionViewer.ts"]
+    ext --> explorer["sessionExplorer.ts"]
     ext --> store["sessionStore.ts"]
+
+    viewer --> types
+    explorer --> store
 
     writer --> types["types.ts"]
     writer --> git
@@ -75,6 +83,11 @@ graph TD
 - `session-control.saveSession` — "Session Control: Save Current Chat Session"
 - `session-control.listSessions` — "Session Control: Browse Saved Sessions"
 - `session-control.deleteSession` — "Session Control: Delete Saved Session"
+- `session-control.viewSessionFile` — "Session Control: View Session" (editor title preview action)
+- `session-control.openSessionFromExplorer` — "Open Saved Session" (Session Explorer inline action)
+- `session-control.deleteSessionFromExplorer` — "Delete Saved Session" (Session Explorer inline action)
+- `session-control.refreshSessionExplorer` — "Refresh Session Explorer"
+- `session-control.toggleAutoSaveOnCommit` — "Toggle Auto-Save On Commit"
 
 ### Chat Participant
 - **ID**: `session-control.resume`
@@ -85,5 +98,8 @@ graph TD
 ### Menus
 - "Save Chat Session" in `chat/context` menu or command palette
 
-### Tree View (Phase 4 stretch)
-- `session-control.sessionExplorer` — Sidebar panel listing saved sessions
+### Tree View
+- `session-control.sessionExplorer` — Sidebar panel listing saved sessions grouped by workspace
+
+### Editor Title Menu
+- `session-control.viewSessionFile` — Preview icon shown when the active file is a recognized session (`.json`/`.jsonl`) via context key `session-control.isSessionFile`

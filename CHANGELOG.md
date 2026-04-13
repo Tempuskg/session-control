@@ -9,3 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial project scaffolding for the Session Control VS Code extension
+- Session web viewer command for active JSON files: `Session Control: View Session`
+- Editor title preview action that appears for recognized Session Control session files (`.json` / `.jsonl`)
+- Session viewer usage documentation covering Session Explorer and open-file workflows

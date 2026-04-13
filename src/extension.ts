@@ -8,6 +8,7 @@ import { SessionExplorerProvider, SessionExplorerSessionItem } from './sessionEx
 import { SessionViewerPanel } from './sessionViewer';
 import { createSessionStore, SessionPruneAction } from './sessionStore';
 import { applySaveBloatControls, createChatSession, SaveOverflowStrategy } from './sessionWriter';
+import { isChatSession } from './types';
 import { parseFileSize } from './utils';
 
 const sessionStore = createSessionStore();
@@ -88,6 +89,17 @@ interface OpenSavedSessionDeps {
 	showSession: (session: ReturnType<typeof createChatSession>, extensionUri: vscode.Uri, storageDirectory: string, fileName: string) => void;
 	showInformationMessage: (message: string) => Thenable<unknown>;
 }
+
+interface ViewSessionFileDeps {
+	getActiveEditor: () => vscode.TextEditor | undefined;
+	showSession: (session: ReturnType<typeof createChatSession>, extensionUri: vscode.Uri, storageDirectory: string, fileName: string) => void;
+	showInformationMessage: (message: string) => Thenable<unknown>;
+}
+
+type ParsedSessionDocument =
+	| { kind: 'ok'; session: ReturnType<typeof createChatSession> }
+	| { kind: 'invalid-json' }
+	| { kind: 'not-session' };
 
 interface ManualWorkspaceSelectionDeps {
 	getWorkspaceFolders: () => readonly vscode.WorkspaceFolder[] | undefined;
@@ -535,6 +547,61 @@ export async function runOpenSavedSessionCommand(
 	deps.showSession(session, context.extensionUri, selectedTarget.storageDirectory, selectedTarget.fileName);
 }
 
+export async function runViewSessionFileCommand(
+	context: vscode.ExtensionContext,
+	depsOverrides: Partial<ViewSessionFileDeps> = {},
+): Promise<void> {
+	const deps: ViewSessionFileDeps = {
+		getActiveEditor: () => vscode.window.activeTextEditor,
+		showSession: (session, extensionUri, storageDirectory, fileName) => {
+			SessionViewerPanel.createOrShow(session, extensionUri, storageDirectory, fileName);
+		},
+		showInformationMessage: (message: string) => vscode.window.showInformationMessage(message),
+		...depsOverrides,
+	};
+
+	const editor = deps.getActiveEditor();
+	if (!editor) {
+		await deps.showInformationMessage('Open a JSON session file before using Session Viewer.');
+		return;
+	}
+
+	const document = editor.document;
+	if (document.uri.scheme !== 'file') {
+		await deps.showInformationMessage('Only local JSON files can be opened in Session Viewer.');
+		return;
+	}
+
+	const parsed = parseSessionDocument(document.getText());
+	if (parsed.kind === 'invalid-json') {
+		await deps.showInformationMessage('The active file is not valid JSON.');
+		return;
+	}
+
+	if (parsed.kind === 'not-session') {
+		await deps.showInformationMessage('This file is not a recognized Session Control session format.');
+		return;
+	}
+
+	const filePath = document.uri.fsPath;
+	deps.showSession(parsed.session, context.extensionUri, path.dirname(filePath), path.basename(filePath));
+}
+
+function parseSessionDocument(text: string): ParsedSessionDocument {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text) as unknown;
+	} catch {
+		return { kind: 'invalid-json' };
+	}
+
+	if (!isChatSession(parsed)) {
+		return { kind: 'not-session' };
+	}
+
+	return { kind: 'ok', session: parsed };
+}
+
 export function registerAutoSaveOnCommitListener(
 	context: vscode.ExtensionContext,
 	output: vscode.OutputChannel,
@@ -695,6 +762,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	syncAutoSaveListener();
 	updateAutoSaveStatusBar(autoSaveStatusBar);
+	const updateSessionFileContext = (editor: vscode.TextEditor | undefined) => {
+		const document = editor?.document;
+		const isSessionFile = document?.uri.scheme === 'file'
+			&& (path.extname(document.uri.fsPath).toLowerCase() === '.json' || path.extname(document.uri.fsPath).toLowerCase() === '.jsonl')
+			&& parseSessionDocument(document.getText()).kind === 'ok';
+		void vscode.commands.executeCommand('setContext', 'session-control.isSessionFile', Boolean(isSessionFile));
+	};
+	updateSessionFileContext(vscode.window.activeTextEditor);
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('session-control.saveSession', async () => {
@@ -714,6 +789,9 @@ export function activate(context: vscode.ExtensionContext): void {
 				const message = error instanceof Error ? error.message : String(error);
 				await vscode.window.showErrorMessage(`Failed to open session: ${message}`);
 			}
+		}),
+		vscode.commands.registerCommand('session-control.viewSessionFile', async () => {
+			await runViewSessionFileCommand(context);
 		}),
 		vscode.commands.registerCommand('session-control.deleteSessionFromExplorer', async (item: SessionExplorerSessionItem) => {
 			const confirmation = await vscode.window.showWarningMessage(
@@ -771,7 +849,15 @@ export function activate(context: vscode.ExtensionContext): void {
 			sessionExplorerProvider.refresh();
 		}
 	}));
-	context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => updateAutoSaveStatusBar(autoSaveStatusBar)));
+	context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((editor) => {
+		updateAutoSaveStatusBar(autoSaveStatusBar);
+		updateSessionFileContext(editor);
+	}));
+	context.subscriptions.push(vscode.workspace.onDidChangeTextDocument((event) => {
+		if (event.document === vscode.window.activeTextEditor?.document) {
+			updateSessionFileContext(vscode.window.activeTextEditor);
+		}
+	}));
 
 	registerChatParticipant(context);
 }

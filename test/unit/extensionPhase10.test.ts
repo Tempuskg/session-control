@@ -8,6 +8,7 @@ import {
 	ensureStoragePathInGitignore,
 	listSessionsAcrossWorkspaceFolders,
 	runOpenSavedSessionCommand,
+	runViewSessionFileCommand,
 	resolveManualWorkspaceFolder,
 	validateStoragePath,
 } from '../../src/extension';
@@ -201,5 +202,79 @@ suite('extension phase 10', () => {
 
 		assert.equal(infoMessages.length, 1);
 		assert.equal(infoMessages[0], 'Open a workspace folder before opening saved sessions.');
+	});
+
+	test('runViewSessionFileCommand opens session viewer for valid session JSON', async () => {
+		const session = createChatSession(createCopilotSession('Viewer Session'), {
+			title: 'Viewer Session',
+			savedAt: '2026-04-13T12:00:00.000Z',
+			vscodeVersion: '1.115.0',
+		});
+		const opened: Array<{ storageDirectory: string; fileName: string; extensionUri: vscode.Uri }> = [];
+
+		await runViewSessionFileCommand(
+			{ extensionUri: vscode.Uri.file('C:/extension') } as vscode.ExtensionContext,
+			{
+				getActiveEditor: () => ({
+					document: {
+						uri: vscode.Uri.file('C:/repo/.chat/viewer-session.json'),
+						getText: () => JSON.stringify(session),
+					},
+				} as unknown as vscode.TextEditor),
+				showSession: (_session, extensionUri, storageDirectory, fileName) => {
+					opened.push({ extensionUri, storageDirectory, fileName });
+				},
+				showInformationMessage: async () => undefined,
+			},
+		);
+
+		assert.equal(opened.length, 1);
+		assert.equal(opened[0]?.storageDirectory.toLowerCase(), path.normalize('C:/repo/.chat').toLowerCase());
+		assert.equal(opened[0]?.fileName, 'viewer-session.json');
+		assert.equal(opened[0]?.extensionUri.fsPath.toLowerCase(), vscode.Uri.file('C:/extension').fsPath.toLowerCase());
+	});
+
+	test('runViewSessionFileCommand shows message for invalid JSON', async () => {
+		const infoMessages: string[] = [];
+
+		await runViewSessionFileCommand(
+			{ extensionUri: vscode.Uri.file('C:/extension') } as vscode.ExtensionContext,
+			{
+				getActiveEditor: () => ({
+					document: {
+						uri: vscode.Uri.file('C:/repo/.chat/bad.json'),
+						getText: () => '{ bad json',
+					},
+				} as unknown as vscode.TextEditor),
+				showInformationMessage: async (message: string) => {
+					infoMessages.push(message);
+					return undefined;
+				},
+			},
+		);
+
+		assert.equal(infoMessages[0], 'The active file is not valid JSON.');
+	});
+
+	test('runViewSessionFileCommand shows message for non-session JSON', async () => {
+		const infoMessages: string[] = [];
+
+		await runViewSessionFileCommand(
+			{ extensionUri: vscode.Uri.file('C:/extension') } as vscode.ExtensionContext,
+			{
+				getActiveEditor: () => ({
+					document: {
+						uri: vscode.Uri.file('C:/repo/.chat/not-session.json'),
+						getText: () => JSON.stringify({ hello: 'world' }),
+					},
+				} as unknown as vscode.TextEditor),
+				showInformationMessage: async (message: string) => {
+					infoMessages.push(message);
+					return undefined;
+				},
+			},
+		);
+
+		assert.equal(infoMessages[0], 'This file is not a recognized Session Control session format.');
 	});
 });

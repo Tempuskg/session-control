@@ -2,7 +2,7 @@
 title: "Wiki Log"
 type: log
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-04-13
 ---
 
 # Wiki Log
@@ -39,3 +39,7 @@ Phase 10 (Polish & Multi-Root Support) now complete with all deliverables implem
 - 58 passing tests (100% coverage of Phase 10 deliverables); npm run lint clean; ready for release
 All changes committed: commit 656f480 "feat: complete phase 10 polish and multi-root support"
 Pages touched: overview.md, source-plan.md, file-manifest.md
+
+## [2026-04-13] update | Session Viewer Feature
+Added session viewer documentation to wiki after implementing the `session-control.viewSessionFile` command and editor title preview action. The session viewer is an HTML webview panel that renders saved sessions as formatted conversations, accessible from the Session Explorer sidebar or by opening a session JSON file and clicking the preview icon in the editor title bar. A context key (`session-control.isSessionFile`) controls button visibility.
+Pages touched: architecture.md, file-manifest.md, overview.md, index.md, log.md

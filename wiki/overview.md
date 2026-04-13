@@ -2,7 +2,7 @@
 title: "Project Overview"
 type: overview
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-04-13
 sources:
   - raw/plan.md
 tags:
@@ -33,6 +33,7 @@ The extension has two main subsystems:
 
 - **[Save System](save-system.md)** — Reads Copilot's internal session storage, transforms it, and writes structured JSON to `.chat/`.
 - **[Resume System](resume-system.md)** — A registered [Chat Participant](chat-participant.md) (`@session-control`) that loads saved sessions and injects them as LLM context.
+- **Session Viewer** — An HTML webview panel that renders saved sessions as formatted conversations. Accessible from the Session Explorer sidebar or by opening a session JSON file and clicking the editor title preview button.
 
 ## Implementation Phases
 
