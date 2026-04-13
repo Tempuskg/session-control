@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "id": "03e49fde-efd3-4414-bdda-e4f7bd3dfaa9",
+  "title": "Publication readiness assessment",
+  "savedAt": "2026-04-13T22:42:15.288Z",
+  "git": {
+    "branch": "main",
+    "commit": "7db4d94d9025ee114870495c1ae3691636b318d7",
+    "dirty": true
+  },
+  "vscodeVersion": "1.115.0",
+  "totalTurns": 8,
+  "part": null,
+  "totalParts": null,
+  "previousPartFile": null,
+  "nextPartFile": null,
+  "turns": [
+    {
+      "type": "request",
+      "participant": "agent",
+      "prompt": "are we ready to publish",
+      "references": [
+        "e:\\chat-commit\\AGENTS.md"
+      ],
+      "timestamp": "2026-04-13T22:37:05.709Z"
+    },
+    {
+      "type": "response",
+      "participant": "agent",
+      "content": "Almost. Here's the status:\n\n**Ready:**\n- All 109 tests pass\n- No TypeScript errors\n-\n\nis built (April 13, 4:37 PM)\n\n**Blocking:**\n-\n\nstill shows `## [Unreleased]` — needs to be promoted to `[0.1.14]` before publishing\n\nWant me to update the CHANGELOG to version `0.1.14` with today's date?",
+      "toolCalls": [
+        {
+          "name": "copilot_memory",
+          "summary": "Read memory [](file:///c%3A/Users/darre/AppData/Roaming/Code/User/workspaceStorage/59ff86c45745caf5a7d57195da55c837/GitHub.copilot-chat/memory-tool/memories/repo/extension-command-notes.md)"
+        },
+        {
+          "name": "copilot_memory",
+          "summary": "Read memory [](file:///c%3A/Users/darre/AppData/Roaming/Code/User/workspaceStorage/59ff86c45745caf5a7d57195da55c837/GitHub.copilot-chat/memory-tool/memories/repo/wiki-update-rule.md)"
+        },
+        {
+          "name": "copilot_readFile",
+          "summary": "Read [](file:///e%3A/chat-commit/package.json#1-1), lines 1 to 60"
+        },
+        {
+          "name": "copilot_readFile",
+          "summary": "Read [](file:///e%3A/chat-commit/CHANGELOG.md)"
+        },
+        {
+          "name": "copilot_getErrors",
+          "summary": "Checked workspace, no problems found"
+        },
+        {
+          "name": "copilot_readFile",
+          "summary": "Read [](file:///e%3A/chat-commit/package.json#60-60), lines 60 to 200"
+        },
+        {
+          "name": "run_in_terminal",
+          "summary": "Running `npm test 2>&1 | Select-Object -Last 30`"
+        },
+        {
+          "name": "copilot_readFile",
+          "summary": "Read [](file:///e%3A/chat-commit/CHANGELOG.md)"
+        },
+        {
+          "name": "run_in_terminal",
+          "summary": "Running `Test-Path dist ; if (Test-Path dist) { Get-ChildItem dist | Select-Object Nam...`"
+        }
+      ],
+      "timestamp": "2026-04-13T22:37:05.710Z"
+    },
+    {
+      "type": "request",
+      "participant": "agent",
+      "prompt": "yes",
+      "references": [
+        "e:\\chat-commit\\AGENTS.md"
+      ],
+      "timestamp": "2026-04-13T22:38:06.422Z"
+    },
+    {
+      "type": "response",
+      "participant": "agent",
+      "content": "```\n\n```\n\nDone.\n\nnow has `## [0.1.14] - 2026-04-13`. You're ready to publish.",
+      "toolCalls": [
+        {
+          "name": "copilot_replaceString",
+          "summary": "Replacing 1 lines with 1 lines in [](file:///e%3A/chat-commit/CHANGELOG.md)"
+        }
+      ],
+      "timestamp": "2026-04-13T22:38:06.423Z"
+    },
+    {
+      "type": "request",
+      "participant": "agent",
+      "prompt": "commit changes",
+      "references": [
+        "e:\\chat-commit\\AGENTS.md"
+      ],
+      "timestamp": "2026-04-13T22:39:58.026Z"
+    },
+    {
+      "type": "response",
+      "participant": "agent",
+      "content": "Committed: `chore: promote changelog to v0.1.14 for release`",
+      "toolCalls": [
+        {
+          "name": "mcp_gitkraken_git_status",
+          "summary": "Ran `git_status` "
+        },
+        {
+          "name": "mcp_gitkraken_git_add_or_commit",
+          "summary": "Ran `git_add_or_commit` "
+        },
+        {
+          "name": "mcp_gitkraken_git_add_or_commit",
+          "summary": "Ran `git_add_or_commit` "
+        }
+      ],
+      "timestamp": "2026-04-13T22:39:58.027Z"
+    },
+    {
+      "type": "request",
+      "participant": "agent",
+      "prompt": "the autosaved session are showing as untracked in source control",
+      "references": [
+        "e:\\chat-commit\\AGENTS.md"
+      ],
+      "timestamp": "2026-04-13T22:41:46.845Z"
+    },
+    {
+      "type": "response",
+      "participant": "agent",
+      "content": "Do you want to add\n\nto\n\nto stop tracking these session files? Or would you prefer to just commit them as-is?",
+      "toolCalls": [
+        {
+          "name": "copilot_findFiles",
+          "summary": "Searched for files matching `**/.gitignore`, 1 match"
+        },
+        {
+          "name": "copilot_readFile",
+          "summary": "Read [](file:///e%3A/chat-commit/.gitignore)"
+        }
+      ],
+      "timestamp": "2026-04-13T22:41:46.846Z"
+    }
+  ],
+  "markdownSummary": "# Chat: Publication readiness assessment\n\n**Branch:** main | **Commit:** 7db4d94 | **Saved:** 2026-04-13T22:42:15.288Z\n**Turns:** 8\n\n---\n\n### Turn 1 - User\nare we ready to publish\n\n- References:\n  - e:\\chat-commit\\AGENTS.md\n\n### Turn 2 - Copilot\nAlmost. Here's the status:\n\n**Ready:**\n- All 109 tests pass\n- No TypeScript errors\n-\n\nis built (April 13, 4:37 PM)\n\n**Blocking:**\n-\n\nstill shows `## [Unreleased]` — needs to be promoted to `[0.1.14]` before publishing\n\nWant me to update the CHANGELOG to version `0.1.14` with today's date?\n\n> **Tool calls:** copilot_memory (Read memory [](file:///c%3A/Users/darre/AppData/Roaming/Code/User/workspaceStorage/59ff86c45745caf5a7d57195da55c837/GitHub.copilot-chat/memory-tool/memories/repo/extension-command-notes.md)), copilot_memory (Read memory [](file:///c%3A/Users/darre/AppData/Roaming/Code/User/workspaceStorage/59ff86c45745caf5a7d57195da55c837/GitHub.copilot-chat/memory-tool/memories/repo/wiki-update-rule.md)), copilot_readFile (Read [](file:///e%3A/chat-commit/package.json#1-1), lines 1 to 60), copilot_readFile (Read [](file:///e%3A/chat-commit/CHANGELOG.md)), copilot_getErrors (Checked workspace, no problems found), copilot_readFile (Read [](file:///e%3A/chat-commit/package.json#60-60), lines 60 to 200), run_in_terminal (Running `npm test 2>&1 | Select-Object -Last 30`), copilot_readFile (Read [](file:///e%3A/chat-commit/CHANGELOG.md)), run_in_terminal (Running `Test-Path dist ; if (Test-Path dist) { Get-ChildItem dist | Select-Object Nam...`)\n\n### Turn 3 - User\nyes\n\n- References:\n  - e:\\chat-commit\\AGENTS.md\n\n### Turn 4 - Copilot\n```\n\n```\n\nDone.\n\nnow has `## [0.1.14] - 2026-04-13`. You're ready to publish.\n\n> **Tool calls:** copilot_replaceString (Replacing 1 lines with 1 lines in [](file:///e%3A/chat-commit/CHANGELOG.md))\n\n### Turn 5 - User\ncommit changes\n\n- References:\n  - e:\\chat-commit\\AGENTS.md\n\n### Turn 6 - Copilot\nCommitted: `chore: promote changelog to v0.1.14 for release`\n\n> **Tool calls:** mcp_gitkraken_git_status (Ran `git_status`), mcp_gitkraken_git_add_or_commit (Ran `git_add_or_commit`), mcp_gitkraken_git_add_or_commit (Ran `git_add_or_commit`)\n\n### Turn 7 - User\nthe autosaved session are showing as untracked in source control\n\n- References:\n  - e:\\chat-commit\\AGENTS.md\n\n### Turn 8 - Copilot\nDo you want to add\n\nto\n\nto stop tracking these session files? Or would you prefer to just commit them as-is?\n\n> **Tool calls:** copilot_findFiles (Searched for files matching `**/.gitignore`, 1 match), copilot_readFile (Read [](file:///e%3A/chat-commit/.gitignore))"
+}
