@@ -765,6 +765,7 @@ export function registerAutoSaveOnChatResponseListener(
 	}
 
 	const sessionsDirectory = deriveChatSessionsPath(storageUri.fsPath);
+	output.appendLine(`[auto-save] Watching: ${sessionsDirectory}`);
 	const watcher = deps.createWatcher(sessionsDirectory);
 
 	const lastAutoSave = new Map<string, { fileName: string; turnCount: number }>();
@@ -774,9 +775,11 @@ export function registerAutoSaveOnChatResponseListener(
 
 	const onStorageChanged = () => {
 		if (disabled) {
+			output.appendLine('[auto-save] Skipped — listener disabled due to a previous error. Reload VS Code to re-enable.');
 			return;
 		}
 
+		output.appendLine('[auto-save] File change detected, debouncing 5 s…');
 		if (debounceTimer) {
 			deps.clearSchedule(debounceTimer);
 		}
@@ -785,24 +788,34 @@ export function registerAutoSaveOnChatResponseListener(
 			void (async () => {
 				try {
 					const sessions = await deps.readCopilotSessions();
+					output.appendLine(`[auto-save] Read ${sessions.length} session(s).`);
 					if (!sessions.length) {
+						output.appendLine('[auto-save] No sessions found — nothing to save.');
 						return;
 					}
 
-					const latest = sessions[0]!;
+					const latest = sessions[0];
+					if (!latest) {
+						return;
+					}
+					output.appendLine(`[auto-save] Latest: "${latest.title}" id=${latest.id} turns=${latest.turns.length}`);
 					const prev = lastAutoSave.get(latest.id);
 					if (prev && prev.turnCount >= latest.turns.length) {
+						output.appendLine(`[auto-save] Skipped — turn count unchanged (${latest.turns.length}).`);
 						return;
 					}
 
 					const workspaceFolder = deps.getImplicitWorkspaceFolder();
 					if (!workspaceFolder) {
+						output.appendLine('[auto-save] Skipped — no workspace folder is open.');
 						return;
 					}
 
 					const storageDirectory = getStoragePath(workspaceFolder);
+					output.appendLine(`[auto-save] Saving to ${storageDirectory}…`);
 					const newFileName = await deps.saveSessionSilently(workspaceFolder, storageDirectory);
 					if (!newFileName) {
+						output.appendLine('[auto-save] Save returned no filename — session may already be up to date.');
 						return;
 					}
 

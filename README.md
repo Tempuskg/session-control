@@ -12,7 +12,9 @@ A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON f
 - **Save sessions** — Capture the active Copilot Chat session as a JSON file in `.chat/`, enriched with branch and commit metadata.
 - **Resume sessions** — Use `@session-control /resume <name>` to reload a saved conversation as LLM context in a new chat.
 - **Browse, preview, delete** — Manage saved sessions via the Session Explorer and command palette.
+- **Resume from viewer** — When viewing a saved session, click the ▶ icon in the editor title bar to resume it directly in chat.
 - **Auto-save on commit** — Optionally save the active session automatically when you make a git commit.
+- **Auto-save on chat response** — Optionally save the active session automatically after every Copilot chat response.
 - **Lives in source control** — Sessions are plain JSON files tracked alongside your code, reviewable in diffs and PRs.
 - **Bloat controls** — Configurable file size limits, session splitting, tool output stripping, and automatic pruning of old sessions.
 
@@ -73,6 +75,10 @@ You can open the HTML session viewer in two ways:
 
 The editor title action is shown only when the active file is a valid Session Control session document. If your JSON does not match the Session Control schema, the viewer action is hidden and the command reports that the format is not recognized.
 
+### Resume from the session viewer
+
+When a saved session is open in the web viewer, a ▶ **Resume** icon appears in the editor title bar. Click it to open the chat panel with `@session-control /resume <session-title>` pre-filled. Press **Enter** to load the session as context and continue the conversation.
+
 ### Viewer command
 
 You can also run this from the command palette:
@@ -89,6 +95,7 @@ This command opens the web viewer for the active JSON file when it matches Sessi
 |---------|---------|-------------|
 | `session-control.storagePath` | `.chat` | Folder (relative to workspace root) where sessions are saved |
 | `session-control.autoSaveOnCommit` | `false` | Auto-save active session on git commit |
+| `session-control.autoSaveOnChatResponse` | `false` | Auto-save active session after every Copilot chat response |
 | `session-control.includeInGitignore` | `false` | Add storage folder to `.gitignore` |
 | `session-control.resume.maxTurns` | `50` | Max turns injected when resuming |
 | `session-control.resume.overflowStrategy` | `summarize` | `summarize`, `truncate`, or `recent-only` |
