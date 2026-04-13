@@ -43,3 +43,7 @@ Pages touched: overview.md, source-plan.md, file-manifest.md
 ## [2026-04-13] update | Session Viewer Feature
 Added session viewer documentation to wiki after implementing the `session-control.viewSessionFile` command and editor title preview action. The session viewer is an HTML webview panel that renders saved sessions as formatted conversations, accessible from the Session Explorer sidebar or by opening a session JSON file and clicking the preview icon in the editor title bar. A context key (`session-control.isSessionFile`) controls button visibility.
 Pages touched: architecture.md, file-manifest.md, overview.md, index.md, log.md
+
+## [2026-04-13] update | Auto-Save on Chat Response Feature
+Documented the new `autoSaveOnChatResponse` setting and its implementation. The feature watches the Copilot chat session storage directory for file changes, debounces (5s), checks turn count increases, auto-saves with old-file cleanup, and disables on error. Uses dependency injection (`AutoSaveOnChatResponseDeps`) for testability. The toggle command now controls chat-response auto-save. Status bar reflects both auto-save modes. 4 new tests added.
+Pages touched: save-system.md, configuration.md, architecture.md, overview.md, file-manifest.md, log.md

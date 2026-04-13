@@ -2,7 +2,7 @@
   "name": "session-control",
   "displayName": "Session Control",
   "description": "Save and resume GitHub Copilot Chat sessions linked to git commits",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "publisher": "darrenjmcleod",
   "license": "MIT",
   "repository": {
@@ -90,6 +90,12 @@
           "type": "boolean",
           "default": false,
           "description": "Automatically save the active chat session when a git commit is made.",
+          "scope": "resource"
+        },
+        "session-control.autoSaveOnChatResponse": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically save the active chat session after every Copilot chat response.",
           "scope": "resource"
         },
         "session-control.includeInGitignore": {

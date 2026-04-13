@@ -68,6 +68,9 @@ An HTML webview panel (`SessionViewerPanel`) that renders saved sessions as a fo
 ### Git Integration
 Wraps the VS Code Git extension API. Provides branch name, commit SHA, dirty state. Optionally listens for commit events to trigger auto-save. See [Git Integration](git-integration.md).
 
+### Auto-Save on Chat Response
+A file-system watcher on the Copilot `chatSessions/` directory that triggers automatic saves when new chat responses arrive. Debounced (5 seconds), tracks turn counts per session ID, and cleans up previous auto-save files to prevent accumulation. Uses dependency injection (`AutoSaveOnChatResponseDeps`) for testability. See [Save System](save-system.md#auto-save-on-chat-response).
+
 ## Data Flow
 
 ### Save Flow

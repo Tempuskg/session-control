@@ -2,7 +2,7 @@
 title: "Save System"
 type: entity
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-04-13
 sources:
   - raw/plan.md
 tags:
@@ -103,3 +103,26 @@ Optional feature (Phase 2, Step 2.5). When `autoSaveOnCommit` is enabled:
 - Debounced to avoid saving on micro-state changes
 - Only saves if new turns exist since last save (tracked via turn count or hash)
 - See [Git Integration](git-integration.md) for details
+
+## Auto-Save on Chat Response
+
+Optional feature controlled by the `session-control.autoSaveOnChatResponse` setting (default `false`). When enabled, the extension watches VS Code's internal Copilot chat session storage directory for file changes and automatically saves the session after each new response.
+
+### How It Works
+1. A file-system watcher monitors the Copilot `chatSessions/` directory for create and change events
+2. Events are **debounced (5 seconds)** to batch rapid file writes from a single response
+3. On trigger, the listener reads the most recently updated session file
+4. It compares the current turn count against the last-saved turn count for that session ID
+5. If the turn count increased, it performs an automatic save via `sessionWriter` and `sessionStore`
+6. It tracks the previous auto-save file path per session ID and **deletes the old file** when a new version is saved, preventing file accumulation
+7. The listener is **disabled after errors** (same pattern as the commit-based auto-save) to avoid repeated failures
+
+### Implementation Details
+- Exported as `registerAutoSaveOnChatResponseListener` from `src/extension.ts`
+- Uses an `AutoSaveOnChatResponseDeps` interface for dependency injection, making it fully testable without touching the file system or VS Code APIs
+- 4 dedicated tests in `test/unit/extensionAutoSave.test.ts` cover the listener lifecycle, debounce behavior, old-file cleanup, and error disabling
+
+### Status Bar Integration
+The status bar item reflects **both** `autoSaveOnCommit` and `autoSaveOnChatResponse` settings. The toggle command (`session-control.toggleAutoSaveOnCommit`) now toggles `autoSaveOnChatResponse` instead of `autoSaveOnCommit`, since chat-response auto-save is the more commonly used auto-save mode.
+
+> ⚠️ Note: Like the commit-based auto-save, this feature relies on the internal Copilot storage directory structure. If VS Code changes where or how chat sessions are stored, the file watcher path will need updating.

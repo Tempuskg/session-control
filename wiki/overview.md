@@ -56,7 +56,7 @@ The plan is organized into ten incremental phases, each delivering a testable mi
 
 - **JSON as primary format** — Machine-parseable for resume; markdown summary embedded for human review.
 - **Minimum VS Code `^1.93.0`** — Chat participant API stabilized at this version.
-- **Manual save + optional auto-save** — Auto-save on commit is opt-in, manual save is the primary workflow.
+- **Manual save + optional auto-save** — Auto-save on commit and auto-save on chat response are both opt-in; manual save is the primary workflow. Chat-response auto-save watches the Copilot storage directory for new turns and saves automatically with old-file cleanup.
 - **Relies on internal Copilot storage format** — A version-detection layer handles format changes gracefully.
 - **Open source (MIT)** — Developed publicly on GitHub with contribution guidelines, issue templates, CI/CD pipelines, and automated publishing.
 

@@ -23,7 +23,7 @@ Planned source files for the session-control extension, their roles, and depende
 | File | Role | Dependencies |
 |------|------|-------------|
 | `package.json` | Extension manifest: commands, settings, chat participant, menus | — |
-| `src/extension.ts` | Entry point: registers commands and chat participant | All modules |
+| `src/extension.ts` | Entry point: registers commands, chat participant, and auto-save listeners (exports `registerAutoSaveOnChatResponseListener`) | All modules |
 | `src/sessionReader.ts` | Reads Copilot internal session files; handles format versioning | VS Code internal API |
 | `src/sessionWriter.ts` | Transforms raw sessions to [Session Format](session-format.md); writes to disk | `types.ts`, `gitIntegration.ts`, `utils.ts` |
 | `src/chatParticipant.ts` | `@session-control` chat participant handler (resume logic) | `sessionStore.ts`, `types.ts` |
@@ -87,7 +87,7 @@ graph TD
 - `session-control.openSessionFromExplorer` — "Open Saved Session" (Session Explorer inline action)
 - `session-control.deleteSessionFromExplorer` — "Delete Saved Session" (Session Explorer inline action)
 - `session-control.refreshSessionExplorer` — "Refresh Session Explorer"
-- `session-control.toggleAutoSaveOnCommit` — "Toggle Auto-Save On Commit"
+- `session-control.toggleAutoSaveOnCommit` — "Toggle Auto-Save On Commit" (now toggles `autoSaveOnChatResponse`)
 
 ### Chat Participant
 - **ID**: `session-control.resume`

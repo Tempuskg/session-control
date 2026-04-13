@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { registerChatParticipant } from './chatParticipant';
 import { getGitContext } from './gitIntegration';
-import { CopilotSession, readCopilotSessions } from './sessionReader';
+import { CopilotSession, deriveChatSessionsPath, readCopilotSessions } from './sessionReader';
 import { SessionExplorerProvider, SessionExplorerSessionItem } from './sessionExplorer';
 import { SessionViewerPanel } from './sessionViewer';
 import { createSessionStore, SessionPruneAction } from './sessionStore';
@@ -76,6 +76,24 @@ interface AutoSaveListenerDeps {
 	getWorkspaceFolder: (uri: vscode.Uri) => vscode.WorkspaceFolder | undefined;
 	runSaveSessionFlow: typeof runSaveSessionFlow;
 	showInformationMessage: (message: string) => Thenable<unknown>;
+	showWarningMessage: (message: string) => Thenable<unknown>;
+	schedule: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
+	clearSchedule: (handle: ReturnType<typeof setTimeout>) => void;
+}
+
+interface ChatResponseFileWatcher {
+	onDidChange: (listener: () => void) => vscode.Disposable;
+	onDidCreate: (listener: () => void) => vscode.Disposable;
+	dispose: () => void;
+}
+
+interface AutoSaveOnChatResponseDeps {
+	getStorageUri: () => { fsPath: string } | undefined;
+	createWatcher: (sessionsDirectory: string) => ChatResponseFileWatcher;
+	getImplicitWorkspaceFolder: () => vscode.WorkspaceFolder | undefined;
+	readCopilotSessions: () => Promise<CopilotSession[]>;
+	saveSessionSilently: (workspaceFolder: vscode.WorkspaceFolder, storageDirectory: string) => Promise<string | undefined>;
+	deleteOldAutoSave: (storageDirectory: string, fileName: string) => Promise<void>;
 	showWarningMessage: (message: string) => Thenable<unknown>;
 	schedule: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
 	clearSchedule: (handle: ReturnType<typeof setTimeout>) => void;
@@ -698,6 +716,143 @@ export function registerAutoSaveOnCommitListener(
 	return registration;
 }
 
+function createDefaultAutoSaveOnChatResponseDeps(context: vscode.ExtensionContext): AutoSaveOnChatResponseDeps {
+	return {
+		getStorageUri: () => context.storageUri,
+		createWatcher: (sessionsDirectory) => {
+			const pattern = new vscode.RelativePattern(
+				vscode.Uri.file(sessionsDirectory),
+				'*.{json,jsonl}',
+			);
+			const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+			return {
+				onDidChange: (listener: () => void) => watcher.onDidChange(() => listener()),
+				onDidCreate: (listener: () => void) => watcher.onDidCreate(() => listener()),
+				dispose: () => watcher.dispose(),
+			};
+		},
+		getImplicitWorkspaceFolder,
+		readCopilotSessions: () => readCopilotSessions(context),
+		saveSessionSilently: async (workspaceFolder, storageDirectory) =>
+			runSaveSessionFlow(context, workspaceFolder, storageDirectory, {
+				selectSession: async (sessions) => sessions[0],
+				promptTitle: async (defaultTitle) => defaultTitle,
+				showInformationMessage: async () => undefined,
+			}),
+		deleteOldAutoSave: async (storageDirectory, fileName) => {
+			await sessionStore.deleteSession(storageDirectory, fileName);
+		},
+		showWarningMessage: (message: string) => vscode.window.showWarningMessage(message),
+		schedule: (callback, delayMs) => setTimeout(callback, delayMs),
+		clearSchedule: (handle) => clearTimeout(handle),
+	};
+}
+
+export function registerAutoSaveOnChatResponseListener(
+	context: vscode.ExtensionContext,
+	output: vscode.OutputChannel,
+	depsOverrides: Partial<AutoSaveOnChatResponseDeps> = {},
+): vscode.Disposable | undefined {
+	const deps = {
+		...createDefaultAutoSaveOnChatResponseDeps(context),
+		...depsOverrides,
+	};
+
+	const storageUri = deps.getStorageUri();
+	if (!storageUri) {
+		output.appendLine('[auto-save] No workspace storage available. Chat response auto-save is disabled.');
+		return undefined;
+	}
+
+	const sessionsDirectory = deriveChatSessionsPath(storageUri.fsPath);
+	const watcher = deps.createWatcher(sessionsDirectory);
+
+	const lastAutoSave = new Map<string, { fileName: string; turnCount: number }>();
+	let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+	let disabled = false;
+	const disposables: vscode.Disposable[] = [];
+
+	const onStorageChanged = () => {
+		if (disabled) {
+			return;
+		}
+
+		if (debounceTimer) {
+			deps.clearSchedule(debounceTimer);
+		}
+
+		debounceTimer = deps.schedule(() => {
+			void (async () => {
+				try {
+					const sessions = await deps.readCopilotSessions();
+					if (!sessions.length) {
+						return;
+					}
+
+					const latest = sessions[0]!;
+					const prev = lastAutoSave.get(latest.id);
+					if (prev && prev.turnCount >= latest.turns.length) {
+						return;
+					}
+
+					const workspaceFolder = deps.getImplicitWorkspaceFolder();
+					if (!workspaceFolder) {
+						return;
+					}
+
+					const storageDirectory = getStoragePath(workspaceFolder);
+					const newFileName = await deps.saveSessionSilently(workspaceFolder, storageDirectory);
+					if (!newFileName) {
+						return;
+					}
+
+					if (prev?.fileName && prev.fileName !== newFileName) {
+						try {
+							await deps.deleteOldAutoSave(storageDirectory, prev.fileName);
+						} catch {
+							// Ignore cleanup errors for previous auto-save files
+						}
+					}
+
+					lastAutoSave.set(latest.id, {
+						fileName: newFileName,
+						turnCount: latest.turns.length,
+					});
+					output.appendLine(
+						`[auto-save] Saved "${latest.title}" (${latest.turns.length} turns) after chat response.`,
+					);
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					output.appendLine(`[auto-save] Disabled after chat response save error: ${message}`);
+					void deps.showWarningMessage(
+						'Session Control auto-save on chat response encountered an error and was disabled for this session.',
+					);
+					disabled = true;
+				}
+			})();
+		}, 5000);
+	};
+
+	disposables.push(
+		watcher.onDidChange(onStorageChanged),
+		watcher.onDidCreate(onStorageChanged),
+	);
+
+	const registration = {
+		dispose: () => {
+			if (debounceTimer) {
+				deps.clearSchedule(debounceTimer);
+			}
+			watcher.dispose();
+			for (const d of disposables) {
+				d.dispose();
+			}
+		},
+	};
+	context.subscriptions.push(registration);
+	return registration;
+}
+
 function getImplicitWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
 	const activeUri = vscode.window.activeTextEditor?.document.uri;
 	if (activeUri) {
@@ -716,6 +871,12 @@ function isAnyWorkspaceAutoSaveEnabled(): boolean {
 		.get<boolean>('autoSaveOnCommit', false));
 }
 
+function isAnyWorkspaceAutoSaveOnChatResponseEnabled(): boolean {
+	return (vscode.workspace.workspaceFolders ?? []).some((workspaceFolder) => vscode.workspace
+		.getConfiguration('session-control', workspaceFolder.uri)
+		.get<boolean>('autoSaveOnChatResponse', false));
+}
+
 function updateAutoSaveStatusBar(item: vscode.StatusBarItem): void {
 	const workspaceFolder = getImplicitWorkspaceFolder();
 	if (!workspaceFolder) {
@@ -723,11 +884,22 @@ function updateAutoSaveStatusBar(item: vscode.StatusBarItem): void {
 		return;
 	}
 
-	const enabled = vscode.workspace
-		.getConfiguration('session-control', workspaceFolder.uri)
-		.get<boolean>('autoSaveOnCommit', false);
-	item.text = `$(history) Session Control ${enabled ? 'Auto-Save On' : 'Auto-Save Off'}`;
-	item.tooltip = `${workspaceFolder.name}: click to ${enabled ? 'disable' : 'enable'} auto-save on commit`;
+	const config = vscode.workspace.getConfiguration('session-control', workspaceFolder.uri);
+	const commitEnabled = config.get<boolean>('autoSaveOnCommit', false);
+	const chatResponseEnabled = config.get<boolean>('autoSaveOnChatResponse', false);
+	const anyEnabled = commitEnabled || chatResponseEnabled;
+	item.text = `$(history) Session Control ${anyEnabled ? 'Auto-Save On' : 'Auto-Save Off'}`;
+
+	if (commitEnabled && chatResponseEnabled) {
+		item.tooltip = `${workspaceFolder.name}: auto-save on commit + chat response`;
+	} else if (commitEnabled) {
+		item.tooltip = `${workspaceFolder.name}: auto-save on commit`;
+	} else if (chatResponseEnabled) {
+		item.tooltip = `${workspaceFolder.name}: auto-save on chat response`;
+	} else {
+		item.tooltip = `${workspaceFolder.name}: click to enable auto-save`;
+	}
+
 	item.show();
 }
 
@@ -742,8 +914,8 @@ export function activate(context: vscode.ExtensionContext): void {
 	autoSaveStatusBar.command = 'session-control.toggleAutoSaveOnCommit';
 	context.subscriptions.push(autoSaveStatusBar);
 
-	// The onStartupFinished activation event fires here; check autoSaveOnCommit
-	// and register the git listener only if enabled.
+	// The onStartupFinished activation event fires here; check auto-save settings
+	// and register listeners only if enabled.
 	const output = vscode.window.createOutputChannel('Session Control');
 	context.subscriptions.push(output);
 	let autoSaveListener: vscode.Disposable | undefined;
@@ -760,7 +932,22 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 	};
 
+	let autoSaveOnChatResponseListener: vscode.Disposable | undefined;
+	const syncAutoSaveOnChatResponseListener = () => {
+		const enabled = isAnyWorkspaceAutoSaveOnChatResponseEnabled();
+		if (enabled && !autoSaveOnChatResponseListener) {
+			autoSaveOnChatResponseListener = registerAutoSaveOnChatResponseListener(context, output);
+			return;
+		}
+
+		if (!enabled && autoSaveOnChatResponseListener) {
+			autoSaveOnChatResponseListener.dispose();
+			autoSaveOnChatResponseListener = undefined;
+		}
+	};
+
 	syncAutoSaveListener();
+	syncAutoSaveOnChatResponseListener();
 	updateAutoSaveStatusBar(autoSaveStatusBar);
 	const updateSessionFileContext = (editor: vscode.TextEditor | undefined) => {
 		const document = editor?.document;
@@ -819,17 +1006,17 @@ export function activate(context: vscode.ExtensionContext): void {
 				getActiveEditorUri: () => vscode.window.activeTextEditor?.document.uri,
 			});
 			if (!workspaceFolder) {
-				await vscode.window.showInformationMessage('Open a workspace folder before changing auto-save on commit.');
+				await vscode.window.showInformationMessage('Open a workspace folder before changing auto-save.');
 				return;
 			}
 
 			const configuration = vscode.workspace.getConfiguration('session-control', workspaceFolder.uri);
-			const current = configuration.get<boolean>('autoSaveOnCommit', false);
-			await configuration.update('autoSaveOnCommit', !current, vscode.ConfigurationTarget.WorkspaceFolder);
+			const current = configuration.get<boolean>('autoSaveOnChatResponse', false);
+			await configuration.update('autoSaveOnChatResponse', !current, vscode.ConfigurationTarget.WorkspaceFolder);
 			updateAutoSaveStatusBar(autoSaveStatusBar);
-			syncAutoSaveListener();
+			syncAutoSaveOnChatResponseListener();
 			await vscode.window.showInformationMessage(
-				`${workspaceFolder.name}: auto-save on commit ${current ? 'disabled' : 'enabled'}.`,
+				`${workspaceFolder.name}: auto-save on chat response ${current ? 'disabled' : 'enabled'}.`,
 			);
 		}),
 	);
@@ -837,11 +1024,17 @@ export function activate(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
 		sessionExplorerProvider.refresh();
 		syncAutoSaveListener();
+		syncAutoSaveOnChatResponseListener();
 		updateAutoSaveStatusBar(autoSaveStatusBar);
 	}));
 	context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
 		if (event.affectsConfiguration('session-control.autoSaveOnCommit')) {
 			syncAutoSaveListener();
+			updateAutoSaveStatusBar(autoSaveStatusBar);
+		}
+
+		if (event.affectsConfiguration('session-control.autoSaveOnChatResponse')) {
+			syncAutoSaveOnChatResponseListener();
 			updateAutoSaveStatusBar(autoSaveStatusBar);
 		}
 
