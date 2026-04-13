@@ -903,6 +903,30 @@ function updateAutoSaveStatusBar(item: vscode.StatusBarItem): void {
 	item.show();
 }
 
+export async function runResumeSessionFromViewerCommand(): Promise<void> {
+	const panel = SessionViewerPanel.currentPanel;
+	if (!panel) {
+		await vscode.window.showInformationMessage('No session viewer is currently open.');
+		return;
+	}
+
+	const sessionTitle = panel.getSessionTitle();
+	if (!sessionTitle) {
+		await vscode.window.showWarningMessage('Unable to determine session title.');
+		return;
+	}
+
+	// Open the chat panel with a pre-filled resume command
+	try {
+		await vscode.commands.executeCommand('workbench.action.chat.open', {
+			query: `@session-control /resume ${sessionTitle}`,
+		});
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		await vscode.window.showErrorMessage(`Failed to open chat: ${message}`);
+	}
+}
+
 export function activate(context: vscode.ExtensionContext): void {
 	const sessionExplorerProvider = new SessionExplorerProvider();
 	const sessionExplorerView = vscode.window.createTreeView('session-control.sessionExplorer', {
@@ -979,6 +1003,9 @@ export function activate(context: vscode.ExtensionContext): void {
 		}),
 		vscode.commands.registerCommand('session-control.viewSessionFile', async () => {
 			await runViewSessionFileCommand(context);
+		}),
+		vscode.commands.registerCommand('session-control.resumeSessionFromViewer', async () => {
+			await runResumeSessionFromViewerCommand();
 		}),
 		vscode.commands.registerCommand('session-control.deleteSessionFromExplorer', async (item: SessionExplorerSessionItem) => {
 			const confirmation = await vscode.window.showWarningMessage(

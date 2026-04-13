@@ -66,6 +66,12 @@
         "icon": "$(open-preview)"
       },
       {
+        "command": "session-control.resumeSessionFromViewer",
+        "title": "Resume This Session in Chat",
+        "category": "Session Control",
+        "icon": "$(debug-start)"
+      },
+      {
         "command": "session-control.deleteSessionFromExplorer",
         "title": "Delete Saved Session",
         "category": "Session Control",
@@ -248,6 +254,11 @@
         {
           "command": "session-control.viewSessionFile",
           "when": "(resourceExtname == .json || resourceExtname == .jsonl) && session-control.isSessionFile",
+          "group": "navigation"
+        },
+        {
+          "command": "session-control.resumeSessionFromViewer",
+          "when": "activeWebviewPanelId == 'session-control.sessionViewer'",
           "group": "navigation"
         }
       ],

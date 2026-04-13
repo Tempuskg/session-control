@@ -162,6 +162,8 @@ export class SessionViewerPanel {
 	private readonly panel: vscode.WebviewPanel;
 	private readonly extensionUri: vscode.Uri;
 	private filePath: string;
+	private sessionTitle: string = '';
+	private fileName: string = '';
 	private readonly disposables: vscode.Disposable[] = [];
 
 	static createOrShow(
@@ -213,8 +215,18 @@ export class SessionViewerPanel {
 
 	update(session: ChatSession, filePath: string): void {
 		this.filePath = filePath;
+		this.sessionTitle = session.title;
+		this.fileName = path.basename(filePath);
 		this.panel.title = `Session: ${session.title}`;
 		this.panel.webview.html = this.renderHtml(session, filePath);
+	}
+
+	getSessionTitle(): string {
+		return this.sessionTitle;
+	}
+
+	getFileName(): string {
+		return this.fileName;
 	}
 
 	private renderHtml(session: ChatSession, filePath: string): string {
@@ -232,5 +244,7 @@ export class SessionViewerPanel {
 			d.dispose();
 		}
 		this.disposables.length = 0;
+		this.sessionTitle = '';
+		this.fileName = '';
 	}
 }

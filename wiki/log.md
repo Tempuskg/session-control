@@ -47,3 +47,7 @@ Pages touched: architecture.md, file-manifest.md, overview.md, index.md, log.md
 ## [2026-04-13] update | Auto-Save on Chat Response Feature
 Documented the new `autoSaveOnChatResponse` setting and its implementation. The feature watches the Copilot chat session storage directory for file changes, debounces (5s), checks turn count increases, auto-saves with old-file cleanup, and disables on error. Uses dependency injection (`AutoSaveOnChatResponseDeps`) for testability. The toggle command now controls chat-response auto-save. Status bar reflects both auto-save modes. 4 new tests added.
 Pages touched: save-system.md, configuration.md, architecture.md, overview.md, file-manifest.md, log.md
+
+## [2026-04-13] update | Resume Icon in Session Viewer
+Implemented the resume icon feature for the Session Viewer. Added `sessionTitle` and `fileName` properties to `SessionViewerPanel` with public getters to expose session metadata. Registered new command `session-control.resumeSessionFromViewer` that opens the chat panel with a pre-filled `@session-control /resume <title>` query. Updated `package.json` to add command declaration and editor/title menu entry (appears when viewer is active via `activeWebviewPanelId` context). Icon: `debug-start` (▶). Added unit test for no-open-viewer case. Architecture documentation already contained forward-looking description; this completes the implementation.
+Pages touched: (implementation only; wiki docs already current)

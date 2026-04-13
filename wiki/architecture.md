@@ -63,7 +63,7 @@ A registered VS Code chat participant (`@session-control`) that reads saved sess
 CRUD layer for saved session files in `.chat/`. Handles file naming, searching, fuzzy matching, archival, and deletion. Used by both Save and Resume systems.
 
 ### Session Viewer
-An HTML webview panel (`SessionViewerPanel`) that renders saved sessions as a formatted conversation view. Accessible from the Session Explorer sidebar (click a session) or from the editor title bar when a recognized session JSON file is open. Uses `buildPageHtml()` to generate a self-contained HTML page with CSP nonce, markdown rendering via `marked`, and XSS-safe escaping. See `src/sessionViewer.ts`.
+An HTML webview panel (`SessionViewerPanel`) that renders saved sessions as a formatted conversation view. Accessible from the Session Explorer sidebar (click a session) or from the editor title bar when a recognized session JSON file is open. Tracks session metadata (title, filename) and exposes it via public getters. Uses `buildPageHtml()` to generate a self-contained HTML page with CSP nonce, markdown rendering via `marked`, and XSS-safe escaping. When the viewer is active, a resume icon (▶ debug-start) appears in the editor title bar; clicking it opens the chat panel with a pre-filled `@session-control /resume` command. See `src/sessionViewer.ts`.
 
 ### Git Integration
 Wraps the VS Code Git extension API. Provides branch name, commit SHA, dirty state. Optionally listens for commit events to trigger auto-save. See [Git Integration](git-integration.md).
@@ -83,10 +83,11 @@ A file-system watcher on the Copilot `chatSessions/` directory that triggers aut
 ### View Flow
 1. User opens a session JSON file in the editor (or clicks a session in Session Explorer)
 2. Extension sets context key `session-control.isSessionFile` when the active file is a valid session
-3. Editor title bar shows a preview icon button
-4. User clicks the button (or runs `Session Control: View Session` from the command palette)
+3. Editor title bar shows a preview icon button and (when viewer is open) a resume icon
+4. User clicks the preview button (or runs `Session Control: View Session` from the command palette)
 5. `extension.ts` parses the document, validates with `isChatSession()`, and calls `SessionViewerPanel.createOrShow()`
 6. Webview panel renders the full conversation with metadata, summary, turns, tool calls, and git info
+7. Once the viewer is open, the resume icon (▶) appears in the title bar; clicking it opens the chat panel with `@session-control /resume <session-title>` pre-filled
 
 ### Resume Flow
 1. User types `@session-control /resume fix-auth-bug` in chat

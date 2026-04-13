@@ -8,10 +8,12 @@ import {
 	ensureStoragePathInGitignore,
 	listSessionsAcrossWorkspaceFolders,
 	runOpenSavedSessionCommand,
+	runResumeSessionFromViewerCommand,
 	runViewSessionFileCommand,
 	resolveManualWorkspaceFolder,
 	validateStoragePath,
 } from '../../src/extension';
+import { SessionViewerPanel } from '../../src/sessionViewer';
 import { createSessionStore } from '../../src/sessionStore';
 import { createChatSession } from '../../src/sessionWriter';
 import { CopilotSession } from '../../src/sessionReader';
@@ -276,5 +278,47 @@ suite('extension phase 10', () => {
 		);
 
 		assert.equal(infoMessages[0], 'This file is not a recognized Session Control session format.');
+	});
+});
+
+suite('runResumeSessionFromViewerCommand', () => {
+	test('shows info message when no session viewer is open', async () => {
+		const infoMessages: string[] = [];
+		let originalExecuteCommand = vscode.commands.executeCommand;
+		const executedCommands: string[] = [];
+
+		// Store original state to restore later
+		const originalCurrentPanel = (SessionViewerPanel as any).currentPanel;
+
+		try {
+			// Mock vscode.commands.executeCommand temporarily
+			(vscode.commands as any).executeCommand = async (...args: unknown[]) => {
+				executedCommands.push(String(args[0]));
+				return undefined;
+			};
+
+			// Ensure no panel is open
+			(SessionViewerPanel as any).currentPanel = undefined;
+
+			// Mock window methods
+			const originalShowMessage = vscode.window.showInformationMessage;
+			(vscode.window as any).showInformationMessage = async (message: string) => {
+				infoMessages.push(message);
+				return undefined;
+			};
+
+			await runResumeSessionFromViewerCommand();
+
+			assert.equal(infoMessages.length, 1);
+			assert.equal(infoMessages[0], 'No session viewer is currently open.');
+			assert.equal(executedCommands.length, 0, 'No commands should be executed when no viewer is open');
+
+			// Restore
+			(vscode.window as any).showInformationMessage = originalShowMessage;
+		} finally {
+			// Restore original state
+			(vscode.commands as any).executeCommand = originalExecuteCommand;
+			(SessionViewerPanel as any).currentPanel = originalCurrentPanel;
+		}
 	});
 });
