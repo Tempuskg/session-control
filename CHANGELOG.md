@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.16] - 2026-04-15
+
+### Changed
+- Added a public-repository privacy warning to the README and clarified that saved chat sessions often contain sensitive local context.
+- Removed outdated auto-save-on-commit references from the documentation and wiki to match the current extension behavior.
+- Added repository-specific Copilot development instructions for building, testing, and release hygiene.
+
+### Fixed
+- Corrected repository metadata and documentation links to point to the published `tempuskg/session-control` repository.
+
 ## [0.1.14] - 2026-04-13
 
 ### Added
