@@ -7,5 +7,6 @@
         "slugification",
         "slugified",
         "vscodeignore"
-    ]
+    ],
+    "snyk.advanced.organization": "2e31c12b-0700-4760-ad9c-bb67afa063d8"
 }
