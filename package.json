@@ -282,6 +282,7 @@
     "compile-tests": "tsc -p tsconfig.test.json",
     "watch-tests": "tsc -p tsconfig.test.json --watch",
     "pretest": "npm run compile-tests && npm run compile",
+    "snyk:sca": "snyk test --exclude=.vscode-test,dist,dist-test,node_modules",
     "snyk:code": "snyk code test --exclude=.vscode-test,dist,dist-test,node_modules",
     "lint": "eslint src --ext ts",
     "test": "node ./dist-test/test/runTests.js"
