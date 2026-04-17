@@ -13,6 +13,10 @@ import { parseFileSize } from './utils';
 
 const sessionStore = createSessionStore();
 
+function isAbsolutePathLike(value: string): boolean {
+	return path.isAbsolute(value) || path.win32.isAbsolute(value);
+}
+
 export interface WorkspaceSessionMeta extends SavedSessionPickItem {
 	storageDirectory: string;
 	workspaceFolder: vscode.WorkspaceFolder;
@@ -107,13 +111,13 @@ export function validateStoragePath(workspaceFolder: vscode.WorkspaceFolder, con
 		throw new Error('session-control.storagePath must not be empty.');
 	}
 
-	if (path.isAbsolute(configured)) {
+	if (isAbsolutePathLike(configured)) {
 		throw new Error('session-control.storagePath must be relative to the workspace folder.');
 	}
 
 	const resolved = path.resolve(workspaceFolder.uri.fsPath, configured);
 	const relative = path.relative(workspaceFolder.uri.fsPath, resolved);
-	if (relative.startsWith('..') || path.isAbsolute(relative)) {
+	if (relative.startsWith('..') || isAbsolutePathLike(relative)) {
 		throw new Error('session-control.storagePath must stay within the workspace folder.');
 	}
 
