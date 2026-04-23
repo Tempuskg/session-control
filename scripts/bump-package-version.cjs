@@ -37,4 +37,16 @@ if (fs.existsSync(packageLockPath)) {
   writeJson(packageLockPath, packageLock);
 }
 
+const readmePath = path.join(rootDir, 'README.md');
+if (fs.existsSync(readmePath)) {
+  const readme = fs.readFileSync(readmePath, 'utf8');
+  const updated = readme.replace(
+    /img\.shields\.io\/badge\/VS%20Marketplace-v[\d.]+-blue/,
+    `img.shields.io/badge/VS%20Marketplace-v${nextVersion}-blue`
+  );
+  if (updated !== readme) {
+    fs.writeFileSync(readmePath, updated, 'utf8');
+  }
+}
+
 process.stdout.write(`${nextVersion}\n`);

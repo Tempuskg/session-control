@@ -44,6 +44,26 @@ npm test
 
 Integration tests run inside the VS Code extension host — use the **Extension Tests** launch configuration in `.vscode/launch.json`.
 
+## Releases
+
+Tagged releases are published automatically to both the VS Code Marketplace and Open VSX by [release.yml](.github/workflows/release.yml).
+
+Repository secrets required for publishing:
+
+- `VSCE_PAT` — Visual Studio Marketplace publishing token
+- `OVSX_PAT` — Open VSX access token
+
+Release flow:
+
+```bash
+npm run lint
+npm test
+git tag v0.1.19
+git push origin v0.1.19
+```
+
+You can also run the **Release** workflow manually from GitHub Actions after the secrets are configured.
+
 ## Code Style
 
 - **TypeScript strict mode** — all strict checks enabled

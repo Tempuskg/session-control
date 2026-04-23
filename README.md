@@ -1,6 +1,6 @@
 # Session Control
 
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/darrenjmcleod.session-control?label=VS%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Marketplace-v0.1.18-blue)](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
 [![Open VSX](https://img.shields.io/open-vsx/v/darrenjmcleod/session-control)](https://open-vsx.org/extension/darrenjmcleod/session-control)
 [![CI](https://github.com/tempuskg/session-control/actions/workflows/ci.yml/badge.svg)](https://github.com/tempuskg/session-control/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -123,6 +123,18 @@ This command opens the web viewer for the active JSON file when it matches Sessi
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, testing instructions, and PR guidelines.
+
+## Release Checklist
+
+Before cutting a tagged release:
+
+1. Run `npm run lint`.
+2. Run `npm test`.
+3. Update `CHANGELOG.md` for the release.
+4. Bump the extension version in `package.json`.
+5. Push a `v*` tag to trigger the automated marketplace and Open VSX publish workflow.
+
+The release workflow also supports manual dispatch from GitHub Actions, but it will only publish after lint, build, and test steps pass.
 
 ## License
 

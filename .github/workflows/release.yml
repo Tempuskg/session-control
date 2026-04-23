@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   publish:
@@ -23,22 +24,50 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate publish secrets
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "Missing required secret: VSCE_PAT"
+            exit 1
+          fi
+
+          if [ -z "$OVSX_PAT" ]; then
+            echo "Missing required secret: OVSX_PAT"
+            exit 1
+          fi
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run compile
+
+      - name: Compile tests
+        run: npm run compile-tests
+
+      - name: Run extension tests
+        run: xvfb-run -a npm test
+
       - name: Package extension
+        id: package
         run: |
           npx @vscode/vsce package
-          echo "VSIX_PATH=$(ls *.vsix | head -n 1)" >> $GITHUB_ENV
+          echo "vsix_path=$(ls *.vsix | head -n 1)" >> $GITHUB_OUTPUT
 
       - name: Publish to VS Code Marketplace
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx @vscode/vsce publish --packagePath "$VSIX_PATH"
+        run: npx @vscode/vsce publish --packagePath "${{ steps.package.outputs.vsix_path }}"
 
       - name: Publish to Open VSX
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
-        run: npx ovsx publish "$VSIX_PATH" -p "$OVSX_PAT"
+        run: npx ovsx publish "${{ steps.package.outputs.vsix_path }}" -p "$OVSX_PAT"
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.VSIX_PATH }}
+          files: ${{ steps.package.outputs.vsix_path }}
