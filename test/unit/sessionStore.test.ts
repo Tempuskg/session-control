@@ -48,6 +48,50 @@ suite('sessionStore', () => {
 		assert.equal(fileName, '2026-04-12T14-30-fix-auth-bug.json');
 	});
 
+	test('writeSession uses title-only filename when configured', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createSessionStore();
+
+		try {
+			const session = createSession('title-only-a', '2026-04-12T10:00:00.000Z', 'Write Test');
+			const fileName = await store.writeSession(storageDirectory, session, {
+				includeTimestampInFileName: false,
+			});
+
+			assert.equal(fileName, 'write-test.json');
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('writeSession appends id suffix when title-only filename collides', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createSessionStore();
+
+		try {
+			const first = createSession('duplicate-a', '2026-04-12T10:00:00.000Z', 'Duplicate Title');
+			const second = createSession('duplicate-b', '2026-04-12T10:00:30.000Z', 'Duplicate Title');
+
+			const firstFile = await store.writeSession(storageDirectory, first, {
+				includeTimestampInFileName: false,
+			});
+			const secondFile = await store.writeSession(storageDirectory, second, {
+				includeTimestampInFileName: false,
+			});
+
+			assert.equal(firstFile, 'duplicate-title.json');
+			assert.equal(secondFile, 'duplicate-title-duplicate-b.json');
+
+			const files = await fs.readdir(storageDirectory);
+			assert.equal(files.includes('duplicate-title.json'), true);
+			assert.equal(files.includes('duplicate-title-duplicate-b.json'), true);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
 	test('writeSession persists session atomically and readSession restores it', async () => {
 		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
 		const storageDirectory = path.join(tempRoot, '.chat');

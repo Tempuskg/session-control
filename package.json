@@ -2,7 +2,7 @@
   "name": "session-control",
   "displayName": "Session Control",
   "description": "Save and resume GitHub Copilot Chat sessions linked to git commits",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "publisher": "darrenjmcleod",
   "icon": "media/session-control.png",
   "license": "MIT",
@@ -163,6 +163,12 @@
           "type": "boolean",
           "default": false,
           "description": "Strip verbose tool call outputs (e.g. file contents, terminal output) from saved turns to reduce file size. Tool call names and summaries are preserved.",
+          "scope": "resource"
+        },
+        "session-control.save.useTimestampInFileName": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include UTC timestamp in saved session file names. When disabled, files use title-only names and add an id suffix if a duplicate title already exists.",
           "scope": "resource"
         },
         "session-control.save.maxSavedSessions": {

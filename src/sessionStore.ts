@@ -8,11 +8,16 @@ interface SessionStoreDeps {
 	readdir(directoryPath: string): Promise<string[]>;
 	readFile(filePath: string): Promise<string>;
 	writeFile(filePath: string, content: string): Promise<void>;
+	exists(filePath: string): Promise<boolean>;
 	rename(fromPath: string, toPath: string): Promise<void>;
 	unlink(filePath: string): Promise<void>;
 }
 
 export type SessionPruneAction = 'archive' | 'delete';
+
+export interface SessionFileNameOptions {
+	includeTimestampInFileName: boolean;
+}
 
 export interface SessionPruneResult {
 	archived: number;
@@ -30,6 +35,14 @@ function createDefaultDeps(): SessionStoreDeps {
 		},
 		readFile: async (filePath: string) => fs.readFile(filePath, 'utf8'),
 		writeFile: async (filePath: string, content: string) => fs.writeFile(filePath, content, 'utf8'),
+		exists: async (filePath: string) => {
+			try {
+				await fs.access(filePath);
+				return true;
+			} catch {
+				return false;
+			}
+		},
 		rename: async (fromPath: string, toPath: string) => fs.rename(fromPath, toPath),
 		unlink: async (filePath: string) => fs.unlink(filePath),
 	};
@@ -52,9 +65,36 @@ function toSessionMeta(fileName: string, session: ChatSession): SessionMeta {
 }
 
 export function createSessionFileName(session: Pick<ChatSession, 'savedAt' | 'title'>): string {
+	return createSessionFileNameWithOptions(session, { includeTimestampInFileName: true });
+}
+
+function createSessionFileNameWithOptions(
+	session: Pick<ChatSession, 'savedAt' | 'title'>,
+	options: SessionFileNameOptions,
+): string {
 	const timestamp = formatTimestamp(new Date(session.savedAt));
 	const slug = slugify(session.title);
-	return `${timestamp}-${slug}.json`;
+
+	if (options.includeTimestampInFileName) {
+		return `${timestamp}-${slug}.json`;
+	}
+
+	return `${slug}.json`;
+}
+
+function createConflictResolvedFileName(
+	session: Pick<ChatSession, 'savedAt' | 'title' | 'id'>,
+	options: SessionFileNameOptions,
+): string {
+	const timestamp = formatTimestamp(new Date(session.savedAt));
+	const slug = slugify(session.title);
+	const suffix = slugify(session.id).slice(0, 12);
+
+	if (options.includeTimestampInFileName) {
+		return `${timestamp}-${slug}-${suffix}.json`;
+	}
+
+	return `${slug}-${suffix}.json`;
 }
 
 export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
@@ -67,10 +107,18 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 		await deps.mkdir(storageDirectory);
 	}
 
-	async function writeSession(storageDirectory: string, session: ChatSession): Promise<string> {
+	async function writeSession(
+		storageDirectory: string,
+		session: ChatSession,
+		options: SessionFileNameOptions = { includeTimestampInFileName: true },
+	): Promise<string> {
 		await ensureStorageDirectory(storageDirectory);
 
-		const fileName = createSessionFileName(session);
+		const preferredFileName = createSessionFileNameWithOptions(session, options);
+		const preferredPath = path.join(storageDirectory, preferredFileName);
+		const fileName = (await deps.exists(preferredPath))
+			? createConflictResolvedFileName(session, options)
+			: preferredFileName;
 		const filePath = path.join(storageDirectory, fileName);
 		const tempPath = path.join(storageDirectory, createTempName(fileName));
 		const content = JSON.stringify(session, null, 2);

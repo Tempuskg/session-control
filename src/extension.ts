@@ -6,7 +6,7 @@ import { getGitContext } from './gitIntegration';
 import { CopilotSession, deriveChatSessionsPath, readCopilotSessions } from './sessionReader';
 import { SessionExplorerProvider, SessionExplorerSessionItem } from './sessionExplorer';
 import { SessionViewerPanel } from './sessionViewer';
-import { createSessionStore, SessionPruneAction } from './sessionStore';
+import { createSessionStore, SessionFileNameOptions, SessionPruneAction } from './sessionStore';
 import { applySaveBloatControls, createChatSession, SaveOverflowStrategy } from './sessionWriter';
 import { isChatSession } from './types';
 import { parseFileSize } from './utils';
@@ -45,7 +45,11 @@ interface SaveSessionFlowDeps {
 	getIncludeInGitignore: (workspaceFolder: vscode.WorkspaceFolder) => boolean;
 	ensureGitignoreEntry: (workspaceFolder: vscode.WorkspaceFolder, storageDirectory: string) => Promise<boolean>;
 	getPruneConfiguration: (workspaceFolder: vscode.WorkspaceFolder) => PruneConfiguration;
-	writeSession: (storageDirectory: string, session: ReturnType<typeof createChatSession>) => Promise<string>;
+	writeSession: (
+		storageDirectory: string,
+		session: ReturnType<typeof createChatSession>,
+		options: SessionFileNameOptions,
+	) => Promise<string>;
 	pruneSessions: (storageDirectory: string, maxSavedSessions: number, action: SessionPruneAction) => Promise<{ archived: number; deleted: number }>;
 	showInformationMessage: (message: string) => Thenable<unknown>;
 }
@@ -54,6 +58,7 @@ interface SaveConfiguration {
 	maxFileSizeBytes: number;
 	overflowStrategy: SaveOverflowStrategy;
 	stripToolOutput: boolean;
+	includeTimestampInFileName: boolean;
 }
 
 interface PruneConfiguration {
@@ -187,11 +192,22 @@ function getSaveConfiguration(workspaceFolder: vscode.WorkspaceFolder): SaveConf
 	const parsedSize = parseFileSize(configuredSize);
 	const overflowStrategy = config.get<SaveOverflowStrategy>('save.overflowStrategy', 'split');
 	const stripToolOutput = config.get<boolean>('save.stripToolOutput', false);
+	const includeTimestampRaw = config.get<unknown>('save.useTimestampInFileName', true);
+	const includeTimestampInFileName = typeof includeTimestampRaw === 'boolean'
+		? includeTimestampRaw
+		: true;
+
+	if (typeof includeTimestampRaw !== 'boolean') {
+		console.warn(
+			`Invalid session-control.save.useTimestampInFileName value (${String(includeTimestampRaw)}). Falling back to true.`,
+		);
+	}
 
 	return {
 		maxFileSizeBytes: parsedSize,
 		overflowStrategy,
 		stripToolOutput,
+		includeTimestampInFileName,
 	};
 }
 
@@ -317,7 +333,8 @@ function createDefaultSaveFlowDeps(): SaveSessionFlowDeps {
 			.get<boolean>('includeInGitignore', false),
 		ensureGitignoreEntry: ensureStoragePathInGitignore,
 		getPruneConfiguration,
-		writeSession: async (storageDirectory, session) => sessionStore.writeSession(storageDirectory, session),
+		writeSession: async (storageDirectory, session, options) =>
+			sessionStore.writeSession(storageDirectory, session, options),
 		pruneSessions: async (storageDirectory, maxSavedSessions, action) =>
 			sessionStore.pruneSessions(storageDirectory, maxSavedSessions, action),
 		showInformationMessage: (message: string) => vscode.window.showInformationMessage(message),
@@ -365,7 +382,9 @@ export async function runSaveSessionFlow(
 
 	const writtenFiles: string[] = [];
 	for (const sessionToWrite of saveResult.sessions) {
-		const fileName = await deps.writeSession(storageDirectory, sessionToWrite);
+		const fileName = await deps.writeSession(storageDirectory, sessionToWrite, {
+			includeTimestampInFileName: saveConfig.includeTimestampInFileName,
+		});
 		writtenFiles.push(fileName);
 	}
 
