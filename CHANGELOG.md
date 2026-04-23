@@ -8,16 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Hardened the release workflow so marketplace publishing only runs after lint, build, and test steps pass.
-- Added maintainer-facing release checklist documentation for tagged releases and automated Open VSX publishing.
 
 ## [0.1.18] - 2026-04-15
+## [Unreleased]
 
 ### Changed
 - Added a public-repository privacy warning to the README and clarified that saved chat sessions often contain sensitive local context.
 - Removed outdated auto-save-on-commit references from the documentation and wiki to match the current extension behavior.
-- Added repository-specific Copilot development instructions for building, testing, and release hygiene.
-
 ### Fixed
 - Corrected repository metadata and documentation links to point to the published `tempuskg/session-control` repository.
 
