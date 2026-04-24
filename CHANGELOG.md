@@ -7,14 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
+## [0.1.22] - 2026-04-24
 
-## [0.1.18] - 2026-04-15
-## [Unreleased]
+### Fixed
+- Opening a new project and typing the first prompt before receiving any response no longer triggers the "Unrecognized Copilot session format" error popup. VS Code writes a valid snapshot-patch session file (`kind:0`) with an empty `requests` array the moment a chat is created; this is now recognised as an in-progress session and skipped silently rather than counted as an unknown format.
 
 ### Changed
 - Added a public-repository privacy warning to the README and clarified that saved chat sessions often contain sensitive local context.
 - Removed outdated auto-save-on-commit references from the documentation and wiki to match the current extension behavior.
+
 ### Fixed
 - Corrected repository metadata and documentation links to point to the published `tempuskg/session-control` repository.
 
