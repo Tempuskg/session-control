@@ -2,7 +2,7 @@
 title: "Wiki Log"
 type: log
 created: 2026-04-12
-updated: 2026-04-13
+updated: 2026-04-24
 ---
 
 # Wiki Log
@@ -63,3 +63,11 @@ Pages touched: configuration.md, save-system.md, log.md
 ## [2026-04-13] update | Finish Removing Auto-Save on Commit Docs
 Completed removal of all `autoSaveOnCommit` references missed in the previous cleanup. Removed the "Auto-save on commit" feature bullet and settings table row from README.md. Removed the "Auto-Save on Commit" section and its sequence diagram from git-integration.md. Updated overview.md phase table and key design decision. Updated file-manifest.md command to `toggleAutoSave`. Updated index.md git-integration summary.
 Pages touched: README.md, wiki/git-integration.md, wiki/overview.md, wiki/file-manifest.md, wiki/index.md, wiki/log.md
+
+## [2026-04-24] fix | Empty Snapshot Session False Positive Error
+Fixed a bug where opening a new project and typing the first prompt (before any response) triggered the error "Unrecognized Copilot session format (VS Code X.Y.Z). Session Control may need an update."
+
+Root cause: VS Code writes a JSONL file with a valid `kind:0` snapshot record but an empty `requests[]` array the moment a chat session is created. The session reader correctly identified the snapshot-patch format but found no completed turns and returned `null`, which was then counted as an unknown format error.
+
+Fix: added `EmptySessionError` class to distinguish "recognized format with no completed turns yet" from a genuinely unrecognized format. The reader now throws `EmptySessionError` when a `kind:0` snapshot record is present but yields no turns, catches it silently (with a log warning only), and does not increment the unknown-format counter. Added a fixture (`test/fixtures/session-reader/empty-snapshot-session.jsonl`) and two new unit tests.
+Pages touched: save-system.md, log.md

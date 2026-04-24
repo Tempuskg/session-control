@@ -2,7 +2,7 @@
 title: "Save System"
 type: entity
 created: 2026-04-12
-updated: 2026-04-13
+updated: 2026-04-24
 sources:
   - raw/plan.md
 tags:
@@ -32,6 +32,18 @@ The Save System is responsible for reading Copilot's internal chat sessions, tra
 - Implements a **version-detection layer** to handle internal format changes gracefully
 
 > ⚠️ Note: This relies on VS Code's internal Copilot storage format, which is undocumented and may change without notice. The version-detection layer is critical for graceful degradation.
+
+### Error Handling in Session Reader
+
+The reader distinguishes three error classes when parsing session files:
+
+| Error class | Meaning | Behaviour |
+|---|---|---|
+| `SyntaxError` | Corrupt / unparseable file | Log warning, skip file |
+| `EmptySessionError` | Recognized snapshot-patch format (`kind:0`) but no completed turns yet | Log warning, skip silently — **no error popup** |
+| `UnknownFormatError` | Unrecognized file shape | Log warning, increment unknown-count; if *all* files fail, show error popup |
+
+The `EmptySessionError` case addresses sessions created by VS Code at the moment a user starts typing their first prompt, before any response has been written. These files contain a valid `kind:0` snapshot record with an empty `requests` array and must not be mistaken for a format VS Code no longer supports.
 
 ### Session Writer (`src/sessionWriter.ts`)
 - Transforms raw session data into the [Session Format](session-format.md)
