@@ -35,6 +35,13 @@ class UnknownFormatError extends Error {
 	}
 }
 
+class EmptySessionError extends Error {
+	constructor(fileName: string) {
+		super(`Empty session (no completed turns): ${fileName}`);
+		this.name = 'EmptySessionError';
+	}
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
 }
@@ -638,6 +645,15 @@ function parseJsonl(content: string, sourceFile: string): CopilotSession {
 
 	const normalized = normalizeJsonlPayload(records, sourceFile);
 	if (!normalized) {
+		// If the file uses a recognized snapshot-patch format but has no completed turns yet
+		// (e.g. user is still typing their first prompt), skip it silently rather than
+		// treating it as an unrecognized format.
+		const isKnownEmptyFormat = records.some(
+			(r) => isRecord(r) && r.kind === 0 && isRecord(r.v) && Array.isArray((r.v as Record<string, unknown>).requests),
+		);
+		if (isKnownEmptyFormat) {
+			throw new EmptySessionError(sourceFile);
+		}
 		throw new UnknownFormatError(sourceFile);
 	}
 
@@ -709,6 +725,11 @@ export function createSessionReader(overrides: Partial<SessionReaderDeps> = {}):
 
 					sessions.push({ ...session, sourceFile });
 				} catch (error) {
+					if (error instanceof EmptySessionError) {
+						deps.logWarning(`Skipped empty session (no completed turns yet): ${fileName}`);
+						continue;
+					}
+
 					if (error instanceof UnknownFormatError) {
 						unknownFormatCount++;
 						deps.logWarning(`Skipped unrecognized session format: ${fileName} (VS Code ${deps.vscodeVersion})`);

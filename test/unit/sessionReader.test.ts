@@ -169,6 +169,63 @@ suite('sessionReader', () => {
 		}
 	});
 
+	test('skips empty snapshot-patch session silently without showing unknown format error', async () => {
+		const errorMessages: string[] = [];
+		const warnings: string[] = [];
+		const setup = await setupWorkspaceStorageRoot();
+
+		try {
+			// Empty snapshot session (kind:0 with no requests) — e.g. user started typing before any response
+			await copyFixture('empty-snapshot-session.jsonl', setup.sessionsDirectory);
+
+			const reader = createSessionReader({
+				showInformationMessage: async () => undefined,
+				showErrorMessage: async (message: string) => {
+					errorMessages.push(message);
+				},
+				logWarning: (message: string) => {
+					warnings.push(message);
+				},
+				vscodeVersion: '1.117.0',
+			});
+
+			const sessions = await reader.readCopilotSessions({ storageUri: { fsPath: setup.storageUriPath } });
+			// Empty session yields nothing — no sessions, but also no error popup
+			assert.equal(sessions.length, 0);
+			assert.equal(errorMessages.length, 0);
+			// A warning is logged but the "unknown format" error is NOT shown
+			assert.ok(warnings.some((w) => w.includes('empty-snapshot-session.jsonl')));
+		} finally {
+			await fs.rm(setup.root, { recursive: true, force: true });
+		}
+	});
+
+	test('empty snapshot-patch session alongside valid sessions returns the valid sessions without error', async () => {
+		const errorMessages: string[] = [];
+		const setup = await setupWorkspaceStorageRoot();
+
+		try {
+			await copyFixture('snapshot-session.jsonl', setup.sessionsDirectory);
+			await copyFixture('empty-snapshot-session.jsonl', setup.sessionsDirectory);
+
+			const reader = createSessionReader({
+				showInformationMessage: async () => undefined,
+				showErrorMessage: async (message: string) => {
+					errorMessages.push(message);
+				},
+				logWarning: () => undefined,
+				vscodeVersion: '1.117.0',
+			});
+
+			const sessions = await reader.readCopilotSessions({ storageUri: { fsPath: setup.storageUriPath } });
+			assert.equal(sessions.length, 1);
+			assert.equal(sessions[0]?.id, 'session-snapshot');
+			assert.equal(errorMessages.length, 0);
+		} finally {
+			await fs.rm(setup.root, { recursive: true, force: true });
+		}
+	});
+
 	test('applies kind:1 scalar patches to resolve customTitle', async () => {
 		const setup = await setupWorkspaceStorageRoot();
 
