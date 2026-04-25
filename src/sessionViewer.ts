@@ -133,15 +133,18 @@ export function buildPageHtml(
 			<span class="meta-item meta-vscode">VS Code ${escapeHtml(session.vscodeVersion)}</span>
 		</div>
 	</div>
-	<div class="search-toolbar" role="search" aria-label="Search session content">
-		<input id="searchInput" class="search-input" type="search" placeholder="Search summary and conversation..." aria-label="Search summary and conversation" />
-		<div class="search-actions">
-			<button id="searchPrev" class="search-btn" type="button" aria-label="Previous match">Prev</button>
-			<button id="searchNext" class="search-btn" type="button" aria-label="Next match">Next</button>
-			<button id="searchClear" class="search-btn search-btn-clear" type="button" aria-label="Clear search">Clear</button>
+	<details class="search-panel" open>
+		<summary class="search-panel-header">Search</summary>
+		<div class="search-toolbar" role="search" aria-label="Search session content">
+			<input id="searchInput" class="search-input" type="search" placeholder="Search summary and conversation..." aria-label="Search summary and conversation" />
+			<div class="search-actions">
+				<button id="searchPrev" class="search-btn" type="button" aria-label="Previous match">Prev</button>
+				<button id="searchNext" class="search-btn" type="button" aria-label="Next match">Next</button>
+				<button id="searchClear" class="search-btn search-btn-clear" type="button" aria-label="Clear search">Clear</button>
+			</div>
+			<span id="searchStatus" class="search-status" aria-live="polite">No search term</span>
 		</div>
-		<span id="searchStatus" class="search-status" aria-live="polite">No search term</span>
-	</div>
+	</details>
 	${multiPartHtml}
 	<details class="section" open>
 		<summary class="section-header">Summary</summary>

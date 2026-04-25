@@ -90,6 +90,8 @@ suite('buildPageHtml — structure', () => {
 
 	test('contains search toolbar controls', () => {
 		const html = makePage(makeSession());
+		assert.ok(html.includes('<details class="search-panel" open>'), 'missing collapsible search panel');
+		assert.ok(html.includes('search-panel-header">Search</summary>'), 'missing search panel header');
 		assert.ok(html.includes('id="searchInput"'), 'missing search input');
 		assert.ok(html.includes('id="searchPrev"'), 'missing previous search button');
 		assert.ok(html.includes('id="searchNext"'), 'missing next search button');

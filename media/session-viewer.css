@@ -67,12 +67,51 @@ body {
 	color: var(--vscode-descriptionForeground);
 }
 
+.search-panel {
+	margin-bottom: 12px;
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 6px;
+	background: var(--vscode-editor-background);
+	overflow: hidden;
+}
+
+.search-panel-header {
+	display: block;
+	padding: 8px 12px;
+	cursor: pointer;
+	font-size: 12px;
+	font-weight: 600;
+	user-select: none;
+	list-style: none;
+	background: var(--vscode-sideBarSectionHeader-background);
+}
+
+.search-panel-header::-webkit-details-marker {
+	display: none;
+}
+
+.search-panel-header::before {
+	display: inline-block;
+	content: '▶';
+	font-size: 10px;
+	margin-right: 8px;
+	transition: transform 0.15s;
+	color: var(--vscode-descriptionForeground);
+}
+
+details[open] > .search-panel-header::before {
+	transform: rotate(90deg);
+}
+
 .search-toolbar {
 	display: grid;
 	grid-template-columns: minmax(220px, 1fr) auto;
 	gap: 8px 10px;
 	align-items: center;
-	margin-bottom: 12px;
+	padding: 10px;
 }
 
 .search-input {

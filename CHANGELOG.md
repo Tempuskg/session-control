@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.24] - 2026-04-25
+
+### Changed
+- Session viewer search controls are now collapsible/expandable via a sticky panel header, so the search bar remains accessible while scrolling through long sessions.
+
 ## [0.1.23] - 2026-04-25
 
 ### Added
