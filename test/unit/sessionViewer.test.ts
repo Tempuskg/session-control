@@ -88,6 +88,15 @@ suite('buildPageHtml — structure', () => {
 		assert.ok(html.includes('Open Raw JSON'), 'missing button label');
 	});
 
+	test('contains search toolbar controls', () => {
+		const html = makePage(makeSession());
+		assert.ok(html.includes('id="searchInput"'), 'missing search input');
+		assert.ok(html.includes('id="searchPrev"'), 'missing previous search button');
+		assert.ok(html.includes('id="searchNext"'), 'missing next search button');
+		assert.ok(html.includes('id="searchClear"'), 'missing clear search button');
+		assert.ok(html.includes('id="searchStatus"'), 'missing search status indicator');
+	});
+
 	test('contains the file path in footer', () => {
 		const html = buildPageHtml(makeSession(), 'css', 'csp', 'nonce', '/work/.chat/session.json');
 		assert.ok(html.includes('/work/.chat/session.json'), 'file path missing from footer');
@@ -102,6 +111,13 @@ suite('buildPageHtml — structure', () => {
 		const html = buildPageHtml(makeSession(), 'css', 'csp', 'mynonce', '/session.json');
 		assert.ok(html.includes('nonce="mynonce"'), 'script nonce missing');
 		assert.ok(html.includes("vscode.postMessage"), 'postMessage call missing');
+	});
+
+	test('contains search script bindings', () => {
+		const html = makePage(makeSession());
+		assert.ok(html.includes("searchInput.addEventListener('input'"), 'search input listener missing');
+		assert.ok(html.includes("setActiveMatch(activeMatchIndex + 1)"), 'next-match navigation missing');
+		assert.ok(html.includes("document.querySelectorAll('mark.' + highlightedClass)"), 'search highlight selector missing');
 	});
 
 	test('CSP meta tag includes provided cspSource', () => {

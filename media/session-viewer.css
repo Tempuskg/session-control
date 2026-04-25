@@ -67,6 +67,64 @@ body {
 	color: var(--vscode-descriptionForeground);
 }
 
+.search-toolbar {
+	display: grid;
+	grid-template-columns: minmax(220px, 1fr) auto;
+	gap: 8px 10px;
+	align-items: center;
+	margin-bottom: 12px;
+}
+
+.search-input {
+	width: 100%;
+	min-height: 30px;
+	padding: 5px 10px;
+	border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+	border-radius: 4px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	font-family: var(--vscode-font-family);
+	font-size: 12px;
+}
+
+.search-actions {
+	display: flex;
+	gap: 6px;
+	justify-self: end;
+}
+
+.search-btn {
+	font-family: var(--vscode-font-family);
+	font-size: 12px;
+	min-height: 30px;
+	padding: 4px 10px;
+	border: 1px solid var(--vscode-button-border, transparent);
+	border-radius: 4px;
+	background-color: var(--vscode-button-secondaryBackground);
+	color: var(--vscode-button-secondaryForeground);
+	cursor: pointer;
+}
+
+.search-btn:hover {
+	background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.search-btn:disabled {
+	opacity: 0.55;
+	cursor: default;
+}
+
+.search-btn-clear {
+	background-color: var(--vscode-editor-inactiveSelectionBackground);
+	color: var(--vscode-editor-foreground);
+}
+
+.search-status {
+	grid-column: 1 / -1;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+
 .meta-item code {
 	font-family: var(--vscode-editor-font-family);
 	font-size: 11px;
@@ -328,6 +386,18 @@ li code {
 	color: var(--vscode-descriptionForeground);
 }
 
+mark.search-highlight {
+	background-color: var(--vscode-editor-findMatchHighlightBackground, #614a19);
+	color: var(--vscode-editor-foreground);
+	border-radius: 2px;
+	padding: 0 1px;
+}
+
+mark.search-highlight-active {
+	background-color: var(--vscode-editor-findMatchBackground, #515c6a);
+	outline: 1px solid var(--vscode-editor-findMatchBorder, transparent);
+}
+
 /* ---- Footer ---- */
 
 .session-footer {
@@ -348,4 +418,14 @@ li code {
 .empty-state {
 	color: var(--vscode-descriptionForeground);
 	font-style: italic;
+}
+
+@media (max-width: 640px) {
+	.search-toolbar {
+		grid-template-columns: 1fr;
+	}
+
+	.search-actions {
+		justify-self: start;
+	}
 }

@@ -133,6 +133,15 @@ export function buildPageHtml(
 			<span class="meta-item meta-vscode">VS Code ${escapeHtml(session.vscodeVersion)}</span>
 		</div>
 	</div>
+	<div class="search-toolbar" role="search" aria-label="Search session content">
+		<input id="searchInput" class="search-input" type="search" placeholder="Search summary and conversation..." aria-label="Search summary and conversation" />
+		<div class="search-actions">
+			<button id="searchPrev" class="search-btn" type="button" aria-label="Previous match">Prev</button>
+			<button id="searchNext" class="search-btn" type="button" aria-label="Next match">Next</button>
+			<button id="searchClear" class="search-btn search-btn-clear" type="button" aria-label="Clear search">Clear</button>
+		</div>
+		<span id="searchStatus" class="search-status" aria-live="polite">No search term</span>
+	</div>
 	${multiPartHtml}
 	<details class="section" open>
 		<summary class="section-header">Summary</summary>
@@ -151,6 +160,182 @@ export function buildPageHtml(
 		document.getElementById('openRawJson').addEventListener('click', function () {
 			vscode.postMessage({ command: 'openRawJson' });
 		});
+
+		const searchInput = document.getElementById('searchInput');
+		const searchPrev = document.getElementById('searchPrev');
+		const searchNext = document.getElementById('searchNext');
+		const searchClear = document.getElementById('searchClear');
+		const searchStatus = document.getElementById('searchStatus');
+		const searchRoots = Array.from(document.querySelectorAll('.section-body'));
+		const highlightedClass = 'search-highlight';
+		const activeClass = 'search-highlight-active';
+		let matches = [];
+		let activeMatchIndex = -1;
+
+		function pluralize(count, singular, plural) {
+			return count === 1 ? singular : plural;
+		}
+
+		function updateSearchStatus() {
+			if (!searchInput.value.trim()) {
+				searchStatus.textContent = 'No search term';
+				return;
+			}
+			if (matches.length === 0) {
+				searchStatus.textContent = 'No matches';
+				return;
+			}
+			searchStatus.textContent = matches.length + ' ' + pluralize(matches.length, 'match', 'matches') + ' (' + (activeMatchIndex + 1) + '/' + matches.length + ')';
+		}
+
+		function updateSearchButtons() {
+			const noMatches = matches.length === 0;
+			searchPrev.disabled = noMatches;
+			searchNext.disabled = noMatches;
+		}
+
+		function clearHighlights() {
+			const highlightedNodes = document.querySelectorAll('mark.' + highlightedClass);
+			for (const node of highlightedNodes) {
+				const parent = node.parentNode;
+				if (!parent) {
+					continue;
+				}
+				parent.replaceChild(document.createTextNode(node.textContent || ''), node);
+				parent.normalize();
+			}
+			matches = [];
+			activeMatchIndex = -1;
+		}
+
+		function openAncestorDetails(node) {
+			let current = node.parentElement;
+			while (current) {
+				if (current.tagName === 'DETAILS') {
+					current.open = true;
+				}
+				current = current.parentElement;
+			}
+		}
+
+		function setActiveMatch(index) {
+			if (matches.length === 0) {
+				activeMatchIndex = -1;
+				updateSearchStatus();
+				return;
+			}
+
+			for (const match of matches) {
+				match.classList.remove(activeClass);
+			}
+
+			activeMatchIndex = ((index % matches.length) + matches.length) % matches.length;
+			const activeMatch = matches[activeMatchIndex];
+			activeMatch.classList.add(activeClass);
+			openAncestorDetails(activeMatch);
+			activeMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			updateSearchStatus();
+		}
+
+		function highlightMatches(term) {
+			if (!term) {
+				return;
+			}
+			const normalizedTerm = term.toLowerCase();
+			for (const root of searchRoots) {
+				const textNodes = [];
+				const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+					acceptNode: function (node) {
+						if (!node.nodeValue || !node.nodeValue.trim()) {
+							return NodeFilter.FILTER_REJECT;
+						}
+						const parentElement = node.parentElement;
+						if (!parentElement) {
+							return NodeFilter.FILTER_REJECT;
+						}
+						const tagName = parentElement.tagName;
+						if (tagName === 'SCRIPT' || tagName === 'STYLE' || tagName === 'MARK') {
+							return NodeFilter.FILTER_REJECT;
+						}
+						if (node.nodeValue.toLowerCase().indexOf(normalizedTerm) === -1) {
+							return NodeFilter.FILTER_REJECT;
+						}
+						return NodeFilter.FILTER_ACCEPT;
+					},
+				});
+
+				let currentNode = walker.nextNode();
+				while (currentNode) {
+					textNodes.push(currentNode);
+					currentNode = walker.nextNode();
+				}
+
+				for (const textNode of textNodes) {
+					const text = textNode.nodeValue || '';
+					const lowerText = text.toLowerCase();
+					let fromIndex = 0;
+					let matchIndex = lowerText.indexOf(normalizedTerm, fromIndex);
+					if (matchIndex === -1) {
+						continue;
+					}
+
+					const fragment = document.createDocumentFragment();
+					while (matchIndex !== -1) {
+						if (matchIndex > fromIndex) {
+							fragment.appendChild(document.createTextNode(text.slice(fromIndex, matchIndex)));
+						}
+						const matchedText = text.slice(matchIndex, matchIndex + term.length);
+						const mark = document.createElement('mark');
+						mark.className = highlightedClass;
+						mark.textContent = matchedText;
+						fragment.appendChild(mark);
+						matches.push(mark);
+						fromIndex = matchIndex + term.length;
+						matchIndex = lowerText.indexOf(normalizedTerm, fromIndex);
+					}
+					if (fromIndex < text.length) {
+						fragment.appendChild(document.createTextNode(text.slice(fromIndex)));
+					}
+					textNode.parentNode.replaceChild(fragment, textNode);
+				}
+			}
+		}
+
+		function runSearch() {
+			const term = searchInput.value.trim();
+			clearHighlights();
+			highlightMatches(term);
+			updateSearchButtons();
+			if (matches.length > 0) {
+				setActiveMatch(0);
+				return;
+			}
+			updateSearchStatus();
+		}
+
+		searchInput.addEventListener('input', runSearch);
+		searchInput.addEventListener('keydown', function (event) {
+			if (event.key === 'Enter') {
+				event.preventDefault();
+				setActiveMatch(activeMatchIndex + (event.shiftKey ? -1 : 1));
+			}
+		});
+
+		searchPrev.addEventListener('click', function () {
+			setActiveMatch(activeMatchIndex - 1);
+		});
+
+		searchNext.addEventListener('click', function () {
+			setActiveMatch(activeMatchIndex + 1);
+		});
+
+		searchClear.addEventListener('click', function () {
+			searchInput.value = '';
+			runSearch();
+			searchInput.focus();
+		});
+
+		updateSearchButtons();
 	</script>
 </body>
 </html>`;
