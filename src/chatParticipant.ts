@@ -1,10 +1,25 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { createAnalysisStore, createSessionAnalysisFingerprint } from './analysisStore';
 import { createSessionStore } from './sessionStore';
+import {
+	ANALYSIS_PROMPT_VERSION,
+	buildAnalysisPrompt,
+	buildAnalysisSynthesisPrompt,
+	createCustomRangeSelection,
+	createNeedsAnalysisSelection,
+	createPresetAnalysisSelection,
+	DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET,
+	filterCandidatesForAnalysis,
+	parseAnalysisSelectionAlias,
+	splitCandidatesIntoAnalysisBatches,
+	type AnalysisCandidateSession,
+} from './sessionAnalysis';
 import { ChatSession, SavedTurn, SessionMeta } from './types';
 import { fuzzyMatchSessions } from './utils';
 
 const chatSessionStore = createSessionStore();
+const analysisStore = createAnalysisStore();
 
 const CHAT_PARTICIPANT_ID = 'session-control.resume';
 const MIN_AUTO_SELECT_SCORE = 60;
@@ -116,6 +131,276 @@ function renderWorkspaceSessionListMarkdown(sessions: WorkspaceSessionMeta[]): s
 	}
 
 	return ['## Saved Sessions', '', ...sessions.map((session) => asWorkspaceMarkdownListItem(session))].join('\n');
+}
+
+function normalizeRelativePath(filePath: string): string {
+	return filePath.replace(/\\/g, '/');
+}
+
+function normalizeDateInput(value: string, endOfDay: boolean): string {
+	const trimmed = value.trim();
+	if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+		return `${trimmed}T${endOfDay ? '23:59:59.999Z' : '00:00:00.000Z'}`;
+	}
+
+	const parsed = new Date(trimmed);
+	if (Number.isNaN(parsed.getTime())) {
+		throw new Error('Date input must be ISO-8601 or YYYY-MM-DD.');
+	}
+
+	return parsed.toISOString();
+}
+
+async function resolveAnalysisSelection(prompt: string): Promise<import('./types').AnalysisSelection | undefined> {
+	const parsed = parseAnalysisSelectionAlias(prompt);
+	if (parsed) {
+		return parsed;
+	}
+
+	const pick = await vscode.window.showQuickPick(
+		[
+			{ label: 'Last 24 Hours', mode: 'last24Hours' as const },
+			{ label: 'Last 7 Days', mode: 'last7Days' as const },
+			{ label: 'Last 30 Days', mode: 'last30Days' as const },
+			{ label: 'Custom Range', mode: 'customRange' as const },
+			{ label: 'Needs Analysis', mode: 'needsAnalysis' as const },
+		],
+		{ title: 'Select saved-chat analysis scope' },
+	);
+
+	if (!pick) {
+		return undefined;
+	}
+
+	if (pick.mode === 'last24Hours' || pick.mode === 'last7Days' || pick.mode === 'last30Days') {
+		return createPresetAnalysisSelection(pick.mode);
+	}
+
+	if (pick.mode === 'needsAnalysis') {
+		return createNeedsAnalysisSelection();
+	}
+
+	const startInput = await vscode.window.showInputBox({
+		title: 'Analysis range start',
+		prompt: 'Enter the start date as YYYY-MM-DD or ISO timestamp',
+		value: new Date(Date.now() - (7 * 24 * 60 * 60 * 1000)).toISOString().slice(0, 10),
+	});
+	if (!startInput) {
+		return undefined;
+	}
+
+	const endInput = await vscode.window.showInputBox({
+		title: 'Analysis range end',
+		prompt: 'Enter the end date as YYYY-MM-DD or ISO timestamp',
+		value: new Date().toISOString().slice(0, 10),
+	});
+	if (!endInput) {
+		return undefined;
+	}
+
+	try {
+		return createCustomRangeSelection(
+			normalizeDateInput(startInput, false),
+			normalizeDateInput(endInput, true),
+		);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		await vscode.window.showWarningMessage(`Invalid custom analysis range: ${message}`);
+		return undefined;
+	}
+}
+
+async function createAnalysisCandidates(workspaceSessions: WorkspaceSessionMeta[]): Promise<AnalysisCandidateSession[]> {
+	const seenRoots = new Set<string>();
+	const candidates: AnalysisCandidateSession[] = [];
+
+	for (const session of workspaceSessions) {
+		const reassembled = await loadReassembledSession(session.storageDirectory, session.fileName);
+		const rootKey = `${session.storageDirectory}::${reassembled.rootFileName}`;
+		if (seenRoots.has(rootKey)) {
+			continue;
+		}
+
+		seenRoots.add(rootKey);
+		candidates.push({
+			workspaceName: session.workspaceFolder.name,
+			storageDirectory: session.storageDirectory,
+			fileName: reassembled.rootFileName,
+			rootFileName: reassembled.rootFileName,
+			fingerprint: createSessionAnalysisFingerprint(reassembled.session),
+			session: reassembled.session,
+		});
+	}
+
+	return candidates.sort((a, b) => Date.parse(b.session.savedAt) - Date.parse(a.session.savedAt));
+}
+
+async function loadAnalyzedFingerprintSet(candidates: AnalysisCandidateSession[]): Promise<Set<string>> {
+	const storageDirectories = [...new Set(candidates.map((candidate) => candidate.storageDirectory))];
+	const indexes = await Promise.all(storageDirectories.map(async (storageDirectory) => ({
+		storageDirectory,
+		index: await analysisStore.readIndex(storageDirectory),
+	})));
+
+	const analyzed = new Set<string>();
+	for (const item of indexes) {
+		for (const entry of item.index.analyzedSessions) {
+			analyzed.add(entry.fingerprint);
+		}
+	}
+
+	return analyzed;
+}
+
+async function collectModelText(
+	request: vscode.ChatRequest,
+	stream: vscode.ChatResponseStream | undefined,
+	token: vscode.CancellationToken,
+	prompt: string,
+): Promise<string> {
+	const modelResponse = await request.model.sendRequest(
+		[vscode.LanguageModelChatMessage.User(prompt)],
+		{},
+		token,
+	);
+
+	let text = '';
+	for await (const part of modelResponse.stream) {
+		if (part instanceof vscode.LanguageModelTextPart) {
+			text += part.value;
+			if (stream) {
+				stream.markdown(part.value);
+			}
+		}
+	}
+
+	return text.trim();
+}
+
+function createStorageSpecificReportReference(
+	report: import('./types').AnalysisReportReference,
+	reportFilePath: string,
+	storageDirectory: string,
+): import('./types').AnalysisReportReference {
+	return {
+		...report,
+		reportPath: normalizeRelativePath(path.relative(storageDirectory, reportFilePath)),
+	};
+}
+
+async function runAnalyzeSessionsCommand(
+	request: vscode.ChatRequest,
+	stream: vscode.ChatResponseStream,
+	token: vscode.CancellationToken,
+	workspaceFolders: readonly vscode.WorkspaceFolder[],
+	workspaceSessions: WorkspaceSessionMeta[],
+): Promise<{ metadata: { analysisReportPath: string; analysisStorageDirectory: string } } | undefined> {
+	if (!workspaceSessions.length) {
+		stream.markdown('No saved sessions found. Save chat sessions before running analysis.');
+		return;
+	}
+
+	const selection = await resolveAnalysisSelection(request.prompt);
+	if (!selection) {
+		return;
+	}
+
+	const candidates = await createAnalysisCandidates(workspaceSessions);
+	const analyzedFingerprints = await loadAnalyzedFingerprintSet(candidates);
+	const filtered = filterCandidatesForAnalysis(candidates, selection, analyzedFingerprints);
+	if (!filtered.length) {
+		stream.markdown(selection.mode === 'needsAnalysis'
+			? 'No saved sessions currently need analysis.'
+			: `No saved sessions matched ${selection.label.toLowerCase()}.`);
+		return;
+	}
+
+	const batches = splitCandidatesIntoAnalysisBatches(filtered, DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET);
+	let finalMarkdown = '';
+	if (batches.length === 1) {
+		finalMarkdown = await collectModelText(request, stream, token, buildAnalysisPrompt(selection, filtered));
+	} else {
+		stream.markdown(`Analyzing ${filtered.length} saved sessions across ${batches.length} batches. Final synthesis will follow.\n\n`);
+		const batchSummaries: string[] = [];
+		for (let index = 0; index < batches.length; index += 1) {
+			if (token.isCancellationRequested) {
+				return;
+			}
+
+			const batch = batches[index];
+			if (!batch) {
+				continue;
+			}
+
+			stream.markdown(`_Analyzing batch ${index + 1} of ${batches.length}..._\n\n`);
+			const batchPrompt = [
+				buildAnalysisPrompt(selection, batch),
+				'',
+				`This is batch ${index + 1} of ${batches.length}. Produce a concise findings summary that will be synthesized with the other batches into one final report.`,
+			].join('\n');
+			batchSummaries.push(await collectModelText(request, undefined, token, batchPrompt));
+		}
+
+		stream.markdown('_Synthesizing final report..._\n\n');
+		finalMarkdown = await collectModelText(request, stream, token, buildAnalysisSynthesisPrompt(selection, batchSummaries));
+	}
+
+	if (!finalMarkdown.trim().length) {
+		stream.markdown('Analysis completed, but the model returned no report text.');
+		return;
+	}
+
+	const ownerWorkspace = pickWorkspaceFolder() ?? workspaceFolders[0];
+	if (!ownerWorkspace) {
+		stream.markdown('Open a workspace folder before saving analysis reports.');
+		return;
+	}
+
+	const ownerStorageDirectory = getStoragePath(ownerWorkspace);
+	const persisted = await analysisStore.writeReport(ownerStorageDirectory, {
+		selection,
+		promptVersion: ANALYSIS_PROMPT_VERSION,
+		contributingWorkspaces: [...new Set(filtered.map((candidate) => candidate.workspaceName))],
+		analyzedFingerprints: filtered.map((candidate) => candidate.fingerprint),
+		content: finalMarkdown,
+	});
+
+	const byStorageDirectory = new Map<string, AnalysisCandidateSession[]>();
+	for (const candidate of filtered) {
+		const existing = byStorageDirectory.get(candidate.storageDirectory);
+		if (existing) {
+			existing.push(candidate);
+			continue;
+		}
+
+		byStorageDirectory.set(candidate.storageDirectory, [candidate]);
+	}
+
+	for (const [storageDirectory, sessions] of byStorageDirectory) {
+		const reportReference = createStorageSpecificReportReference(
+			persisted.report,
+			persisted.reportFilePath,
+			storageDirectory,
+		);
+		await analysisStore.recordAnalysis(
+			storageDirectory,
+			reportReference,
+			sessions.map((candidate) => ({
+				fingerprint: candidate.fingerprint,
+				sessionId: candidate.session.id,
+				title: candidate.session.title,
+				savedAt: candidate.session.savedAt,
+			})),
+		);
+	}
+
+	stream.markdown(`\n\nSaved analysis report to **${persisted.report.reportPath}** in workspace **${ownerWorkspace.name}**.`);
+	return {
+		metadata: {
+			analysisReportPath: persisted.report.reportPath,
+			analysisStorageDirectory: ownerStorageDirectory,
+		},
+	};
 }
 
 export function trimTurnsForResume(turns: SavedTurn[], maxTurns: number, maxContextChars: number): SavedTurn[] {
@@ -514,6 +799,10 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 		if (request.command === 'list') {
 			stream.markdown(renderWorkspaceSessionListMarkdown(workspaceSessions));
 			return;
+		}
+
+		if (request.command === 'analyze') {
+			return runAnalyzeSessionsCommand(request, stream, token, workspaceFolders, workspaceSessions);
 		}
 
 		if (request.command === 'resume') {

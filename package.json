@@ -208,6 +208,10 @@
           {
             "name": "list",
             "description": "List all saved chat sessions with metadata"
+          },
+          {
+            "name": "analyze",
+            "description": "Analyze saved chat sessions from a timeframe or only sessions that have not been analyzed yet"
           }
         ]
       }

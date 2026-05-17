@@ -2,7 +2,7 @@
 title: "Chat Participant"
 type: entity
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-05-17
 sources:
   - raw/plan.md
 tags:
@@ -41,6 +41,7 @@ Registered at activation via `vscode.chat.createChatParticipant()` in `src/chatP
 |---------|-------|-------------|
 | `/resume` | `@session-control /resume <name>` | Load and inject a saved session as context |
 | `/list` | `@session-control /list` | Show available saved sessions in chat response |
+| `/analyze` | `@session-control /analyze` | Analyze saved sessions from a timeframe or only sessions that have not been analyzed yet |
 
 ### `/resume` Behavior
 1. Fuzzy match `<name>` against session titles and filenames in `.chat/`
@@ -53,6 +54,14 @@ Registered at activation via `vscode.chat.createChatParticipant()` in `src/chatP
 - Displays all saved sessions as a formatted list in the chat response
 - Shows: title, date, branch, commit SHA, turn count
 - Each entry is clickable to resume that session
+
+### `/analyze` Behavior
+1. Resolve an analysis scope from the prompt alias (`24h`, `7d`, `30d`, `needs analysis`) or from a QuickPick
+2. Reassemble split session part chains before analysis so each logical conversation is analyzed once
+3. Filter sessions either by saved-at timeframe or by fingerprint-based "needs analysis" state from `.chat/analysis/index.json`
+4. Batch large transcript sets into multiple model requests, then synthesize one final markdown report
+5. Stream the final report back into chat and persist it under `.chat/analysis/reports/`
+6. Update each contributing workspace's analysis index so unchanged chats are skipped by future "Needs Analysis" runs
 
 ## Implementation
 
@@ -72,6 +81,8 @@ async function handler(
     // Find, load, and inject session
   } else if (request.command === 'list') {
     // List all saved sessions
+  } else if (request.command === 'analyze') {
+    // Filter saved sessions, analyze them with the chat model, and persist the report
   }
 }
 ```
@@ -91,7 +102,7 @@ The following is a previous conversation that the user wants to continue:
 
 On follow-up turns, this context is re-injected via `context.history` and the context budget is re-evaluated. See [Resume System](resume-system.md) for details on overflow strategies.
 
-## Menu Integration
+## Notes
 
-- "Save Chat Session" added to the `chat/context` menu (if available) or command palette
-- Future: Tree View sidebar panel (`session-control.sessionExplorer`) for browsing sessions (Phase 4 stretch goal)
+- The participant now serves two roles: resuming prior chat context and analyzing saved chats for recurring workflow problems.
+- Analysis state is stored separately from saved session JSON documents so the saved session schema remains backward compatible.

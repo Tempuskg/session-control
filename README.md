@@ -11,6 +11,7 @@ A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON f
 
 - **Save sessions** — Capture the active Copilot Chat session as a JSON file in `.chat/`, enriched with branch and commit metadata.
 - **Resume sessions** — Use `@session-control /resume <name>` to reload a saved conversation as LLM context in a new chat.
+- **Analyze saved chats** — Use `@session-control /analyze` to review a timeframe of saved sessions or only chats that have not been analyzed yet.
 - **Browse, preview, delete** — Manage saved sessions via the Session Explorer and command palette.
 - **Resume from viewer** — When viewing a saved session, click the ▶ icon in the editor title bar to resume it directly in chat.
 - **Auto-save on chat response** — Optionally save the active session automatically after every Copilot chat response.
@@ -59,6 +60,18 @@ or via the Command Palette:
 ```
 Session Control: Browse Saved Sessions
 ```
+
+### Analyze saved chats
+
+In VS Code Chat, type:
+
+```
+@session-control /analyze
+```
+
+You can either choose a timeframe interactively or use a quick alias such as `24h`, `7d`, `30d`, or `needs analysis`.
+
+The participant reviews saved sessions from the configured storage folder, streams a report back into chat, and writes a markdown report under `.chat/analysis/reports/`. It also keeps an analysis index in `.chat/analysis/index.json` so the **Needs Analysis** mode only selects chats that have not been analyzed yet or whose content has changed since the last analysis.
 
 ### View a saved session in the web viewer
 

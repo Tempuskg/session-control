@@ -54,6 +54,45 @@ export interface SessionMeta {
 	git: GitContext | null;
 }
 
+export type AnalysisSelectionMode = 'last24Hours' | 'last7Days' | 'last30Days' | 'customRange' | 'needsAnalysis';
+
+export interface AnalysisTimeRange {
+	start: string;
+	end: string;
+}
+
+export interface AnalysisSelection {
+	mode: AnalysisSelectionMode;
+	label: string;
+	range: AnalysisTimeRange | null;
+}
+
+export interface AnalysisReportReference {
+	id: string;
+	createdAt: string;
+	selection: AnalysisSelection;
+	promptVersion: string;
+	reportPath: string;
+	contributingWorkspaces: string[];
+	analyzedFingerprints: string[];
+}
+
+export interface AnalysisIndexEntry {
+	fingerprint: string;
+	sessionId: string;
+	title: string;
+	savedAt: string;
+	analyzedAt: string;
+	reportPath: string;
+}
+
+export interface AnalysisIndex {
+	version: number;
+	updatedAt: string;
+	reports: AnalysisReportReference[];
+	analyzedSessions: AnalysisIndexEntry[];
+}
+
 export interface ScoredSession extends SessionMeta {
 	score: number;
 }
@@ -140,6 +179,74 @@ export function isResponseTurn(value: unknown): value is ResponseTurn {
 
 export function isSavedTurn(value: unknown): value is SavedTurn {
 	return isRequestTurn(value) || isResponseTurn(value);
+}
+
+function isAnalysisSelectionMode(value: unknown): value is AnalysisSelectionMode {
+	return value === 'last24Hours'
+		|| value === 'last7Days'
+		|| value === 'last30Days'
+		|| value === 'customRange'
+		|| value === 'needsAnalysis';
+}
+
+export function isAnalysisTimeRange(value: unknown): value is AnalysisTimeRange {
+	if (!isRecord(value)) {
+		return false;
+	}
+
+	return isIsoTimestamp(value.start) && isIsoTimestamp(value.end);
+}
+
+export function isAnalysisSelection(value: unknown): value is AnalysisSelection {
+	if (!isRecord(value)) {
+		return false;
+	}
+
+	return isAnalysisSelectionMode(value.mode)
+		&& typeof value.label === 'string'
+		&& (value.range === null || isAnalysisTimeRange(value.range));
+}
+
+export function isAnalysisReportReference(value: unknown): value is AnalysisReportReference {
+	if (!isRecord(value)) {
+		return false;
+	}
+
+	return typeof value.id === 'string'
+		&& isIsoTimestamp(value.createdAt)
+		&& isAnalysisSelection(value.selection)
+		&& typeof value.promptVersion === 'string'
+		&& typeof value.reportPath === 'string'
+		&& Array.isArray(value.contributingWorkspaces)
+		&& value.contributingWorkspaces.every((workspace) => typeof workspace === 'string')
+		&& Array.isArray(value.analyzedFingerprints)
+		&& value.analyzedFingerprints.every((fingerprint) => typeof fingerprint === 'string');
+}
+
+export function isAnalysisIndexEntry(value: unknown): value is AnalysisIndexEntry {
+	if (!isRecord(value)) {
+		return false;
+	}
+
+	return typeof value.fingerprint === 'string'
+		&& typeof value.sessionId === 'string'
+		&& typeof value.title === 'string'
+		&& isIsoTimestamp(value.savedAt)
+		&& isIsoTimestamp(value.analyzedAt)
+		&& typeof value.reportPath === 'string';
+}
+
+export function isAnalysisIndex(value: unknown): value is AnalysisIndex {
+	if (!isRecord(value)) {
+		return false;
+	}
+
+	return typeof value.version === 'number'
+		&& isIsoTimestamp(value.updatedAt)
+		&& Array.isArray(value.reports)
+		&& value.reports.every((report) => isAnalysisReportReference(report))
+		&& Array.isArray(value.analyzedSessions)
+		&& value.analyzedSessions.every((entry) => isAnalysisIndexEntry(entry));
 }
 
 export function isChatSession(value: unknown): value is ChatSession {

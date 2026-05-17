@@ -2,7 +2,7 @@
 title: "Project Overview"
 type: overview
 created: 2026-04-12
-updated: 2026-04-13
+updated: 2026-05-17
 sources:
   - raw/plan.md
 tags:
@@ -16,7 +16,7 @@ related:
 
 # Project Overview
 
-**Session Control** is an open source (MIT-licensed) VS Code extension that saves GitHub Copilot Chat sessions as structured JSON files into a configurable `.chat/` folder in the repo, linked to git commits and branches. Users can resume saved chats via a `@session-control` chat participant that loads prior conversation as LLM context. Published to the VS Code Marketplace and Open VSX Registry.
+**Session Control** is an open source (MIT-licensed) VS Code extension that saves GitHub Copilot Chat sessions as structured JSON files into a configurable `.chat/` folder in the repo, linked to git commits and branches. Users can resume saved chats via a `@session-control` chat participant that loads prior conversation as LLM context, and can now analyze saved chats to extract recurring workflow problems and coding-agent insights. Published to the VS Code Marketplace and Open VSX Registry.
 
 ## Core Value Proposition
 
@@ -25,14 +25,15 @@ Chat sessions with Copilot are ephemeral — they disappear when VS Code is clos
 1. **Persisting conversations** — Saving chat sessions as JSON files alongside the code they relate to.
 2. **Linking to git context** — Each saved session captures the branch, commit SHA, and dirty state, tying the conversation to a point in the codebase's history.
 3. **Enabling resumption** — A chat participant (`@session-control`) can reload a saved session and inject it as context into a new conversation, allowing the LLM to "remember" prior work.
-4. **Living in source control** — Sessions are stored as files in the repo (`.chat/`), meaning they can be reviewed in PRs, shared with teammates, and versioned alongside code.
+4. **Analyzing workflow patterns** — Saved sessions can be re-read by the chat participant to identify repeated tool misuse, inefficiencies, and coding-agent preload insights across repositories.
+5. **Living in source control** — Sessions and analysis artifacts are stored as files in the repo (`.chat/`), meaning they can be reviewed in PRs, shared with teammates, and versioned alongside code.
 
 ## Two Subsystems
 
 The extension has two main subsystems:
 
 - **[Save System](save-system.md)** — Reads Copilot's internal session storage, transforms it, and writes structured JSON to `.chat/`.
-- **[Resume System](resume-system.md)** — A registered [Chat Participant](chat-participant.md) (`@session-control`) that loads saved sessions and injects them as LLM context.
+- **[Resume System](resume-system.md)** — A registered [Chat Participant](chat-participant.md) (`@session-control`) that loads saved sessions, injects them as LLM context, and analyzes saved chat history.
 - **Session Viewer** — An HTML webview panel that renders saved sessions as formatted conversations. Accessible from the Session Explorer sidebar or by opening a session JSON file and clicking the editor title preview button.
 
 ## Implementation Phases

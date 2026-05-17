@@ -2,7 +2,7 @@
 title: "Wiki Log"
 type: log
 created: 2026-04-12
-updated: 2026-04-24
+updated: 2026-05-17
 ---
 
 # Wiki Log
@@ -71,3 +71,7 @@ Root cause: VS Code writes a JSONL file with a valid `kind:0` snapshot record bu
 
 Fix: added `EmptySessionError` class to distinguish "recognized format with no completed turns yet" from a genuinely unrecognized format. The reader now throws `EmptySessionError` when a `kind:0` snapshot record is present but yields no turns, catches it silently (with a log warning only), and does not increment the unknown-format counter. Added a fixture (`test/fixtures/session-reader/empty-snapshot-session.jsonl`) and two new unit tests.
 Pages touched: save-system.md, log.md
+
+## [2026-05-17] update | Saved Chat Analysis Feature
+Implemented the first version of saved-chat analysis via `@session-control /analyze`. The chat participant can now resolve a timeframe or "Needs Analysis" scope, reassemble split session files, batch large transcript sets into multiple model requests, synthesize a final markdown report, and persist that report under `.chat/analysis/reports/`. Added a fingerprint-based analysis index at `.chat/analysis/index.json` so unchanged chats can be skipped on future analysis runs. Added new source files `src/analysisStore.ts` and `src/sessionAnalysis.ts`, plus unit coverage for prompt selection, filtering, batching, and analysis-store persistence.
+Pages touched: chat-participant.md, file-manifest.md, overview.md, index.md, log.md

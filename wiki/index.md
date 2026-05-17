@@ -2,7 +2,7 @@
 title: "Wiki Index"
 type: index
 created: 2026-04-12
-updated: 2026-04-13
+updated: 2026-05-17
 ---
 
 # Session Control Wiki Index
@@ -35,4 +35,4 @@ Master catalog of all wiki pages for the **session-control** VS Code extension.
 
 ---
 
-*Last updated: 2026-04-13 — 10 pages*
+*Last updated: 2026-05-17 — 10 pages*
