@@ -1,9 +1,13 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { createAnalysisStore, createSessionAnalysisFingerprint } from './analysisStore';
+import {
+	runAnalyzeSessionsFlow,
+	type AnalyzeSessionsFlowDeps,
+	type WorkspaceSessionMeta,
+} from './analysisOrchestrator';
 import { createSessionStore } from './sessionStore';
 import {
-	ANALYSIS_PROMPT_VERSION,
 	buildAnalysisPrompt,
 	buildAnalysisSynthesisPrompt,
 	buildImplementationPrompt,
@@ -11,13 +15,15 @@ import {
 	createNeedsAnalysisSelection,
 	createPresetAnalysisSelection,
 	DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET,
-	filterCandidatesForAnalysis,
 	parseAnalysisSelectionAlias,
 	splitCandidatesIntoAnalysisBatches,
 	type AnalysisCandidateSession,
 } from './sessionAnalysis';
-import { AnalysisReportReference, AnalysisSelection, ChatSession, SavedTurn, SessionMeta } from './types';
+import { AnalysisReportResultMetadata, AnalysisSelection, ChatSession, SavedTurn, SessionMeta } from './types';
 import { fuzzyMatchSessions } from './utils';
+
+export { runAnalyzeSessionsFlow } from './analysisOrchestrator';
+export type { AnalyzeSessionsFlowDeps, AnalyzeSessionsFlowResult, WorkspaceSessionMeta } from './analysisOrchestrator';
 
 const chatSessionStore = createSessionStore();
 const analysisStore = createAnalysisStore();
@@ -43,42 +49,12 @@ export interface ReassembledSessionResult {
 	partFiles: string[];
 }
 
-interface WorkspaceSessionMeta extends SessionMeta {
-	workspaceFolder: vscode.WorkspaceFolder;
-	storageDirectory: string;
-	displayTitle: string;
-}
-
-export interface AnalyzeSessionsFlowResult {
-	metadata: {
-		resultType: 'analysis-report';
-		analysisReportPath: string;
-		analysisStorageDirectory: string;
-	};
-}
-
 export interface ImplementRecommendationsFlowResult {
 	metadata: {
 		resultType: 'analysis-implementation';
 		analysisReportPath: string;
 		analysisStorageDirectory: string;
 	};
-}
-
-export interface AnalyzeSessionsFlowDeps {
-	resolveSelection: (prompt: string) => Promise<AnalysisSelection | undefined>;
-	createCandidates: (workspaceSessions: WorkspaceSessionMeta[]) => Promise<AnalysisCandidateSession[]>;
-	loadAnalyzedFingerprints: (candidates: AnalysisCandidateSession[]) => Promise<Set<string>>;
-	splitIntoBatches: (candidates: AnalysisCandidateSession[], maxChars?: number) => AnalysisCandidateSession[][];
-	buildPrompt: (selection: AnalysisSelection, candidates: AnalysisCandidateSession[]) => string;
-	buildSynthesisPrompt: (selection: AnalysisSelection, batchSummaries: string[]) => string;
-	runModelPrompt: (prompt: string, streamOutput: boolean) => Promise<string>;
-	streamMarkdown: (markdown: string) => void;
-	pickOwnerWorkspace: (workspaceFolders: readonly vscode.WorkspaceFolder[]) => vscode.WorkspaceFolder | undefined;
-	getStoragePath: (workspaceFolder: vscode.WorkspaceFolder) => string;
-	writeReport: (storageDirectory: string, input: Parameters<typeof analysisStore.writeReport>[1]) => ReturnType<typeof analysisStore.writeReport>;
-	recordAnalysis: (storageDirectory: string, report: AnalysisReportReference, sessions: Parameters<typeof analysisStore.recordAnalysis>[2]) => ReturnType<typeof analysisStore.recordAnalysis>;
-	batchCharBudget: number;
 }
 
 export interface ImplementRecommendationsFlowDeps {
@@ -175,10 +151,6 @@ function renderWorkspaceSessionListMarkdown(sessions: WorkspaceSessionMeta[]): s
 	}
 
 	return ['## Saved Sessions', '', ...sessions.map((session) => asWorkspaceMarkdownListItem(session))].join('\n');
-}
-
-function normalizeRelativePath(filePath: string): string {
-	return filePath.replace(/\\/g, '/');
 }
 
 function normalizeDateInput(value: string, endOfDay: boolean): string {
@@ -352,52 +324,6 @@ async function collectModelText(
 	return text.trim();
 }
 
-function createStorageSpecificReportReference(
-	report: import('./types').AnalysisReportReference,
-	reportFilePath: string,
-	storageDirectory: string,
-): import('./types').AnalysisReportReference {
-	return {
-		...report,
-		reportPath: normalizeRelativePath(path.relative(storageDirectory, reportFilePath)),
-	};
-}
-
-function summarizeRepositoriesForAnalysis(candidates: AnalysisCandidateSession[]): import('./types').AnalysisReportRepositorySummary[] {
-	const byWorkspace = new Map<string, AnalysisCandidateSession[]>();
-
-	for (const candidate of candidates) {
-		const existing = byWorkspace.get(candidate.workspaceName);
-		if (existing) {
-			existing.push(candidate);
-			continue;
-		}
-
-		byWorkspace.set(candidate.workspaceName, [candidate]);
-	}
-
-	return [...byWorkspace.entries()].map(([workspaceName, workspaceCandidates]) => {
-		const firstGit = workspaceCandidates[0]?.session.git ?? null;
-		const branch = workspaceCandidates.every((candidate) => candidate.session.git?.branch === firstGit?.branch)
-			? (firstGit?.branch ?? null)
-			: null;
-		const commit = workspaceCandidates.every((candidate) => candidate.session.git?.commit === firstGit?.commit)
-			? (firstGit?.commit ?? null)
-			: null;
-		const dirty = workspaceCandidates.every((candidate) => candidate.session.git?.dirty === firstGit?.dirty)
-			? (firstGit?.dirty ?? null)
-			: null;
-
-		return {
-			workspaceName,
-			branch,
-			commit,
-			dirty,
-			sessionCount: workspaceCandidates.length,
-		};
-	});
-}
-
 function findLatestAnalysisReportMeta(history: readonly (vscode.ChatRequestTurn | vscode.ChatResponseTurn)[]): {
 	analysisReportPath: string;
 	analysisStorageDirectory: string;
@@ -412,11 +338,7 @@ function findLatestAnalysisReportMeta(history: readonly (vscode.ChatRequestTurn 
 			continue;
 		}
 
-		const metadata = turn.result.metadata as {
-			resultType?: string;
-			analysisReportPath?: string;
-			analysisStorageDirectory?: string;
-		} | undefined;
+		const metadata = turn.result.metadata as Partial<AnalysisReportResultMetadata> | undefined;
 		if (!metadata?.analysisReportPath || !metadata.analysisStorageDirectory) {
 			continue;
 		}
@@ -466,137 +388,6 @@ function createDefaultImplementRecommendationsFlowDeps(
 	};
 }
 
-export async function runAnalyzeSessionsFlow(
-	requestPrompt: string,
-	workspaceFolders: readonly vscode.WorkspaceFolder[],
-	workspaceSessions: WorkspaceSessionMeta[],
-	depsOverrides: Partial<AnalyzeSessionsFlowDeps> = {},
-): Promise<AnalyzeSessionsFlowResult | undefined> {
-	const deps = {
-		...depsOverrides,
-	} as AnalyzeSessionsFlowDeps;
-
-	if (!workspaceSessions.length) {
-		deps.streamMarkdown('No saved sessions found. Save chat sessions before running analysis.');
-		return;
-	}
-
-	const selection = await deps.resolveSelection(requestPrompt);
-	if (!selection) {
-		return;
-	}
-
-	const candidates = await deps.createCandidates(workspaceSessions);
-	const analyzedFingerprints = await deps.loadAnalyzedFingerprints(candidates);
-	const filtered = filterCandidatesForAnalysis(candidates, selection, analyzedFingerprints);
-	if (!filtered.length) {
-		deps.streamMarkdown(selection.mode === 'needsAnalysis'
-			? 'No saved sessions currently need analysis.'
-			: `No saved sessions matched ${selection.label.toLowerCase()}.`);
-		return;
-	}
-
-	const batches = deps.splitIntoBatches(filtered, deps.batchCharBudget);
-	let finalMarkdown = '';
-	if (batches.length === 1) {
-		finalMarkdown = await deps.runModelPrompt(deps.buildPrompt(selection, filtered), true);
-	} else {
-		deps.streamMarkdown(`Analyzing ${filtered.length} saved sessions across ${batches.length} batches. Final synthesis will follow.\n\n`);
-		const batchSummaries: string[] = [];
-		for (let index = 0; index < batches.length; index += 1) {
-			const batch = batches[index];
-			if (!batch) {
-				continue;
-			}
-
-			deps.streamMarkdown(`_Analyzing batch ${index + 1} of ${batches.length}..._\n\n`);
-			const batchPrompt = [
-				deps.buildPrompt(selection, batch),
-				'',
-				`This is batch ${index + 1} of ${batches.length}. Produce a concise findings summary that will be synthesized with the other batches into one final report.`,
-			].join('\n');
-			batchSummaries.push(await deps.runModelPrompt(batchPrompt, false));
-		}
-
-		deps.streamMarkdown('_Synthesizing final report..._\n\n');
-		finalMarkdown = await deps.runModelPrompt(deps.buildSynthesisPrompt(selection, batchSummaries), true);
-	}
-
-	if (!finalMarkdown.trim().length) {
-		deps.streamMarkdown('Analysis completed, but the model returned no report text.');
-		return;
-	}
-
-	const ownerWorkspace = deps.pickOwnerWorkspace(workspaceFolders);
-	if (!ownerWorkspace) {
-		deps.streamMarkdown('Open a workspace folder before saving analysis reports.');
-		return;
-	}
-
-	const ownerStorageDirectory = deps.getStoragePath(ownerWorkspace);
-	const persisted = await deps.writeReport(ownerStorageDirectory, {
-		selection,
-		promptVersion: ANALYSIS_PROMPT_VERSION,
-		contributingWorkspaces: [...new Set(filtered.map((candidate) => candidate.workspaceName))],
-		analyzedFingerprints: filtered.map((candidate) => candidate.fingerprint),
-		sessionCount: filtered.length,
-		ownerWorkspaceName: ownerWorkspace.name,
-		repositories: summarizeRepositoriesForAnalysis(filtered),
-		sourceSessions: filtered.map((candidate) => ({
-			workspaceName: candidate.workspaceName,
-			sessionId: candidate.session.id,
-			title: candidate.session.title,
-			savedAt: candidate.session.savedAt,
-			rootFileName: candidate.rootFileName,
-			fingerprint: candidate.fingerprint,
-			git: candidate.session.git,
-		})),
-		content: finalMarkdown,
-	});
-
-	const byStorageDirectory = new Map<string, AnalysisCandidateSession[]>();
-	for (const candidate of filtered) {
-		const existing = byStorageDirectory.get(candidate.storageDirectory);
-		if (existing) {
-			existing.push(candidate);
-			continue;
-		}
-
-		byStorageDirectory.set(candidate.storageDirectory, [candidate]);
-	}
-
-	for (const [storageDirectory, sessions] of byStorageDirectory) {
-		const reportReference = createStorageSpecificReportReference(
-			persisted.report,
-			persisted.reportFilePath,
-			storageDirectory,
-		);
-		await deps.recordAnalysis(
-			storageDirectory,
-			reportReference,
-			sessions.map((candidate) => ({
-				fingerprint: candidate.fingerprint,
-				sessionId: candidate.session.id,
-				title: candidate.session.title,
-				savedAt: candidate.session.savedAt,
-				rootFileName: candidate.rootFileName,
-				git: candidate.session.git,
-			})),
-		);
-	}
-
-	deps.streamMarkdown(
-		`\n\nSaved analysis report to **${persisted.report.reportPath}** in workspace **${ownerWorkspace.name}**. Use **@session-control /implement** to apply the recommendations.`,
-	);
-	return {
-		metadata: {
-			resultType: 'analysis-report',
-			analysisReportPath: persisted.report.reportPath,
-			analysisStorageDirectory: ownerStorageDirectory,
-		},
-	};
-}
-
 export async function runImplementRecommendationsFlow(
 	requestPrompt: string,
 	history: readonly (vscode.ChatRequestTurn | vscode.ChatResponseTurn)[],
@@ -638,11 +429,7 @@ export async function runImplementRecommendationsFlow(
 	}
 
 export function buildParticipantFollowups(result: vscode.ChatResult): vscode.ChatFollowup[] {
-	const metadata = result.metadata as {
-		resultType?: string;
-		analysisReportPath?: string;
-		analysisStorageDirectory?: string;
-	} | undefined;
+	const metadata = result.metadata as Partial<AnalysisReportResultMetadata> | undefined;
 
 	if (metadata?.resultType === 'analysis-report' && metadata.analysisReportPath && metadata.analysisStorageDirectory) {
 		return [{

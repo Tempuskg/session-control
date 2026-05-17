@@ -60,6 +60,7 @@ suite('analysisStore', () => {
 				promptVersion: '1',
 				contributingWorkspaces: ['workspace'],
 				analyzedFingerprints: ['fingerprint-a'],
+				status: 'complete',
 				content: '## Findings\n\nA useful finding.',
 				createdAt: '2026-05-17T12:00:00.000Z',
 			});
@@ -84,6 +85,7 @@ suite('analysisStore', () => {
 				promptVersion: '1',
 				contributingWorkspaces: ['workspace'],
 				analyzedFingerprints: ['fingerprint-a'],
+				status: 'complete',
 				content: '## Findings\n\nA useful finding.',
 				createdAt: '2026-05-17T12:00:00.000Z',
 			});
@@ -117,6 +119,7 @@ suite('analysisStore', () => {
 				promptVersion: '1',
 				contributingWorkspaces: ['workspace'],
 				analyzedFingerprints: ['fingerprint-a'],
+				status: 'complete',
 				content: '## Findings\n\nA useful finding.',
 				createdAt: '2026-05-17T12:00:00.000Z',
 			});

@@ -68,6 +68,15 @@ export interface AnalysisSelection {
 	onlyUnanalyzed?: boolean;
 }
 
+export type AnalysisReportStatus = 'complete' | 'partial';
+
+export interface AnalysisReportResultMetadata {
+	resultType: 'analysis-report';
+	analysisStatus: AnalysisReportStatus;
+	analysisReportPath: string;
+	analysisStorageDirectory: string;
+}
+
 export interface AnalysisReportRepositorySummary {
 	workspaceName: string;
 	branch: string | null;
@@ -98,6 +107,8 @@ export interface AnalysisReportReference {
 	ownerWorkspaceName?: string;
 	repositories?: AnalysisReportRepositorySummary[];
 	sourceSessions?: AnalysisReportSourceSession[];
+	status?: AnalysisReportStatus;
+	warnings?: string[];
 }
 
 export interface AnalysisIndexEntry {
@@ -215,6 +226,10 @@ function isAnalysisSelectionMode(value: unknown): value is AnalysisSelectionMode
 		|| value === 'needsAnalysis';
 }
 
+function isAnalysisReportStatus(value: unknown): value is AnalysisReportStatus {
+	return value === 'complete' || value === 'partial';
+}
+
 export function isAnalysisTimeRange(value: unknown): value is AnalysisTimeRange {
 	if (!isRecord(value)) {
 		return false;
@@ -281,7 +296,11 @@ export function isAnalysisReportReference(value: unknown): value is AnalysisRepo
 				&& value.repositories.every((repository) => isAnalysisReportRepositorySummary(repository))))
 		&& (value.sourceSessions === undefined
 			|| (Array.isArray(value.sourceSessions)
-				&& value.sourceSessions.every((session) => isAnalysisReportSourceSession(session))));
+				&& value.sourceSessions.every((session) => isAnalysisReportSourceSession(session))))
+		&& (value.status === undefined || isAnalysisReportStatus(value.status))
+		&& (value.warnings === undefined
+			|| (Array.isArray(value.warnings)
+				&& value.warnings.every((warning) => typeof warning === 'string')));
 }
 
 export function isAnalysisIndexEntry(value: unknown): value is AnalysisIndexEntry {

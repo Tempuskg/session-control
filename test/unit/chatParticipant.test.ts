@@ -82,15 +82,21 @@ function createAnalysisCandidate(overrides: Partial<AnalysisCandidateSession> = 
 	};
 }
 
-function createAnalyzeReportReference(): AnalysisReportReference {
+function createAnalyzeReportReference(overrides: Partial<AnalysisReportReference> = {}): AnalysisReportReference {
 	return {
-		id: 'report-1',
-		createdAt: '2026-05-17T13:00:00.000Z',
-		selection: createNeedsAnalysisSelection(),
-		promptVersion: '1',
-		reportPath: 'analysis/reports/report-1.md',
-		contributingWorkspaces: ['workspace'],
-		analyzedFingerprints: ['fingerprint-1'],
+		id: overrides.id ?? 'report-1',
+		createdAt: overrides.createdAt ?? '2026-05-17T13:00:00.000Z',
+		selection: overrides.selection ?? createNeedsAnalysisSelection(),
+		promptVersion: overrides.promptVersion ?? '1',
+		reportPath: overrides.reportPath ?? 'analysis/reports/report-1.md',
+		contributingWorkspaces: overrides.contributingWorkspaces ?? ['workspace'],
+		analyzedFingerprints: overrides.analyzedFingerprints ?? ['fingerprint-1'],
+		...(overrides.sessionCount === undefined ? {} : { sessionCount: overrides.sessionCount }),
+		...(overrides.ownerWorkspaceName === undefined ? {} : { ownerWorkspaceName: overrides.ownerWorkspaceName }),
+		...(overrides.repositories === undefined ? {} : { repositories: overrides.repositories }),
+		...(overrides.sourceSessions === undefined ? {} : { sourceSessions: overrides.sourceSessions }),
+		...(overrides.status === undefined ? {} : { status: overrides.status }),
+		...(overrides.warnings === undefined ? {} : { warnings: overrides.warnings }),
 	};
 }
 
@@ -337,8 +343,16 @@ suite('chatParticipant analyze flow', () => {
 			createAnalyzeFlowDeps({
 				resolveSelection: async () => createPresetAnalysisSelection('last7Days', new Date('2026-05-17T12:00:00.000Z')),
 				createCandidates: async () => [
-					createAnalysisCandidate({ fingerprint: 'fingerprint-a', session: createChatSession({ id: 'a', title: 'Session A' }) }),
-					createAnalysisCandidate({ fingerprint: 'fingerprint-b', session: createChatSession({ id: 'b', title: 'Session B' }) }),
+					createAnalysisCandidate({
+						fingerprint: 'fingerprint-a',
+						storageDirectory: 'e:/workspace/.chat',
+						session: createChatSession({ id: 'a', title: 'Session A' }),
+					}),
+					createAnalysisCandidate({
+						fingerprint: 'fingerprint-b',
+						storageDirectory: 'e:/workspace/.chat',
+						session: createChatSession({ id: 'b', title: 'Session B' }),
+					}),
 				],
 				splitIntoBatches: (candidates: AnalysisCandidateSession[]) => candidates.map((candidate) => [candidate]),
 				buildPrompt: (_selection, candidates) => `batch:${candidates[0]?.fingerprint}`,
@@ -367,6 +381,91 @@ suite('chatParticipant analyze flow', () => {
 		assert.equal(prompts[2]?.prompt.includes('summary:batch:fingerprint-b'), true);
 		assert.equal(messages.some((message) => message.includes('Analyzing 2 saved sessions across 2 batches')), true);
 		assert.equal(messages.some((message) => message.includes('_Synthesizing final report..._')), true);
+	});
+
+	test('persists a partial report when a later analysis batch fails', async () => {
+		const messages: string[] = [];
+		const reportWrites: Array<{ status: string | undefined; warnings: readonly string[] | undefined; fingerprints: string[]; content: string }> = [];
+		const recorded: Array<{ storageDirectory: string; fingerprints: string[] }> = [];
+
+		const result = await runAnalyzeSessionsFlow(
+			'7d',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			[{ ...createMeta(), workspaceFolder: createWorkspaceFolder('workspace', 'e:/workspace', 0), storageDirectory: 'e:/workspace/.chat', displayTitle: '[workspace] Fix auth bug' }],
+			createAnalyzeFlowDeps({
+				resolveSelection: async () => createPresetAnalysisSelection('last7Days', new Date('2026-05-17T12:00:00.000Z')),
+				createCandidates: async () => [
+					createAnalysisCandidate({
+						fingerprint: 'fingerprint-a',
+						storageDirectory: 'e:/workspace/.chat',
+						session: createChatSession({ id: 'a', title: 'Session A' }),
+					}),
+					createAnalysisCandidate({
+						fingerprint: 'fingerprint-b',
+						storageDirectory: 'e:/workspace/.chat',
+						session: createChatSession({ id: 'b', title: 'Session B' }),
+					}),
+				],
+				splitIntoBatches: (candidates: AnalysisCandidateSession[]) => candidates.map((candidate) => [candidate]),
+				buildPrompt: (_selection, candidates) => `batch:${candidates[0]?.fingerprint}`,
+				buildSynthesisPrompt: (_selection, batchSummaries) => `synthesis:${batchSummaries.join('|')}`,
+				runModelPrompt: async (prompt: string) => {
+					if (prompt.startsWith('batch:fingerprint-a')) {
+						return 'summary:batch-a';
+					}
+
+					if (prompt.startsWith('batch:fingerprint-b')) {
+						throw new Error('model unavailable');
+					}
+
+					return '## Findings\n\nSynthesized partial report';
+				},
+				streamMarkdown: (markdown: string) => {
+					messages.push(markdown);
+				},
+				writeReport: async (_storageDirectory, input) => {
+					reportWrites.push({
+						status: input.status,
+						warnings: input.warnings,
+						fingerprints: input.analyzedFingerprints,
+						content: input.content,
+					});
+
+					return {
+						report: createAnalyzeReportReference({
+							analyzedFingerprints: [...input.analyzedFingerprints],
+							status: input.status,
+							...(input.warnings === undefined ? {} : { warnings: input.warnings }),
+						}),
+						reportFilePath: 'e:/workspace/.chat/analysis/reports/report-1.md',
+					};
+				},
+				recordAnalysis: async (storageDirectory, _report, sessions) => {
+					recorded.push({
+						storageDirectory,
+						fingerprints: sessions.map((session) => session.fingerprint),
+					});
+
+					return {
+						version: 1,
+						updatedAt: '2026-05-17T13:00:00.000Z',
+						reports: [createAnalyzeReportReference()],
+						analyzedSessions: [],
+					};
+				},
+			}),
+		);
+
+		assert.equal(result?.metadata.resultType, 'analysis-report');
+		assert.equal(result?.metadata.analysisStatus, 'partial');
+		assert.deepEqual(reportWrites, [{
+			status: 'partial',
+			warnings: ['Batch 2 of 2 failed: model unavailable'],
+			fingerprints: ['fingerprint-a'],
+			content: '## Findings\n\nSynthesized partial report',
+		}]);
+		assert.deepEqual(recorded, [{ storageDirectory: 'e:/workspace/.chat', fingerprints: ['fingerprint-a'] }]);
+		assert.equal(messages.some((message) => message.includes('Saved partial analysis report')), true);
 	});
 });
 
@@ -428,6 +527,8 @@ suite('chatParticipant implementation followups', () => {
 		assert.equal(prompts[0]?.streamOutput, true);
 		assert.equal(prompts[0]?.prompt.includes('# Chat Analysis Report'), true);
 		assert.equal(prompts[0]?.prompt.includes('User request: Implement the highest-priority recommendation.'), true);
+		assert.equal(prompts[0]?.prompt.includes('stay in implementation mode for the current repository'), true);
+		assert.equal(prompts[0]?.prompt.includes('explicitly say BLOCKED and name the blocker'), true);
 		assert.equal(messages[0]?.includes('Using analysis report **analysis/reports/report-1.md** as implementation context.'), true);
 		assert.equal(result?.metadata.resultType, 'analysis-implementation');
 		assert.equal(result?.metadata.analysisReportPath, 'analysis/reports/report-1.md');

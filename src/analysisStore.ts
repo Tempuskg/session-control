@@ -31,11 +31,13 @@ export interface AnalysisWriteReportInput {
 	contributingWorkspaces: string[];
 	analyzedFingerprints: string[];
 	content: string;
+	status: 'complete' | 'partial';
 	createdAt?: string;
 	sessionCount?: number;
 	ownerWorkspaceName?: string;
 	repositories?: AnalysisReportRepositorySummary[];
 	sourceSessions?: AnalysisReportSourceSession[];
+	warnings?: string[];
 }
 
 export interface AnalysisRecordInput {
@@ -152,6 +154,9 @@ function renderReportMarkdown(report: AnalysisReportReference, content: string):
 	}
 
 	lines.push(`- Prompt Version: ${report.promptVersion}`);
+	if (report.status) {
+		lines.push(`- Status: ${report.status}`);
+	}
 	lines.push(`- Only Unanalyzed: ${report.selection.onlyUnanalyzed === true ? 'yes' : 'no'}`);
 	if (report.ownerWorkspaceName) {
 		lines.push(`- Owner Workspace: ${report.ownerWorkspaceName}`);
@@ -179,6 +184,15 @@ function renderReportMarkdown(report: AnalysisReportReference, content: string):
 		lines.push('');
 		for (const session of report.sourceSessions) {
 			lines.push(`- ${session.workspaceName} | ${session.title} | ${session.rootFileName} | ${session.savedAt}`);
+		}
+	}
+
+	if (report.warnings && report.warnings.length > 0) {
+		lines.push('');
+		lines.push('## Warnings');
+		lines.push('');
+		for (const warning of report.warnings) {
+			lines.push(`- ${warning}`);
 		}
 	}
 	lines.push('');
@@ -300,9 +314,11 @@ export function createAnalysisStore(overrides: Partial<AnalysisStoreDeps> = {}) 
 			contributingWorkspaces: [...input.contributingWorkspaces],
 			analyzedFingerprints: [...input.analyzedFingerprints],
 			sessionCount,
+			status: input.status,
 			...(input.ownerWorkspaceName === undefined ? {} : { ownerWorkspaceName: input.ownerWorkspaceName }),
 			...(input.repositories === undefined ? {} : { repositories: [...input.repositories] }),
 			...(input.sourceSessions === undefined ? {} : { sourceSessions: [...input.sourceSessions] }),
+			...(input.warnings === undefined ? {} : { warnings: [...input.warnings] }),
 		};
 
 		await writeAtomic(deps, reportFilePath, renderReportMarkdown(report, input.content));

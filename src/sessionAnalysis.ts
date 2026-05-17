@@ -279,9 +279,12 @@ export function buildImplementationPrompt(reportMarkdown: string, userPrompt: st
 
 	return [
 		'The user previously ran an analysis over saved chat sessions and now wants help implementing the recommendations.',
-		'Use the analysis report below as the source of truth. Turn the recommendations into concrete implementation guidance for the current repository.',
+		'Use the analysis report below as the source of truth and stay in implementation mode for the current repository.',
+		'Do not stop at planning or broad discovery when the next concrete edit or validation step is already clear.',
 		'When the report includes multiple recommendations, prioritize the highest-impact changes that are feasible in the current repository.',
-		'If the request is broad, start with the first actionable implementation slice and explain why.',
+		'If the request is broad, start with the first actionable implementation slice, make the change, and validate it with the narrowest relevant test or command before expanding scope.',
+		'If you cannot safely complete the next implementation step, explicitly say BLOCKED and name the blocker instead of giving another plan.',
+		'Close with the concrete outcome: files changed, commands run, results, and any remaining unverified items.',
 		'',
 		'Analysis report:',
 		'',
