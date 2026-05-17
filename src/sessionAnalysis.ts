@@ -13,7 +13,7 @@ export interface AnalysisCandidateSession {
 	session: ChatSession;
 }
 
-export const ANALYSIS_PROMPT_VERSION = '1';
+export const ANALYSIS_PROMPT_VERSION = '2';
 export const DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET = 48000;
 
 const ANALYSIS_PROMPT_TEMPLATE = `Review my last interactions with AI from {user chosen timeframe}.
@@ -21,6 +21,17 @@ Look for any problems that I encountered, things that weren't working efficientl
 Look for common mistakes AI was doing and other things that can be optimized.
 Look thoroughly through all conversations and make a plan for how we can optimize our flow in the future, both within each repository and cross-repositories.
 Also look for insights that would be useful for the coding agent to know beforehand, both before entering a repository and when working in multiple repositories at the same time.`;
+
+function buildRecommendationScopeGuidance(): string {
+	return [
+		'Restrict all recommendations to AI-specific control files in the repository.',
+		'Prioritize AGENTS.md and .github/copilot-instructions.md when they exist.',
+		'If present, CLAUDE.md, *.instructions.md, *.prompt.md, *.agent.md, SKILL.md, and similar repository-local AI instruction files are also in scope.',
+		'Do not recommend application source-code changes, test changes, build tooling changes, or general documentation edits unless the change is specifically to one of those AI control files.',
+		'If the evidence does not support a concrete AI-control-file recommendation, say so instead of proposing general repository changes.',
+		'For every recommendation, name the target AI control file and the instruction or prompt change to make.',
+	].join('\n');
+}
 
 function createRangeSelection(
 	mode: AnalysisSelectionMode,
@@ -248,6 +259,8 @@ export function buildAnalysisPrompt(selection: AnalysisSelection, candidates: An
 	return [
 		instruction,
 		'',
+		buildRecommendationScopeGuidance(),
+		'',
 		buildRequiredSections(),
 		'',
 		'Chats to analyze:',
@@ -264,6 +277,8 @@ export function buildAnalysisSynthesisPrompt(selection: AnalysisSelection, batch
 		'You are synthesizing batch-level findings from the same analysis request into one final report.',
 		'Deduplicate repeated findings and keep repository-specific findings separate from cross-repository patterns.',
 		'',
+		buildRecommendationScopeGuidance(),
+		'',
 		buildRequiredSections(),
 		'',
 		'Batch findings:',
@@ -278,11 +293,12 @@ export function buildImplementationHandoffPrompt(reportFilePath: string, userPro
 		: 'Implement the highest-priority recommendations from the saved analysis report.';
 
 	return [
-		'Implement the recommendations from the latest Session Control analysis using full workspace access.',
+		'Implement the AI-control-file recommendations from the latest Session Control analysis using full workspace access.',
 		`Start by reading this saved analysis report: "${reportFilePath}"`,
-		'Also read AGENTS.md, .github/copilot-instructions.md, package.json, and the source files relevant to the first actionable recommendation.',
+		'Also read AGENTS.md, .github/copilot-instructions.md, CLAUDE.md when present, and any other repository-local AI control files relevant to the first actionable recommendation.',
+		'Do not expand into application source files, tests, build tooling, or general documentation unless the saved report specifically calls for updating an AI control file that governs those workflows.',
 		'Inspect the current working tree first so you do not assume a clean baseline before editing or validating.',
-		'Make the next concrete implementation change and validate it with focused tests or build commands before expanding scope.',
+		'Make the next concrete implementation change in the relevant AI control file and validate it with focused checks before expanding scope.',
 		`User request: ${normalizedPrompt}`,
 	].join('\n');
 }

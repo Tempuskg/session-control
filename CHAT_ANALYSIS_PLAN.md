@@ -5,8 +5,8 @@
 - State: Implemented in source, tests, docs, and manifest contributions.
 - Last updated: 2026-05-17.
 - Current follow-up model: `@session-control /analyze` persists a saved report and offers `@session-control /handoff`; `Session Control: Handoff Latest Analysis` provides the same handoff from the command palette.
-- Planned refinement: restrict analysis recommendations to AI-specific control files only.
-- Remaining work: implement and verify the AI-control-file recommendation restriction, then manually smoke-test the analyze and handoff flows in VS Code.
+- Implemented refinement: analysis recommendations and handoff implementation prompts are restricted to AI-specific control files only.
+- Remaining work: manually smoke-test the analyze and handoff flows in VS Code.
 
 ## Goal
 
@@ -28,14 +28,15 @@ Implement an `@session-control /analyze` workflow that reads saved sessions from
 12. Completed: documented the feature in `README.md`, `CHANGELOG.md`, and the required wiki pages.
 13. Completed: added a lightweight handoff flow so analysis results can open a generated implementation prompt in chat or an agent-capable surface.
 14. Completed: removed the earlier in-thread `/implement` path and standardized the post-analysis continuation model on handoff-only flows.
+15. Completed: restricted analysis recommendations and handoff implementation prompts to AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and similar repository-local instruction files.
 
-## Next Scope Refinement
+## Implemented Recommendation Scope Refinement
 
-1. Restrict the analysis and synthesis prompts so the recommendation sections only propose edits to AI-specific control files.
-2. Treat `AGENTS.md` and `.github/copilot-instructions.md` as first-class targets in this repository.
-3. Treat `CLAUDE.md`, `*.instructions.md`, `*.prompt.md`, `*.agent.md`, `SKILL.md`, and comparable repository-local AI control files as in-scope when present.
-4. Treat recommendations for application source, tests, build tooling, and general documentation as out of scope unless the recommendation is specifically to change an AI control file that governs those workflows.
-5. Add or update tests so prompt construction and follow-up behavior reflect the narrowed recommendation scope.
+1. Completed: restricted the analysis and synthesis prompts so the recommendation sections only propose edits to AI-specific control files.
+2. Completed: treated `AGENTS.md` and `.github/copilot-instructions.md` as first-class targets in this repository.
+3. Completed: treated `CLAUDE.md`, `*.instructions.md`, `*.prompt.md`, `*.agent.md`, `SKILL.md`, and comparable repository-local AI control files as in-scope when present.
+4. Completed: treated recommendations for application source, tests, build tooling, and general documentation as out of scope unless the recommendation is specifically to change an AI control file that governs those workflows.
+5. Completed: updated tests so prompt construction and follow-up behavior reflect the narrowed recommendation scope.
 
 ## Relevant Files
 
@@ -66,7 +67,7 @@ Implement an `@session-control /analyze` workflow that reads saved sessions from
 3. Completed: unit tests cover prompt composition and batching so the selected timeframe is reflected and oversized input falls back to batch summaries plus a final synthesis pass.
 4. Completed: chat participant tests cover analysis execution, empty selections, report persistence, and analysis follow-up behavior.
 5. Completed: `npm run compile-tests`, `npm run compile`, `npm test`, and `npm run lint` all passed on 2026-05-17.
-6. Remaining: add verification that the analysis prompt restricts recommendations to AI-specific control files, including current repo targets `AGENTS.md` and `.github/copilot-instructions.md`, plus optional files such as `CLAUDE.md` when present.
+6. Completed: unit tests now verify that the analysis and handoff prompts restrict recommendations to AI-specific control files, including current repo targets `AGENTS.md` and `.github/copilot-instructions.md`, plus optional files such as `CLAUDE.md` when present.
 7. Remaining: manually smoke-test `@session-control /analyze`, verify report persistence under the analysis subdirectory, rerun to confirm unchanged sessions are skipped until content changes, confirm the handoff prompt opens as expected, and verify the resulting recommendations stay within the AI-control-file scope.
 
 ## Decisions

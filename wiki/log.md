@@ -95,3 +95,7 @@ Pages touched: README.md, chat-participant.md, file-manifest.md, log.md
 ## [2026-05-17] update | Remove Implement Command
 Removed `@session-control /implement` from the chat participant so saved-chat analysis now flows only into the handoff surfaces. Updated the participant follow-up behavior, manifest, README, changelog, and wiki pages to point users at `@session-control /handoff` or `Session Control: Handoff Latest Analysis` instead.
 Pages touched: README.md, CHANGELOG.md, chat-participant.md, file-manifest.md, log.md
+
+## [2026-05-17] update | Restrict Analysis Recommendations To AI Control Files
+Restricted saved-chat analysis recommendations and handoff implementation prompts to AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and similar repository-local instruction files. Updated prompt construction, tests, README, changelog, and wiki pages to reflect the narrower scope.
+Pages touched: CHAT_ANALYSIS_PLAN.md, README.md, CHANGELOG.md, chat-participant.md, file-manifest.md, log.md
