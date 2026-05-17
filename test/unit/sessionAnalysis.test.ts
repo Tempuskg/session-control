@@ -2,6 +2,7 @@ import * as assert from 'node:assert';
 import {
 	buildAnalysisPrompt,
 	buildAnalysisSynthesisPrompt,
+	buildImplementationPrompt,
 	createCustomRangeSelection,
 	createNeedsAnalysisSelection,
 	createPresetAnalysisSelection,
@@ -115,5 +116,16 @@ suite('sessionAnalysis', () => {
 		assert.equal(prompt.includes('Needs Analysis'), true);
 		assert.equal(prompt.includes('## Batch 1'), true);
 		assert.equal(prompt.includes('## Batch 2'), true);
+	});
+
+	test('buildImplementationPrompt includes the saved analysis report and user request', () => {
+		const prompt = buildImplementationPrompt(
+			'# Chat Analysis Report\n\n## Findings\n\n- Tighten the save flow',
+			'Implement the highest-priority recommendation.',
+		);
+
+		assert.equal(prompt.includes('The user previously ran an analysis over saved chat sessions'), true);
+		assert.equal(prompt.includes('# Chat Analysis Report'), true);
+		assert.equal(prompt.includes('User request: Implement the highest-priority recommendation.'), true);
 	});
 });

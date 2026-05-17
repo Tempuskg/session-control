@@ -212,6 +212,10 @@
           {
             "name": "analyze",
             "description": "Analyze saved chat sessions from a timeframe or only sessions that have not been analyzed yet"
+          },
+          {
+            "name": "implement",
+            "description": "Use the latest saved-chat analysis report as context for implementing its recommendations"
           }
         ]
       }

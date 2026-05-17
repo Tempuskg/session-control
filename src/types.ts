@@ -67,6 +67,24 @@ export interface AnalysisSelection {
 	range: AnalysisTimeRange | null;
 }
 
+export interface AnalysisReportRepositorySummary {
+	workspaceName: string;
+	branch: string | null;
+	commit: string | null;
+	dirty: boolean | null;
+	sessionCount: number;
+}
+
+export interface AnalysisReportSourceSession {
+	workspaceName: string;
+	sessionId: string;
+	title: string;
+	savedAt: string;
+	rootFileName: string;
+	fingerprint: string;
+	git: GitContext | null;
+}
+
 export interface AnalysisReportReference {
 	id: string;
 	createdAt: string;
@@ -75,6 +93,10 @@ export interface AnalysisReportReference {
 	reportPath: string;
 	contributingWorkspaces: string[];
 	analyzedFingerprints: string[];
+	sessionCount?: number;
+	ownerWorkspaceName?: string;
+	repositories?: AnalysisReportRepositorySummary[];
+	sourceSessions?: AnalysisReportSourceSession[];
 }
 
 export interface AnalysisIndexEntry {
@@ -84,6 +106,9 @@ export interface AnalysisIndexEntry {
 	savedAt: string;
 	analyzedAt: string;
 	reportPath: string;
+	rootFileName?: string;
+	reportId?: string;
+	git?: GitContext | null;
 }
 
 export interface AnalysisIndex {
@@ -207,6 +232,32 @@ export function isAnalysisSelection(value: unknown): value is AnalysisSelection 
 		&& (value.range === null || isAnalysisTimeRange(value.range));
 }
 
+export function isAnalysisReportRepositorySummary(value: unknown): value is AnalysisReportRepositorySummary {
+	if (!isRecord(value)) {
+		return false;
+	}
+
+	return typeof value.workspaceName === 'string'
+		&& (value.branch === null || typeof value.branch === 'string')
+		&& (value.commit === null || typeof value.commit === 'string')
+		&& (value.dirty === null || typeof value.dirty === 'boolean')
+		&& typeof value.sessionCount === 'number';
+}
+
+export function isAnalysisReportSourceSession(value: unknown): value is AnalysisReportSourceSession {
+	if (!isRecord(value)) {
+		return false;
+	}
+
+	return typeof value.workspaceName === 'string'
+		&& typeof value.sessionId === 'string'
+		&& typeof value.title === 'string'
+		&& isIsoTimestamp(value.savedAt)
+		&& typeof value.rootFileName === 'string'
+		&& typeof value.fingerprint === 'string'
+		&& (value.git === null || isGitContext(value.git));
+}
+
 export function isAnalysisReportReference(value: unknown): value is AnalysisReportReference {
 	if (!isRecord(value)) {
 		return false;
@@ -220,7 +271,15 @@ export function isAnalysisReportReference(value: unknown): value is AnalysisRepo
 		&& Array.isArray(value.contributingWorkspaces)
 		&& value.contributingWorkspaces.every((workspace) => typeof workspace === 'string')
 		&& Array.isArray(value.analyzedFingerprints)
-		&& value.analyzedFingerprints.every((fingerprint) => typeof fingerprint === 'string');
+		&& value.analyzedFingerprints.every((fingerprint) => typeof fingerprint === 'string')
+		&& (value.sessionCount === undefined || typeof value.sessionCount === 'number')
+		&& (value.ownerWorkspaceName === undefined || typeof value.ownerWorkspaceName === 'string')
+		&& (value.repositories === undefined
+			|| (Array.isArray(value.repositories)
+				&& value.repositories.every((repository) => isAnalysisReportRepositorySummary(repository))))
+		&& (value.sourceSessions === undefined
+			|| (Array.isArray(value.sourceSessions)
+				&& value.sourceSessions.every((session) => isAnalysisReportSourceSession(session))));
 }
 
 export function isAnalysisIndexEntry(value: unknown): value is AnalysisIndexEntry {
@@ -233,7 +292,10 @@ export function isAnalysisIndexEntry(value: unknown): value is AnalysisIndexEntr
 		&& typeof value.title === 'string'
 		&& isIsoTimestamp(value.savedAt)
 		&& isIsoTimestamp(value.analyzedAt)
-		&& typeof value.reportPath === 'string';
+		&& typeof value.reportPath === 'string'
+		&& (value.rootFileName === undefined || typeof value.rootFileName === 'string')
+		&& (value.reportId === undefined || typeof value.reportId === 'string')
+		&& (value.git === undefined || value.git === null || isGitContext(value.git));
 }
 
 export function isAnalysisIndex(value: unknown): value is AnalysisIndex {

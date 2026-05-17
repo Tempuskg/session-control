@@ -42,6 +42,7 @@ Registered at activation via `vscode.chat.createChatParticipant()` in `src/chatP
 | `/resume` | `@session-control /resume <name>` | Load and inject a saved session as context |
 | `/list` | `@session-control /list` | Show available saved sessions in chat response |
 | `/analyze` | `@session-control /analyze` | Analyze saved sessions from a timeframe or only sessions that have not been analyzed yet |
+| `/implement` | `@session-control /implement` | Reuse the latest analysis report as context for implementation follow-up |
 
 ### `/resume` Behavior
 1. Fuzzy match `<name>` against session titles and filenames in `.chat/`
@@ -60,8 +61,15 @@ Registered at activation via `vscode.chat.createChatParticipant()` in `src/chatP
 2. Reassemble split session part chains before analysis so each logical conversation is analyzed once
 3. Filter sessions either by saved-at timeframe or by fingerprint-based "needs analysis" state from `.chat/analysis/index.json`
 4. Batch large transcript sets into multiple model requests, then synthesize one final markdown report
-5. Stream the final report back into chat and persist it under `.chat/analysis/reports/`
-6. Update each contributing workspace's analysis index so unchanged chats are skipped by future "Needs Analysis" runs
+5. Stream the final report back into chat and persist it under `.chat/analysis/reports/` with owner-workspace, repository-context, and source-session provenance
+6. Update each contributing workspace's analysis index so unchanged chats are skipped by future "Needs Analysis" runs while retaining report IDs, root files, and git context for audited sessions
+7. Offer an **Implement Recommendations** follow-up suggestion that routes to `/implement` and echo the equivalent `@session-control /implement` command in the completion message
+
+### `/implement` Behavior
+1. Find the most recent analysis result in the current chat thread via result metadata
+2. Load the saved markdown report from `.chat/analysis/reports/`
+3. Use that report as implementation context for the next model request
+4. Keep the analysis report metadata attached so additional implementation follow-ups can continue in the same thread
 
 ## Implementation
 
@@ -83,6 +91,8 @@ async function handler(
     // List all saved sessions
   } else if (request.command === 'analyze') {
     // Filter saved sessions, analyze them with the chat model, and persist the report
+  } else if (request.command === 'implement') {
+    // Load the latest saved analysis report and continue with implementation guidance
   }
 }
 ```
@@ -105,4 +115,6 @@ On follow-up turns, this context is re-injected via `context.history` and the co
 ## Notes
 
 - The participant now serves two roles: resuming prior chat context and analyzing saved chats for recurring workflow problems.
+- After `/analyze`, the participant suggests a follow-up that turns the saved report into implementation context.
 - Analysis state is stored separately from saved session JSON documents so the saved session schema remains backward compatible.
+- Saved analysis artifacts now retain enough provenance to trace a report back to its owner workspace, repository context, and source session files.

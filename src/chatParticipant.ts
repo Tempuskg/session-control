@@ -6,6 +6,7 @@ import {
 	ANALYSIS_PROMPT_VERSION,
 	buildAnalysisPrompt,
 	buildAnalysisSynthesisPrompt,
+	buildImplementationPrompt,
 	createCustomRangeSelection,
 	createNeedsAnalysisSelection,
 	createPresetAnalysisSelection,
@@ -15,7 +16,15 @@ import {
 	splitCandidatesIntoAnalysisBatches,
 	type AnalysisCandidateSession,
 } from './sessionAnalysis';
-import { AnalysisReportReference, AnalysisSelection, ChatSession, SavedTurn, SessionMeta } from './types';
+import {
+	AnalysisReportReference,
+	AnalysisReportRepositorySummary,
+	AnalysisReportSourceSession,
+	AnalysisSelection,
+	ChatSession,
+	SavedTurn,
+	SessionMeta,
+} from './types';
 import { fuzzyMatchSessions } from './utils';
 
 const chatSessionStore = createSessionStore();
@@ -50,6 +59,15 @@ interface WorkspaceSessionMeta extends SessionMeta {
 
 export interface AnalyzeSessionsFlowResult {
 	metadata: {
+		resultType: 'analysis-report';
+		analysisReportPath: string;
+		analysisStorageDirectory: string;
+	};
+}
+
+export interface ImplementRecommendationsFlowResult {
+	metadata: {
+		resultType: 'analysis-implementation';
 		analysisReportPath: string;
 		analysisStorageDirectory: string;
 	};
@@ -69,6 +87,17 @@ export interface AnalyzeSessionsFlowDeps {
 	writeReport: (storageDirectory: string, input: Parameters<typeof analysisStore.writeReport>[1]) => ReturnType<typeof analysisStore.writeReport>;
 	recordAnalysis: (storageDirectory: string, report: AnalysisReportReference, sessions: Parameters<typeof analysisStore.recordAnalysis>[2]) => ReturnType<typeof analysisStore.recordAnalysis>;
 	batchCharBudget: number;
+}
+
+export interface ImplementRecommendationsFlowDeps {
+	findAnalysisReportMeta: (history: readonly (vscode.ChatRequestTurn | vscode.ChatResponseTurn)[]) => {
+		analysisReportPath: string;
+		analysisStorageDirectory: string;
+	} | null;
+	readReport: (storageDirectory: string, reportPath: string) => Promise<string>;
+	buildPrompt: (reportMarkdown: string, userPrompt: string) => string;
+	runModelPrompt: (prompt: string, streamOutput: boolean) => Promise<string>;
+	streamMarkdown: (markdown: string) => void;
 }
 
 function getStoragePath(workspaceFolder: vscode.WorkspaceFolder): string {
@@ -258,6 +287,56 @@ async function createAnalysisCandidates(workspaceSessions: WorkspaceSessionMeta[
 	return candidates.sort((a, b) => Date.parse(b.session.savedAt) - Date.parse(a.session.savedAt));
 }
 
+function buildAnalysisRepositorySummaries(candidates: AnalysisCandidateSession[]): AnalysisReportRepositorySummary[] {
+	const summaries = new Map<string, AnalysisReportRepositorySummary>();
+
+	for (const candidate of candidates) {
+		const branch = candidate.session.git?.branch ?? null;
+		const commit = candidate.session.git?.commit ?? null;
+		const dirty = candidate.session.git?.dirty ?? null;
+		const key = [candidate.workspaceName, branch ?? '', commit ?? '', dirty === null ? 'unknown' : String(dirty)].join('::');
+		const existing = summaries.get(key);
+		if (existing) {
+			existing.sessionCount += 1;
+			continue;
+		}
+
+		summaries.set(key, {
+			workspaceName: candidate.workspaceName,
+			branch,
+			commit,
+			dirty,
+			sessionCount: 1,
+		});
+	}
+
+	return [...summaries.values()].sort((left, right) => {
+		const workspaceComparison = left.workspaceName.localeCompare(right.workspaceName);
+		if (workspaceComparison !== 0) {
+			return workspaceComparison;
+		}
+
+		const branchComparison = (left.branch ?? '').localeCompare(right.branch ?? '');
+		if (branchComparison !== 0) {
+			return branchComparison;
+		}
+
+		return (left.commit ?? '').localeCompare(right.commit ?? '');
+	});
+}
+
+function buildAnalysisSourceSessions(candidates: AnalysisCandidateSession[]): AnalysisReportSourceSession[] {
+	return candidates.map((candidate) => ({
+		workspaceName: candidate.workspaceName,
+		sessionId: candidate.session.id,
+		title: candidate.session.title,
+		savedAt: candidate.session.savedAt,
+		rootFileName: candidate.rootFileName,
+		fingerprint: candidate.fingerprint,
+		git: candidate.session.git,
+	}));
+}
+
 async function loadAnalyzedFingerprintSet(candidates: AnalysisCandidateSession[]): Promise<Set<string>> {
 	const storageDirectories = [...new Set(candidates.map((candidate) => candidate.storageDirectory))];
 	const indexes = await Promise.all(storageDirectories.map(async (storageDirectory) => ({
@@ -311,6 +390,38 @@ function createStorageSpecificReportReference(
 	};
 }
 
+function findLatestAnalysisReportMeta(history: readonly (vscode.ChatRequestTurn | vscode.ChatResponseTurn)[]): {
+	analysisReportPath: string;
+	analysisStorageDirectory: string;
+} | null {
+	for (let index = history.length - 1; index >= 0; index -= 1) {
+		const turn = history[index];
+		if (!(turn instanceof vscode.ChatResponseTurn)) {
+			continue;
+		}
+
+		if (turn.participant !== CHAT_PARTICIPANT_ID) {
+			continue;
+		}
+
+		const metadata = turn.result.metadata as {
+			resultType?: string;
+			analysisReportPath?: string;
+			analysisStorageDirectory?: string;
+		} | undefined;
+		if (!metadata?.analysisReportPath || !metadata.analysisStorageDirectory) {
+			continue;
+		}
+
+		return {
+			analysisReportPath: metadata.analysisReportPath,
+			analysisStorageDirectory: metadata.analysisStorageDirectory,
+		};
+	}
+
+	return null;
+}
+
 function createDefaultAnalyzeSessionsFlowDeps(
 	request: vscode.ChatRequest,
 	stream: vscode.ChatResponseStream,
@@ -330,6 +441,20 @@ function createDefaultAnalyzeSessionsFlowDeps(
 		writeReport: async (storageDirectory, input) => analysisStore.writeReport(storageDirectory, input),
 		recordAnalysis: async (storageDirectory, report, sessions) => analysisStore.recordAnalysis(storageDirectory, report, sessions),
 		batchCharBudget: DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET,
+	};
+}
+
+function createDefaultImplementRecommendationsFlowDeps(
+	request: vscode.ChatRequest,
+	stream: vscode.ChatResponseStream,
+	token: vscode.CancellationToken,
+): ImplementRecommendationsFlowDeps {
+	return {
+		findAnalysisReportMeta: (history) => findLatestAnalysisReportMeta(history),
+		readReport: async (storageDirectory: string, reportPath: string) => analysisStore.readReport(storageDirectory, reportPath),
+		buildPrompt: (reportMarkdown: string, userPrompt: string) => buildImplementationPrompt(reportMarkdown, userPrompt),
+		runModelPrompt: async (prompt: string, streamOutput: boolean) => collectModelText(request, streamOutput ? stream : undefined, token, prompt),
+		streamMarkdown: (markdown: string) => stream.markdown(markdown),
 	};
 }
 
@@ -401,11 +526,16 @@ export async function runAnalyzeSessionsFlow(
 	}
 
 	const ownerStorageDirectory = deps.getStoragePath(ownerWorkspace);
+	const repositorySummaries = buildAnalysisRepositorySummaries(filtered);
+	const sourceSessions = buildAnalysisSourceSessions(filtered);
 	const persisted = await deps.writeReport(ownerStorageDirectory, {
 		selection,
 		promptVersion: ANALYSIS_PROMPT_VERSION,
 		contributingWorkspaces: [...new Set(filtered.map((candidate) => candidate.workspaceName))],
 		analyzedFingerprints: filtered.map((candidate) => candidate.fingerprint),
+		ownerWorkspaceName: ownerWorkspace.name,
+		repositories: repositorySummaries,
+		sourceSessions,
 		content: finalMarkdown,
 	});
 
@@ -434,17 +564,79 @@ export async function runAnalyzeSessionsFlow(
 				sessionId: candidate.session.id,
 				title: candidate.session.title,
 				savedAt: candidate.session.savedAt,
+				rootFileName: candidate.rootFileName,
+				git: candidate.session.git,
 			})),
 		);
 	}
 
-	deps.streamMarkdown(`\n\nSaved analysis report to **${persisted.report.reportPath}** in workspace **${ownerWorkspace.name}**.`);
+	deps.streamMarkdown(`\n\nSaved analysis report to **${persisted.report.reportPath}** in workspace **${ownerWorkspace.name}**.\n\nUse the **Implement Recommendations** follow-up or run \`@session-control /implement\` to continue from this report.`);
 	return {
 		metadata: {
+			resultType: 'analysis-report',
 			analysisReportPath: persisted.report.reportPath,
 			analysisStorageDirectory: ownerStorageDirectory,
 		},
 	};
+}
+
+export async function runImplementRecommendationsFlow(
+	requestPrompt: string,
+	history: readonly (vscode.ChatRequestTurn | vscode.ChatResponseTurn)[],
+	depsOverrides: Partial<ImplementRecommendationsFlowDeps> = {},
+): Promise<ImplementRecommendationsFlowResult | undefined> {
+	const deps = {
+		...depsOverrides,
+	} as ImplementRecommendationsFlowDeps;
+
+	const analysisMeta = deps.findAnalysisReportMeta(history);
+	if (!analysisMeta) {
+		deps.streamMarkdown('Use @session-control /analyze first, then ask me to implement the recommendations.');
+		return;
+	}
+
+	let reportMarkdown: string;
+	try {
+		reportMarkdown = await deps.readReport(analysisMeta.analysisStorageDirectory, analysisMeta.analysisReportPath);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		deps.streamMarkdown(`Failed to read the saved analysis report: ${message}`);
+		return;
+	}
+
+	deps.streamMarkdown(`Using analysis report **${analysisMeta.analysisReportPath}** as implementation context.\n\n`);
+	const response = await deps.runModelPrompt(deps.buildPrompt(reportMarkdown, requestPrompt), true);
+	if (!response.trim().length) {
+		deps.streamMarkdown('The implementation follow-up completed, but the model returned no response.');
+		return;
+	}
+
+	return {
+		metadata: {
+			resultType: 'analysis-implementation',
+			analysisReportPath: analysisMeta.analysisReportPath,
+			analysisStorageDirectory: analysisMeta.analysisStorageDirectory,
+		},
+	};
+	}
+
+export function buildParticipantFollowups(result: vscode.ChatResult): vscode.ChatFollowup[] {
+	const metadata = result.metadata as {
+		resultType?: string;
+		analysisReportPath?: string;
+		analysisStorageDirectory?: string;
+	} | undefined;
+
+	if (metadata?.resultType === 'analysis-report' && metadata.analysisReportPath && metadata.analysisStorageDirectory) {
+		return [{
+			label: 'Implement Recommendations',
+			prompt: 'Implement the highest-priority recommendations from this analysis report.',
+			participant: CHAT_PARTICIPANT_ID,
+			command: 'implement',
+		}];
+	}
+
+	return [];
 }
 
 export function trimTurnsForResume(turns: SavedTurn[], maxTurns: number, maxContextChars: number): SavedTurn[] {
@@ -854,6 +1046,14 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 			);
 		}
 
+		if (request.command === 'implement') {
+			return runImplementRecommendationsFlow(
+				request.prompt,
+				chatContext.history,
+				createDefaultImplementRecommendationsFlowDeps(request, stream, token),
+			);
+		}
+
 		if (request.command === 'resume') {
 			if (!workspaceSessions.length) {
 				stream.markdown('No saved sessions found. Save a session before resuming.');
@@ -904,9 +1104,18 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 			return;
 		}
 
+		const analysisReportMeta = findLatestAnalysisReportMeta(chatContext.history);
+		if (analysisReportMeta) {
+			return runImplementRecommendationsFlow(
+				request.prompt,
+				chatContext.history,
+				createDefaultImplementRecommendationsFlowDeps(request, stream, token),
+			);
+		}
+
 		const resumedSessionMeta = findResumedSessionMeta(chatContext.history);
 		if (!resumedSessionMeta) {
-			stream.markdown('Use @session-control /resume <session name> first, then ask your follow-up.');
+			stream.markdown('Use @session-control /resume <session name> or @session-control /analyze first, then ask your follow-up.');
 			return;
 		}
 
@@ -940,6 +1149,9 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 			},
 		};
 	});
+	participant.followupProvider = {
+		provideFollowups: (result) => buildParticipantFollowups(result),
+	};
 
 	context.subscriptions.push(participant);
 }

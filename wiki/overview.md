@@ -25,7 +25,7 @@ Chat sessions with Copilot are ephemeral — they disappear when VS Code is clos
 1. **Persisting conversations** — Saving chat sessions as JSON files alongside the code they relate to.
 2. **Linking to git context** — Each saved session captures the branch, commit SHA, and dirty state, tying the conversation to a point in the codebase's history.
 3. **Enabling resumption** — A chat participant (`@session-control`) can reload a saved session and inject it as context into a new conversation, allowing the LLM to "remember" prior work.
-4. **Analyzing workflow patterns** — Saved sessions can be re-read by the chat participant to identify repeated tool misuse, inefficiencies, and coding-agent preload insights across repositories.
+4. **Analyzing workflow patterns** — Saved sessions can be re-read by the chat participant to identify repeated tool misuse, inefficiencies, and coding-agent preload insights across repositories, with persisted owner-workspace, repository, and source-session provenance for later follow-up.
 5. **Living in source control** — Sessions and analysis artifacts are stored as files in the repo (`.chat/`), meaning they can be reviewed in PRs, shared with teammates, and versioned alongside code.
 
 ## Two Subsystems
@@ -58,6 +58,7 @@ The plan is organized into ten incremental phases, each delivering a testable mi
 - **JSON as primary format** — Machine-parseable for resume; markdown summary embedded for human review.
 - **Minimum VS Code `^1.93.0`** — Chat participant API stabilized at this version.
 - **Manual save + optional auto-save** — Auto-save on chat response is opt-in; manual save is the primary workflow. The auto-save feature watches the Copilot storage directory for new turns and saves automatically with old-file cleanup.
+- **Analysis artifacts stay separate and auditable** — Markdown reports and fingerprint indexes live under `.chat/analysis/`, with repository-context and source-session provenance stored outside the saved chat JSON schema.
 - **Relies on internal Copilot storage format** — A version-detection layer handles format changes gracefully.
 - **Open source (MIT)** — Developed publicly on GitHub with contribution guidelines, issue templates, CI/CD pipelines, and automated publishing.
 

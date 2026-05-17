@@ -1,13 +1,16 @@
 import * as assert from 'node:assert';
 import * as vscode from 'vscode';
 import {
+	buildParticipantFollowups,
 	renderSessionListMarkdown,
 	resolveSummarizeNoteWithFallback,
 	runAnalyzeSessionsFlow,
+	runImplementRecommendationsFlow,
 	selectSessionForResume,
 	trimTurnsForResume,
 } from '../../src/chatParticipant';
 import {
+	buildImplementationPrompt,
 	createNeedsAnalysisSelection,
 	createPresetAnalysisSelection,
 	type AnalysisCandidateSession,
@@ -88,6 +91,8 @@ function createAnalyzeReportReference(): AnalysisReportReference {
 		reportPath: 'analysis/reports/report-1.md',
 		contributingWorkspaces: ['workspace'],
 		analyzedFingerprints: ['fingerprint-1'],
+		sessionCount: 1,
+		ownerWorkspaceName: 'workspace',
 	};
 }
 
@@ -118,6 +123,20 @@ function createAnalyzeFlowDeps(overrides: Partial<Parameters<typeof runAnalyzeSe
 		}),
 		recordAnalysis: async () => defaultIndex,
 		batchCharBudget: 1000,
+		...overrides,
+	};
+}
+
+function createImplementFlowDeps(overrides: Partial<Parameters<typeof runImplementRecommendationsFlow>[2]> = {}) {
+	return {
+		findAnalysisReportMeta: () => ({
+			analysisReportPath: 'analysis/reports/report-1.md',
+			analysisStorageDirectory: 'e:/workspace/.chat',
+		}),
+		readReport: async () => '# Chat Analysis Report\n\n## Findings\n\n- Tighten session flow',
+		buildPrompt: (reportMarkdown: string, userPrompt: string) => buildImplementationPrompt(reportMarkdown, userPrompt),
+		runModelPrompt: async () => 'Implementation guidance',
+		streamMarkdown: (_markdown: string) => undefined,
 		...overrides,
 	};
 }
@@ -350,5 +369,127 @@ suite('chatParticipant analyze flow', () => {
 		assert.equal(prompts[2]?.prompt.includes('summary:batch:fingerprint-b'), true);
 		assert.equal(messages.some((message) => message.includes('Analyzing 2 saved sessions across 2 batches')), true);
 		assert.equal(messages.some((message) => message.includes('_Synthesizing final report..._')), true);
+	});
+
+		test('writes analysis provenance metadata and streams implement guidance', async () => {
+			const messages: string[] = [];
+			let writeInput: {
+				ownerWorkspaceName?: string;
+				repositories?: Array<{ workspaceName: string; branch: string | null; commit: string | null; dirty: boolean | null; sessionCount: number }>;
+				sourceSessions?: Array<{ workspaceName: string; sessionId: string; title: string; savedAt: string; rootFileName: string; fingerprint: string; git: ChatSession['git'] }>;
+			} | undefined;
+			let recordedSessions: Array<{ rootFileName?: string; git?: ChatSession['git'] }> = [];
+
+			await runAnalyzeSessionsFlow(
+				'needs analysis',
+				[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+				[{ ...createMeta(), workspaceFolder: createWorkspaceFolder('workspace', 'e:/workspace', 0), storageDirectory: 'e:/workspace/.chat', displayTitle: '[workspace] Fix auth bug' }],
+				createAnalyzeFlowDeps({
+					createCandidates: async () => [createAnalysisCandidate({
+						rootFileName: 'fix-auth-bug.json',
+						fingerprint: 'fingerprint-auth',
+						session: createChatSession({
+							id: 'session-auth',
+							title: 'Fix auth bug',
+							git: { branch: 'main', commit: 'abcdef1234567890', dirty: false },
+						}),
+					})],
+					writeReport: async (_storageDirectory, input) => {
+						writeInput = input;
+						return {
+							report: createAnalyzeReportReference(),
+							reportFilePath: 'e:/workspace/.chat/analysis/reports/report-1.md',
+						};
+					},
+					recordAnalysis: async (_storageDirectory, _report, sessions) => {
+						recordedSessions = sessions;
+						return {
+							version: 1,
+							updatedAt: '2026-05-17T13:00:00.000Z',
+							reports: [createAnalyzeReportReference()],
+							analyzedSessions: [],
+						};
+					},
+					streamMarkdown: (markdown: string) => {
+						messages.push(markdown);
+					},
+				}),
+			);
+
+			assert.equal(writeInput?.ownerWorkspaceName, 'workspace');
+			assert.equal(writeInput?.repositories?.length, 1);
+			assert.equal(writeInput?.repositories?.[0]?.workspaceName, 'workspace');
+			assert.equal(writeInput?.repositories?.[0]?.branch, 'main');
+			assert.equal(writeInput?.repositories?.[0]?.sessionCount, 1);
+			assert.equal(writeInput?.sourceSessions?.length, 1);
+			assert.equal(writeInput?.sourceSessions?.[0]?.rootFileName, 'fix-auth-bug.json');
+			assert.equal(writeInput?.sourceSessions?.[0]?.sessionId, 'session-auth');
+			assert.equal(recordedSessions[0]?.rootFileName, 'fix-auth-bug.json');
+			assert.equal(recordedSessions[0]?.git?.branch, 'main');
+			assert.equal(messages.some((message) => message.includes('@session-control /implement')), true);
+		});
+});
+
+suite('chatParticipant implementation followups', () => {
+	test('suggests an implementation followup after an analysis result', () => {
+		const followups = buildParticipantFollowups({
+			metadata: {
+				resultType: 'analysis-report',
+				analysisReportPath: 'analysis/reports/report-1.md',
+				analysisStorageDirectory: 'e:/workspace/.chat',
+			},
+		} as vscode.ChatResult);
+
+		assert.equal(followups.length, 1);
+		assert.equal(followups[0]?.label, 'Implement Recommendations');
+		assert.equal(followups[0]?.command, 'implement');
+	});
+
+	test('does not suggest implementation followups for unrelated results', () => {
+		const followups = buildParticipantFollowups({ metadata: { resultType: 'analysis-implementation' } } as vscode.ChatResult);
+		assert.equal(followups.length, 0);
+	});
+
+	test('shows guidance when implementing without a prior analysis result', async () => {
+		const messages: string[] = [];
+		const result = await runImplementRecommendationsFlow(
+			'Implement the recommendations.',
+			[],
+			createImplementFlowDeps({
+				findAnalysisReportMeta: () => null,
+				streamMarkdown: (markdown: string) => {
+					messages.push(markdown);
+				},
+			}),
+		);
+
+		assert.equal(result, undefined);
+		assert.deepEqual(messages, ['Use @session-control /analyze first, then ask me to implement the recommendations.']);
+	});
+
+	test('loads the saved analysis report and returns implementation metadata', async () => {
+		const prompts: Array<{ prompt: string; streamOutput: boolean }> = [];
+		const messages: string[] = [];
+		const result = await runImplementRecommendationsFlow(
+			'Implement the highest-priority recommendation.',
+			[],
+			createImplementFlowDeps({
+				runModelPrompt: async (prompt: string, streamOutput: boolean) => {
+					prompts.push({ prompt, streamOutput });
+					return 'Implementation guidance';
+				},
+				streamMarkdown: (markdown: string) => {
+					messages.push(markdown);
+				},
+			}),
+		);
+
+		assert.equal(prompts.length, 1);
+		assert.equal(prompts[0]?.streamOutput, true);
+		assert.equal(prompts[0]?.prompt.includes('# Chat Analysis Report'), true);
+		assert.equal(prompts[0]?.prompt.includes('User request: Implement the highest-priority recommendation.'), true);
+		assert.equal(messages[0]?.includes('Using analysis report **analysis/reports/report-1.md** as implementation context.'), true);
+		assert.equal(result?.metadata.resultType, 'analysis-implementation');
+		assert.equal(result?.metadata.analysisReportPath, 'analysis/reports/report-1.md');
 	});
 });

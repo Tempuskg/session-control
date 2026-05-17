@@ -75,3 +75,11 @@ Pages touched: save-system.md, log.md
 ## [2026-05-17] update | Saved Chat Analysis Feature
 Implemented the first version of saved-chat analysis via `@session-control /analyze`. The chat participant can now resolve a timeframe or "Needs Analysis" scope, reassemble split session files, batch large transcript sets into multiple model requests, synthesize a final markdown report, and persist that report under `.chat/analysis/reports/`. Added a fingerprint-based analysis index at `.chat/analysis/index.json` so unchanged chats can be skipped on future analysis runs. Added new source files `src/analysisStore.ts` and `src/sessionAnalysis.ts`, plus unit coverage for prompt selection, filtering, batching, and analysis-store persistence.
 Pages touched: chat-participant.md, file-manifest.md, overview.md, index.md, log.md
+
+## [2026-05-17] update | Analysis Implementation Followup
+Extended the saved-chat analysis flow so it now suggests an **Implement Recommendations** follow-up after `@session-control /analyze`. Added `/implement` to the participant command set, report-loading support in `analysisStore.ts`, and implementation-context prompt building in `sessionAnalysis.ts`. The participant can now reuse the latest saved analysis report in the same chat thread for implementation-oriented follow-ups.
+Pages touched: chat-participant.md, file-manifest.md, log.md
+
+## [2026-05-17] update | Analysis Provenance Metadata
+Expanded saved analysis artifacts so reports now retain owner-workspace, repository-context, and source-session provenance, and analysis index entries retain root-file and git metadata for audited sessions. The analyze flow now also prints the equivalent `@session-control /implement` next step in the chat response so the handoff remains visible even without using the follow-up button.
+Pages touched: README.md, CHANGELOG.md, chat-participant.md, overview.md, file-manifest.md, log.md

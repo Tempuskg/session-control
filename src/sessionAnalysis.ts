@@ -261,3 +261,22 @@ export function buildAnalysisSynthesisPrompt(selection: AnalysisSelection, batch
 		batchSummaries.map((summary, index) => `## Batch ${index + 1}\n\n${summary}`).join('\n\n'),
 	].join('\n');
 }
+
+export function buildImplementationPrompt(reportMarkdown: string, userPrompt: string): string {
+	const normalizedPrompt = userPrompt.trim().length > 0
+		? userPrompt.trim()
+		: 'Implement the highest-priority recommendations from this analysis in the current repository.';
+
+	return [
+		'The user previously ran an analysis over saved chat sessions and now wants help implementing the recommendations.',
+		'Use the analysis report below as the source of truth. Turn the recommendations into concrete implementation guidance for the current repository.',
+		'When the report includes multiple recommendations, prioritize the highest-impact changes that are feasible in the current repository.',
+		'If the request is broad, start with the first actionable implementation slice and explain why.',
+		'',
+		'Analysis report:',
+		'',
+		reportMarkdown.trim(),
+		'',
+		`User request: ${normalizedPrompt}`,
+	].join('\n');
+}

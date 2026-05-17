@@ -1,5 +1,14 @@
 {
   "version": 1,
   "groups": [],
-  "commands": []
+  "commands": [
+    {
+      "id": "fc8bbb98-31ff-4799-8417-a7e0e042586c",
+      "label": "Create vsix",
+      "command": "npx @vscode/vsce package",
+      "group": null,
+      "sortOrder": 0,
+      "terminalMode": "dedicated"
+    }
+  ]
 }

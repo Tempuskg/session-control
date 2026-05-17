@@ -73,6 +73,10 @@ You can either choose a timeframe interactively or use a quick alias such as `24
 
 The participant reviews saved sessions from the configured storage folder, streams a report back into chat, and writes a markdown report under `.chat/analysis/reports/`. It also keeps an analysis index in `.chat/analysis/index.json` so the **Needs Analysis** mode only selects chats that have not been analyzed yet or whose content has changed since the last analysis.
 
+Saved analysis reports now include the owner workspace, repository-context summaries, and the source session files that contributed to the report so later synthesis and implementation follow-ups have clearer provenance.
+
+After the report is generated, Session Control suggests an **Implement Recommendations** follow-up in chat and also prints the equivalent `@session-control /implement` next step in the response. Clicking the follow-up sends `@session-control /implement` with the latest saved analysis report as context so you can continue from analysis into implementation guidance in the same thread.
+
 ### View a saved session in the web viewer
 
 You can open the HTML session viewer in two ways:

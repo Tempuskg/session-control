@@ -4,9 +4,12 @@ import * as path from 'node:path';
 import {
 	AnalysisIndex,
 	AnalysisIndexEntry,
+	AnalysisReportRepositorySummary,
 	AnalysisReportReference,
+	AnalysisReportSourceSession,
 	AnalysisSelection,
 	ChatSession,
+	GitContext,
 	isAnalysisIndex,
 } from './types';
 
@@ -29,6 +32,9 @@ export interface AnalysisWriteReportInput {
 	analyzedFingerprints: string[];
 	content: string;
 	createdAt?: string;
+	ownerWorkspaceName?: string;
+	repositories?: AnalysisReportRepositorySummary[];
+	sourceSessions?: AnalysisReportSourceSession[];
 }
 
 export interface AnalysisRecordInput {
@@ -36,6 +42,8 @@ export interface AnalysisRecordInput {
 	sessionId: string;
 	title: string;
 	savedAt: string;
+	rootFileName?: string;
+	git?: GitContext | null;
 }
 
 export interface PersistedAnalysisReport {
@@ -128,6 +136,7 @@ function createReportFileName(createdAt: string, selection: AnalysisSelection, r
 }
 
 function renderReportMarkdown(report: AnalysisReportReference, content: string): string {
+	const sessionCount = report.sessionCount ?? report.analyzedFingerprints.length;
 	const lines = [
 		'# Chat Analysis Report',
 		'',
@@ -143,8 +152,37 @@ function renderReportMarkdown(report: AnalysisReportReference, content: string):
 	}
 
 	lines.push(`- Prompt Version: ${report.promptVersion}`);
+	lines.push(`- Owner Workspace: ${report.ownerWorkspaceName ?? 'n/a'}`);
 	lines.push(`- Workspaces: ${report.contributingWorkspaces.join(', ') || 'n/a'}`);
-	lines.push(`- Sessions Analyzed: ${report.analyzedFingerprints.length}`);
+	lines.push(`- Sessions Analyzed: ${sessionCount}`);
+
+	if (report.repositories?.length) {
+		lines.push('');
+		lines.push('## Repository Context');
+		lines.push('');
+		for (const repository of report.repositories) {
+			const gitSummary = repository.branch && repository.commit
+				? `${repository.branch}@${repository.commit.slice(0, 12)} (${repository.dirty === true ? 'dirty' : repository.dirty === false ? 'clean' : 'unknown'})`
+				: 'n/a';
+			const suffix = repository.sessionCount === 1 ? 'session' : 'sessions';
+			lines.push(`- [${repository.workspaceName}] ${gitSummary} | ${repository.sessionCount} ${suffix}`);
+		}
+	}
+
+	if (report.sourceSessions?.length) {
+		lines.push('');
+		lines.push('## Source Sessions');
+		lines.push('');
+		for (const session of report.sourceSessions) {
+			const gitSummary = session.git
+				? `${session.git.branch}@${session.git.commit.slice(0, 12)}${session.git.dirty ? ' dirty' : ' clean'}`
+				: 'n/a';
+			lines.push(
+				`- [${session.workspaceName}] ${session.title} | ${session.savedAt} | ${session.rootFileName} | ${gitSummary} | ${session.fingerprint.slice(0, 12)}`,
+			);
+		}
+	}
+
 	lines.push('');
 	lines.push('## Findings');
 	lines.push('');
@@ -262,6 +300,10 @@ export function createAnalysisStore(overrides: Partial<AnalysisStoreDeps> = {}) 
 			reportPath,
 			contributingWorkspaces: [...input.contributingWorkspaces],
 			analyzedFingerprints: [...input.analyzedFingerprints],
+			sessionCount: input.sourceSessions?.length ?? input.analyzedFingerprints.length,
+			...(input.ownerWorkspaceName ? { ownerWorkspaceName: input.ownerWorkspaceName } : {}),
+			...(input.repositories?.length ? { repositories: [...input.repositories] } : {}),
+			...(input.sourceSessions?.length ? { sourceSessions: [...input.sourceSessions] } : {}),
 		};
 
 		await writeAtomic(deps, reportFilePath, renderReportMarkdown(report, input.content));
@@ -270,6 +312,11 @@ export function createAnalysisStore(overrides: Partial<AnalysisStoreDeps> = {}) 
 			report,
 			reportFilePath,
 		};
+	}
+
+	async function readReport(storageDirectory: string, reportPath: string): Promise<string> {
+		const reportFilePath = path.join(storageDirectory, reportPath);
+		return deps.readFile(reportFilePath);
 	}
 
 	async function recordAnalysis(
@@ -292,6 +339,9 @@ export function createAnalysisStore(overrides: Partial<AnalysisStoreDeps> = {}) 
 				savedAt: session.savedAt,
 				analyzedAt: report.createdAt,
 				reportPath: report.reportPath,
+				reportId: report.id,
+				...(session.rootFileName ? { rootFileName: session.rootFileName } : {}),
+				...(session.git !== undefined ? { git: session.git } : {}),
 			});
 		}
 
@@ -320,6 +370,7 @@ export function createAnalysisStore(overrides: Partial<AnalysisStoreDeps> = {}) 
 	return {
 		ensureAnalysisDirectories,
 		readIndex,
+		readReport,
 		writeReport,
 		recordAnalysis,
 		hasAnalyzedFingerprint,
