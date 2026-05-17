@@ -15,7 +15,7 @@ import {
 	splitCandidatesIntoAnalysisBatches,
 	type AnalysisCandidateSession,
 } from './sessionAnalysis';
-import { ChatSession, SavedTurn, SessionMeta } from './types';
+import { AnalysisReportReference, AnalysisSelection, ChatSession, SavedTurn, SessionMeta } from './types';
 import { fuzzyMatchSessions } from './utils';
 
 const chatSessionStore = createSessionStore();
@@ -46,6 +46,29 @@ interface WorkspaceSessionMeta extends SessionMeta {
 	workspaceFolder: vscode.WorkspaceFolder;
 	storageDirectory: string;
 	displayTitle: string;
+}
+
+export interface AnalyzeSessionsFlowResult {
+	metadata: {
+		analysisReportPath: string;
+		analysisStorageDirectory: string;
+	};
+}
+
+export interface AnalyzeSessionsFlowDeps {
+	resolveSelection: (prompt: string) => Promise<AnalysisSelection | undefined>;
+	createCandidates: (workspaceSessions: WorkspaceSessionMeta[]) => Promise<AnalysisCandidateSession[]>;
+	loadAnalyzedFingerprints: (candidates: AnalysisCandidateSession[]) => Promise<Set<string>>;
+	splitIntoBatches: (candidates: AnalysisCandidateSession[], maxChars?: number) => AnalysisCandidateSession[][];
+	buildPrompt: (selection: AnalysisSelection, candidates: AnalysisCandidateSession[]) => string;
+	buildSynthesisPrompt: (selection: AnalysisSelection, batchSummaries: string[]) => string;
+	runModelPrompt: (prompt: string, streamOutput: boolean) => Promise<string>;
+	streamMarkdown: (markdown: string) => void;
+	pickOwnerWorkspace: (workspaceFolders: readonly vscode.WorkspaceFolder[]) => vscode.WorkspaceFolder | undefined;
+	getStoragePath: (workspaceFolder: vscode.WorkspaceFolder) => string;
+	writeReport: (storageDirectory: string, input: Parameters<typeof analysisStore.writeReport>[1]) => ReturnType<typeof analysisStore.writeReport>;
+	recordAnalysis: (storageDirectory: string, report: AnalysisReportReference, sessions: Parameters<typeof analysisStore.recordAnalysis>[2]) => ReturnType<typeof analysisStore.recordAnalysis>;
+	batchCharBudget: number;
 }
 
 function getStoragePath(workspaceFolder: vscode.WorkspaceFolder): string {
@@ -288,76 +311,97 @@ function createStorageSpecificReportReference(
 	};
 }
 
-async function runAnalyzeSessionsCommand(
+function createDefaultAnalyzeSessionsFlowDeps(
 	request: vscode.ChatRequest,
 	stream: vscode.ChatResponseStream,
 	token: vscode.CancellationToken,
+): AnalyzeSessionsFlowDeps {
+	return {
+		resolveSelection: async (prompt: string) => resolveAnalysisSelection(prompt),
+		createCandidates: async (workspaceSessions: WorkspaceSessionMeta[]) => createAnalysisCandidates(workspaceSessions),
+		loadAnalyzedFingerprints: async (candidates: AnalysisCandidateSession[]) => loadAnalyzedFingerprintSet(candidates),
+		splitIntoBatches: (candidates, maxChars) => splitCandidatesIntoAnalysisBatches(candidates, maxChars),
+		buildPrompt: (selection, candidates) => buildAnalysisPrompt(selection, candidates),
+		buildSynthesisPrompt: (selection, batchSummaries) => buildAnalysisSynthesisPrompt(selection, batchSummaries),
+		runModelPrompt: async (prompt: string, streamOutput: boolean) => collectModelText(request, streamOutput ? stream : undefined, token, prompt),
+		streamMarkdown: (markdown: string) => stream.markdown(markdown),
+		pickOwnerWorkspace: (workspaceFolders: readonly vscode.WorkspaceFolder[]) => pickWorkspaceFolder() ?? workspaceFolders[0],
+		getStoragePath: (workspaceFolder: vscode.WorkspaceFolder) => getStoragePath(workspaceFolder),
+		writeReport: async (storageDirectory, input) => analysisStore.writeReport(storageDirectory, input),
+		recordAnalysis: async (storageDirectory, report, sessions) => analysisStore.recordAnalysis(storageDirectory, report, sessions),
+		batchCharBudget: DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET,
+	};
+}
+
+export async function runAnalyzeSessionsFlow(
+	requestPrompt: string,
 	workspaceFolders: readonly vscode.WorkspaceFolder[],
 	workspaceSessions: WorkspaceSessionMeta[],
-): Promise<{ metadata: { analysisReportPath: string; analysisStorageDirectory: string } } | undefined> {
+	depsOverrides: Partial<AnalyzeSessionsFlowDeps> = {},
+): Promise<AnalyzeSessionsFlowResult | undefined> {
+	const deps = {
+		...depsOverrides,
+	} as AnalyzeSessionsFlowDeps;
+
 	if (!workspaceSessions.length) {
-		stream.markdown('No saved sessions found. Save chat sessions before running analysis.');
+		deps.streamMarkdown('No saved sessions found. Save chat sessions before running analysis.');
 		return;
 	}
 
-	const selection = await resolveAnalysisSelection(request.prompt);
+	const selection = await deps.resolveSelection(requestPrompt);
 	if (!selection) {
 		return;
 	}
 
-	const candidates = await createAnalysisCandidates(workspaceSessions);
-	const analyzedFingerprints = await loadAnalyzedFingerprintSet(candidates);
+	const candidates = await deps.createCandidates(workspaceSessions);
+	const analyzedFingerprints = await deps.loadAnalyzedFingerprints(candidates);
 	const filtered = filterCandidatesForAnalysis(candidates, selection, analyzedFingerprints);
 	if (!filtered.length) {
-		stream.markdown(selection.mode === 'needsAnalysis'
+		deps.streamMarkdown(selection.mode === 'needsAnalysis'
 			? 'No saved sessions currently need analysis.'
 			: `No saved sessions matched ${selection.label.toLowerCase()}.`);
 		return;
 	}
 
-	const batches = splitCandidatesIntoAnalysisBatches(filtered, DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET);
+	const batches = deps.splitIntoBatches(filtered, deps.batchCharBudget);
 	let finalMarkdown = '';
 	if (batches.length === 1) {
-		finalMarkdown = await collectModelText(request, stream, token, buildAnalysisPrompt(selection, filtered));
+		finalMarkdown = await deps.runModelPrompt(deps.buildPrompt(selection, filtered), true);
 	} else {
-		stream.markdown(`Analyzing ${filtered.length} saved sessions across ${batches.length} batches. Final synthesis will follow.\n\n`);
+		deps.streamMarkdown(`Analyzing ${filtered.length} saved sessions across ${batches.length} batches. Final synthesis will follow.\n\n`);
 		const batchSummaries: string[] = [];
 		for (let index = 0; index < batches.length; index += 1) {
-			if (token.isCancellationRequested) {
-				return;
-			}
-
 			const batch = batches[index];
 			if (!batch) {
 				continue;
 			}
 
-			stream.markdown(`_Analyzing batch ${index + 1} of ${batches.length}..._\n\n`);
+			deps.streamMarkdown(`_Analyzing batch ${index + 1} of ${batches.length}..._\n\n`);
 			const batchPrompt = [
-				buildAnalysisPrompt(selection, batch),
+				deps.buildPrompt(selection, batch),
 				'',
 				`This is batch ${index + 1} of ${batches.length}. Produce a concise findings summary that will be synthesized with the other batches into one final report.`,
 			].join('\n');
-			batchSummaries.push(await collectModelText(request, undefined, token, batchPrompt));
+			batchSummaries.push(await deps.runModelPrompt(batchPrompt, false));
 		}
 
-		stream.markdown('_Synthesizing final report..._\n\n');
-		finalMarkdown = await collectModelText(request, stream, token, buildAnalysisSynthesisPrompt(selection, batchSummaries));
+		deps.streamMarkdown('_Synthesizing final report..._\n\n');
+		finalMarkdown = await deps.runModelPrompt(deps.buildSynthesisPrompt(selection, batchSummaries), true);
 	}
 
 	if (!finalMarkdown.trim().length) {
-		stream.markdown('Analysis completed, but the model returned no report text.');
+		deps.streamMarkdown('Analysis completed, but the model returned no report text.');
 		return;
 	}
 
-	const ownerWorkspace = pickWorkspaceFolder() ?? workspaceFolders[0];
+	const ownerWorkspace = deps.pickOwnerWorkspace(workspaceFolders);
 	if (!ownerWorkspace) {
-		stream.markdown('Open a workspace folder before saving analysis reports.');
+		deps.streamMarkdown('Open a workspace folder before saving analysis reports.');
 		return;
 	}
 
-	const ownerStorageDirectory = getStoragePath(ownerWorkspace);
-	const persisted = await analysisStore.writeReport(ownerStorageDirectory, {
+	const ownerStorageDirectory = deps.getStoragePath(ownerWorkspace);
+	const persisted = await deps.writeReport(ownerStorageDirectory, {
 		selection,
 		promptVersion: ANALYSIS_PROMPT_VERSION,
 		contributingWorkspaces: [...new Set(filtered.map((candidate) => candidate.workspaceName))],
@@ -382,7 +426,7 @@ async function runAnalyzeSessionsCommand(
 			persisted.reportFilePath,
 			storageDirectory,
 		);
-		await analysisStore.recordAnalysis(
+		await deps.recordAnalysis(
 			storageDirectory,
 			reportReference,
 			sessions.map((candidate) => ({
@@ -394,7 +438,7 @@ async function runAnalyzeSessionsCommand(
 		);
 	}
 
-	stream.markdown(`\n\nSaved analysis report to **${persisted.report.reportPath}** in workspace **${ownerWorkspace.name}**.`);
+	deps.streamMarkdown(`\n\nSaved analysis report to **${persisted.report.reportPath}** in workspace **${ownerWorkspace.name}**.`);
 	return {
 		metadata: {
 			analysisReportPath: persisted.report.reportPath,
@@ -802,7 +846,12 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 		}
 
 		if (request.command === 'analyze') {
-			return runAnalyzeSessionsCommand(request, stream, token, workspaceFolders, workspaceSessions);
+			return runAnalyzeSessionsFlow(
+				request.prompt,
+				workspaceFolders,
+				workspaceSessions,
+				createDefaultAnalyzeSessionsFlowDeps(request, stream, token),
+			);
 		}
 
 		if (request.command === 'resume') {

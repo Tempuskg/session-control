@@ -1,11 +1,18 @@
 import * as assert from 'node:assert';
+import * as vscode from 'vscode';
 import {
 	renderSessionListMarkdown,
 	resolveSummarizeNoteWithFallback,
+	runAnalyzeSessionsFlow,
 	selectSessionForResume,
 	trimTurnsForResume,
 } from '../../src/chatParticipant';
-import { SavedTurn, SessionMeta } from '../../src/types';
+import {
+	createNeedsAnalysisSelection,
+	createPresetAnalysisSelection,
+	type AnalysisCandidateSession,
+} from '../../src/sessionAnalysis';
+import { AnalysisIndex, AnalysisReportReference, ChatSession, SavedTurn, SessionMeta } from '../../src/types';
 
 function createMeta(overrides: Partial<SessionMeta> = {}): SessionMeta {
 	return {
@@ -15,6 +22,103 @@ function createMeta(overrides: Partial<SessionMeta> = {}): SessionMeta {
 		fileName: overrides.fileName ?? '2026-04-12T12-00-fix-auth-bug.json',
 		turnCount: overrides.turnCount ?? 10,
 		git: overrides.git ?? null,
+	};
+}
+
+function createWorkspaceFolder(name: string, folderPath: string, index: number): vscode.WorkspaceFolder {
+	return {
+		uri: vscode.Uri.file(folderPath),
+		name,
+		index,
+	} as vscode.WorkspaceFolder;
+}
+
+function createChatSession(overrides: Partial<ChatSession> = {}): ChatSession {
+	const savedAt = overrides.savedAt ?? '2026-05-17T12:00:00.000Z';
+	return {
+		version: 1,
+		id: overrides.id ?? 'session-1',
+		title: overrides.title ?? 'Fix auth bug',
+		savedAt,
+		git: overrides.git ?? { branch: 'main', commit: 'abcdef123456', dirty: false },
+		vscodeVersion: overrides.vscodeVersion ?? '1.115.0',
+		totalTurns: overrides.totalTurns ?? 2,
+		part: overrides.part ?? null,
+		totalParts: overrides.totalParts ?? null,
+		previousPartFile: overrides.previousPartFile ?? null,
+		nextPartFile: overrides.nextPartFile ?? null,
+		turns: overrides.turns ?? [
+			{
+				type: 'request',
+				participant: 'copilot',
+				prompt: 'Investigate the issue',
+				references: [],
+				timestamp: savedAt,
+			},
+			{
+				type: 'response',
+				participant: 'copilot',
+				content: 'I found a likely root cause.',
+				toolCalls: [],
+				timestamp: savedAt,
+			},
+		],
+		markdownSummary: overrides.markdownSummary ?? '# Chat: Summary',
+	};
+}
+
+function createAnalysisCandidate(overrides: Partial<AnalysisCandidateSession> = {}): AnalysisCandidateSession {
+	const session = overrides.session ?? createChatSession();
+	return {
+		workspaceName: overrides.workspaceName ?? 'workspace',
+		storageDirectory: overrides.storageDirectory ?? 'storage',
+		fileName: overrides.fileName ?? 'session.json',
+		rootFileName: overrides.rootFileName ?? 'session.json',
+		fingerprint: overrides.fingerprint ?? 'fingerprint-1',
+		session,
+	};
+}
+
+function createAnalyzeReportReference(): AnalysisReportReference {
+	return {
+		id: 'report-1',
+		createdAt: '2026-05-17T13:00:00.000Z',
+		selection: createNeedsAnalysisSelection(),
+		promptVersion: '1',
+		reportPath: 'analysis/reports/report-1.md',
+		contributingWorkspaces: ['workspace'],
+		analyzedFingerprints: ['fingerprint-1'],
+	};
+}
+
+function createAnalyzeFlowDeps(overrides: Partial<Parameters<typeof runAnalyzeSessionsFlow>[3]> = {}) {
+	const workspace = createWorkspaceFolder('workspace', 'e:/workspace', 0);
+	const report = createAnalyzeReportReference();
+	const defaultIndex: AnalysisIndex = {
+		version: 1,
+		updatedAt: '2026-05-17T13:00:00.000Z',
+		reports: [report],
+		analyzedSessions: [],
+	};
+
+	return {
+		resolveSelection: async () => createNeedsAnalysisSelection(),
+		createCandidates: async () => [createAnalysisCandidate()],
+		loadAnalyzedFingerprints: async () => new Set<string>(),
+		splitIntoBatches: (candidates: AnalysisCandidateSession[]) => [candidates],
+		buildPrompt: () => 'analysis prompt',
+		buildSynthesisPrompt: () => 'synthesis prompt',
+		runModelPrompt: async () => '## Findings\n\nReport content',
+		streamMarkdown: (_markdown: string) => undefined,
+		pickOwnerWorkspace: () => workspace,
+		getStoragePath: () => 'e:/workspace/.chat',
+		writeReport: async () => ({
+			report,
+			reportFilePath: 'e:/workspace/.chat/analysis/reports/report-1.md',
+		}),
+		recordAnalysis: async () => defaultIndex,
+		batchCharBudget: 1000,
+		...overrides,
 	};
 }
 
@@ -134,5 +238,117 @@ suite('chatParticipant selection', () => {
 		);
 
 		assert.equal(note, 'Summary generation failed - showing most recent turns only.');
+	});
+});
+
+suite('chatParticipant analyze flow', () => {
+	test('shows guidance when no saved sessions exist', async () => {
+		const messages: string[] = [];
+		const result = await runAnalyzeSessionsFlow(
+			'needs analysis',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			[],
+			createAnalyzeFlowDeps({
+				streamMarkdown: (markdown: string) => {
+					messages.push(markdown);
+				},
+			}),
+		);
+
+		assert.equal(result, undefined);
+		assert.deepEqual(messages, ['No saved sessions found. Save chat sessions before running analysis.']);
+	});
+
+	test('filters analyzed sessions in needs-analysis mode and persists only remaining sessions', async () => {
+		const recorded: Array<{ storageDirectory: string; fingerprints: string[] }> = [];
+		const reportWrites: string[][] = [];
+		const result = await runAnalyzeSessionsFlow(
+			'needs analysis',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			[{ ...createMeta(), workspaceFolder: createWorkspaceFolder('workspace', 'e:/workspace', 0), storageDirectory: 'e:/workspace/.chat', displayTitle: '[workspace] Fix auth bug' }],
+			createAnalyzeFlowDeps({
+				createCandidates: async () => [
+					createAnalysisCandidate({
+						fingerprint: 'already-analyzed',
+						storageDirectory: 'e:/workspace/.chat',
+						session: createChatSession({ id: 'a', title: 'Already analyzed' }),
+					}),
+					createAnalysisCandidate({
+						fingerprint: 'needs-analysis',
+						storageDirectory: 'e:/workspace/.chat',
+						rootFileName: 'needs-analysis.json',
+						session: createChatSession({ id: 'b', title: 'Needs analysis' }),
+					}),
+				],
+				loadAnalyzedFingerprints: async () => new Set<string>(['already-analyzed']),
+				resolveSelection: async () => createNeedsAnalysisSelection(),
+				writeReport: async (_storageDirectory, input) => {
+					reportWrites.push(input.analyzedFingerprints);
+					return {
+						report: createAnalyzeReportReference(),
+						reportFilePath: 'e:/workspace/.chat/analysis/reports/report-1.md',
+					};
+				},
+				recordAnalysis: async (storageDirectory, _report, sessions) => {
+					recorded.push({
+						storageDirectory,
+						fingerprints: sessions.map((session) => session.fingerprint),
+					});
+					return {
+						version: 1,
+						updatedAt: '2026-05-17T13:00:00.000Z',
+						reports: [createAnalyzeReportReference()],
+						analyzedSessions: [],
+					};
+				},
+			}),
+		);
+
+		assert.equal(reportWrites.length, 1);
+		assert.deepEqual(reportWrites[0], ['needs-analysis']);
+		assert.deepEqual(recorded, [{ storageDirectory: 'e:/workspace/.chat', fingerprints: ['needs-analysis'] }]);
+		assert.equal(result?.metadata.analysisReportPath, 'analysis/reports/report-1.md');
+	});
+
+	test('uses batch summaries then a synthesis pass when analysis input is split', async () => {
+		const prompts: Array<{ prompt: string; streamOutput: boolean }> = [];
+		const messages: string[] = [];
+		await runAnalyzeSessionsFlow(
+			'7d',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			[{ ...createMeta(), workspaceFolder: createWorkspaceFolder('workspace', 'e:/workspace', 0), storageDirectory: 'e:/workspace/.chat', displayTitle: '[workspace] Fix auth bug' }],
+			createAnalyzeFlowDeps({
+				resolveSelection: async () => createPresetAnalysisSelection('last7Days', new Date('2026-05-17T12:00:00.000Z')),
+				createCandidates: async () => [
+					createAnalysisCandidate({ fingerprint: 'fingerprint-a', session: createChatSession({ id: 'a', title: 'Session A' }) }),
+					createAnalysisCandidate({ fingerprint: 'fingerprint-b', session: createChatSession({ id: 'b', title: 'Session B' }) }),
+				],
+				splitIntoBatches: (candidates: AnalysisCandidateSession[]) => candidates.map((candidate) => [candidate]),
+				buildPrompt: (_selection, candidates) => `batch:${candidates[0]?.fingerprint}`,
+				buildSynthesisPrompt: (_selection, batchSummaries) => `synthesis:${batchSummaries.join('|')}`,
+				runModelPrompt: async (prompt: string, streamOutput: boolean) => {
+					prompts.push({ prompt, streamOutput });
+					if (prompt.startsWith('batch:')) {
+						return `summary:${prompt}`;
+					}
+
+					return '## Findings\n\nSynthesized report';
+				},
+				streamMarkdown: (markdown: string) => {
+					messages.push(markdown);
+				},
+			}),
+		);
+
+		assert.equal(prompts.length, 3);
+		assert.equal(prompts[0]?.streamOutput, false);
+		assert.equal(prompts[0]?.prompt.startsWith('batch:fingerprint-a'), true);
+		assert.equal(prompts[1]?.streamOutput, false);
+		assert.equal(prompts[1]?.prompt.startsWith('batch:fingerprint-b'), true);
+		assert.equal(prompts[2]?.streamOutput, true);
+		assert.equal(prompts[2]?.prompt.includes('synthesis:summary:batch:fingerprint-a'), true);
+		assert.equal(prompts[2]?.prompt.includes('summary:batch:fingerprint-b'), true);
+		assert.equal(messages.some((message) => message.includes('Analyzing 2 saved sessions across 2 batches')), true);
+		assert.equal(messages.some((message) => message.includes('_Synthesizing final report..._')), true);
 	});
 });
