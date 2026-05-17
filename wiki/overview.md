@@ -25,7 +25,7 @@ Chat sessions with Copilot are ephemeral — they disappear when VS Code is clos
 1. **Persisting conversations** — Saving chat sessions as JSON files alongside the code they relate to.
 2. **Linking to git context** — Each saved session captures the branch, commit SHA, and dirty state, tying the conversation to a point in the codebase's history.
 3. **Enabling resumption** — A chat participant (`@session-control`) can reload a saved session and inject it as context into a new conversation, allowing the LLM to "remember" prior work.
-4. **Analyzing workflow patterns** — Saved sessions can be re-read by the chat participant to identify repeated tool misuse, inefficiencies, and coding-agent preload insights across repositories, with persisted owner-workspace, repository, and source-session provenance for later follow-up.
+4. **Analyzing workflow patterns** — Saved sessions can be re-read by the chat participant to identify repeated tool misuse, inefficiencies, and coding-agent preload insights across repositories, with persisted owner-workspace, repository, and source-session provenance for later follow-up or coding-agent handoff.
 5. **Living in source control** — Sessions and analysis artifacts are stored as files in the repo (`.chat/`), meaning they can be reviewed in PRs, shared with teammates, and versioned alongside code.
 
 ## Two Subsystems

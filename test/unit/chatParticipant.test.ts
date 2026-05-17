@@ -1,16 +1,17 @@
 import * as assert from 'node:assert';
+import * as path from 'node:path';
 import * as vscode from 'vscode';
 import {
 	buildParticipantFollowups,
 	renderSessionListMarkdown,
 	resolveSummarizeNoteWithFallback,
 	runAnalyzeSessionsFlow,
-	runImplementRecommendationsFlow,
+	runImplementationHandoffFlow,
 	selectSessionForResume,
 	trimTurnsForResume,
 } from '../../src/chatParticipant';
 import {
-	buildImplementationPrompt,
+	buildImplementationHandoffPrompt,
 	createNeedsAnalysisSelection,
 	createPresetAnalysisSelection,
 	type AnalysisCandidateSession,
@@ -131,15 +132,18 @@ function createAnalyzeFlowDeps(overrides: Partial<Parameters<typeof runAnalyzeSe
 	};
 }
 
-function createImplementFlowDeps(overrides: Partial<Parameters<typeof runImplementRecommendationsFlow>[2]> = {}) {
+function createHandoffFlowDeps(overrides: Partial<Parameters<typeof runImplementationHandoffFlow>[2]> = {}) {
 	return {
 		findAnalysisReportMeta: () => ({
 			analysisReportPath: 'analysis/reports/report-1.md',
 			analysisStorageDirectory: 'e:/workspace/.chat',
 		}),
-		readReport: async () => '# Chat Analysis Report\n\n## Findings\n\n- Tighten session flow',
-		buildPrompt: (reportMarkdown: string, userPrompt: string) => buildImplementationPrompt(reportMarkdown, userPrompt),
-		runModelPrompt: async () => 'Implementation guidance',
+		buildPrompt: (reportFilePath: string, userPrompt: string) => buildImplementationHandoffPrompt(reportFilePath, userPrompt),
+		getCommands: async () => [],
+		pickTarget: async (_agentSessionAvailable: boolean): Promise<'chat'> => 'chat',
+		openChat: async (_prompt: string) => undefined,
+		openAgentSession: async (_commandId: string) => undefined,
+		writeClipboard: async (_text: string) => undefined,
 		streamMarkdown: (_markdown: string) => undefined,
 		...overrides,
 	};
@@ -470,7 +474,7 @@ suite('chatParticipant analyze flow', () => {
 });
 
 suite('chatParticipant implementation followups', () => {
-	test('suggests an implementation followup after an analysis result', () => {
+	test('suggests a handoff followup after an analysis result', () => {
 		const followups = buildParticipantFollowups({
 			metadata: {
 				resultType: 'analysis-report',
@@ -480,43 +484,22 @@ suite('chatParticipant implementation followups', () => {
 		} as vscode.ChatResult);
 
 		assert.equal(followups.length, 1);
-		assert.equal(followups[0]?.label, 'Implement Recommendations');
-		assert.equal(followups[0]?.command, 'implement');
+		assert.equal(followups[0]?.label, 'Handoff to Agent');
+		assert.equal(followups[0]?.command, 'handoff');
 	});
 
 	test('does not suggest implementation followups for unrelated results', () => {
-		const followups = buildParticipantFollowups({ metadata: { resultType: 'analysis-implementation' } } as vscode.ChatResult);
+		const followups = buildParticipantFollowups({ metadata: {} } as vscode.ChatResult);
 		assert.equal(followups.length, 0);
 	});
 
-	test('suggests a recovery followup after a blocked implementation result', () => {
-		const followups = buildParticipantFollowups({
-			metadata: {
-				resultType: 'analysis-implementation',
-				implementationStatus: 'blocked',
-				analysisReportPath: 'analysis/reports/report-1.md',
-				analysisStorageDirectory: 'e:/workspace/.chat',
-				summary: 'Cannot continue until the workspace folder is resolved.',
-				filesChanged: [],
-				commandsRun: [],
-				results: [],
-				blockers: ['Missing workspace folder'],
-				unverified: ['No compile run yet'],
-			},
-		} as vscode.ChatResult);
-
-		assert.equal(followups.length, 1);
-		assert.equal(followups[0]?.label, 'Resolve Blocker');
-		assert.equal(followups[0]?.command, 'implement');
-		assert.equal(followups[0]?.prompt.includes('Missing workspace folder'), true);
-	});
-
-	test('shows guidance when implementing without a prior analysis result', async () => {
+	test('shows guidance when handing off without a prior analysis result', async () => {
 		const messages: string[] = [];
-		const result = await runImplementRecommendationsFlow(
-			'Implement the recommendations.',
+
+		await runImplementationHandoffFlow(
+			'Open a coding agent handoff.',
 			[],
-			createImplementFlowDeps({
+			createHandoffFlowDeps({
 				findAnalysisReportMeta: () => null,
 				streamMarkdown: (markdown: string) => {
 					messages.push(markdown);
@@ -524,38 +507,19 @@ suite('chatParticipant implementation followups', () => {
 			}),
 		);
 
-		assert.equal(result, undefined);
-		assert.deepEqual(messages, ['Use @session-control /analyze first, then ask me to implement the recommendations.']);
+		assert.deepEqual(messages, ['Use @session-control /analyze first, then ask me to hand off the recommendations.']);
 	});
 
-	test('loads the saved analysis report and returns implementation metadata', async () => {
-		const prompts: Array<{ prompt: string; streamOutput: boolean }> = [];
+	test('opens chat with a generated implementation handoff prompt by default', async () => {
+		let openedPrompt: string | undefined;
 		const messages: string[] = [];
-		const result = await runImplementRecommendationsFlow(
+
+		await runImplementationHandoffFlow(
 			'Implement the highest-priority recommendation.',
 			[],
-			createImplementFlowDeps({
-				runModelPrompt: async (prompt: string, streamOutput: boolean) => {
-					prompts.push({ prompt, streamOutput });
-					return [
-						'## Status',
-						'COMPLETED',
-						'',
-						'## Summary',
-						'Implemented the highest-priority recommendation.',
-						'',
-						'## Files Changed',
-						'- src/chatParticipant.ts',
-						'',
-						'## Commands Run',
-						'- npm test',
-						'',
-						'## Results',
-						'- 134 passing',
-						'',
-						'## Unverified',
-						'- Manual Development Host smoke test',
-					].join('\n');
+			createHandoffFlowDeps({
+				openChat: async (prompt: string) => {
+					openedPrompt = prompt;
 				},
 				streamMarkdown: (markdown: string) => {
 					messages.push(markdown);
@@ -563,45 +527,38 @@ suite('chatParticipant implementation followups', () => {
 			}),
 		);
 
-		assert.equal(prompts.length, 1);
-		assert.equal(prompts[0]?.streamOutput, true);
-		assert.equal(prompts[0]?.prompt.includes('# Chat Analysis Report'), true);
-		assert.equal(prompts[0]?.prompt.includes('User request: Implement the highest-priority recommendation.'), true);
-		assert.equal(prompts[0]?.prompt.includes('stay in implementation mode for the current repository'), true);
-		assert.equal(prompts[0]?.prompt.includes('explicitly say BLOCKED and name the blocker'), true);
-		assert.equal(prompts[0]?.prompt.includes('Return markdown using exactly one of these shapes'), true);
-		assert.equal(messages[0]?.includes('Using analysis report **analysis/reports/report-1.md** as implementation context.'), true);
-		assert.equal(result?.metadata.resultType, 'analysis-implementation');
-		assert.equal(result?.metadata.implementationStatus, 'completed');
-		assert.equal(result?.metadata.analysisReportPath, 'analysis/reports/report-1.md');
-		assert.deepEqual(result?.metadata.filesChanged, ['src/chatParticipant.ts']);
-		assert.deepEqual(result?.metadata.commandsRun, ['npm test']);
-		assert.deepEqual(result?.metadata.results, ['134 passing']);
-		assert.deepEqual(result?.metadata.blockers, []);
-		assert.deepEqual(result?.metadata.unverified, ['Manual Development Host smoke test']);
+		const expectedReportPath = path.join('e:/workspace/.chat', 'analysis/reports/report-1.md');
+		assert.equal(openedPrompt?.includes(expectedReportPath), true);
+		assert.equal(openedPrompt?.includes('User request: Implement the highest-priority recommendation.'), true);
+		assert.deepEqual(messages, ['Opened chat with a generated implementation handoff prompt.']);
 	});
 
-	test('treats an unparseable implementation response as blocked metadata', async () => {
+	test('opens an agent session and copies the handoff prompt when available', async () => {
+		let openedCommand: string | undefined;
+		let clipboardText: string | undefined;
 		const messages: string[] = [];
-		const result = await runImplementRecommendationsFlow(
+
+		await runImplementationHandoffFlow(
 			'Implement the highest-priority recommendation.',
 			[],
-			createImplementFlowDeps({
-				runModelPrompt: async () => 'Implementation guidance without the required structure',
+			createHandoffFlowDeps({
+				getCommands: async () => ['github.copilot.cli.newSession'],
+				pickTarget: async (_agentSessionAvailable: boolean): Promise<'agentSession'> => 'agentSession',
+				openAgentSession: async (commandId: string) => {
+					openedCommand = commandId;
+				},
+				writeClipboard: async (text: string) => {
+					clipboardText = text;
+				},
 				streamMarkdown: (markdown: string) => {
 					messages.push(markdown);
 				},
 			}),
 		);
 
-		assert.equal(result?.metadata.resultType, 'analysis-implementation');
-		assert.equal(result?.metadata.implementationStatus, 'blocked');
-		assert.equal(result?.metadata.summary, 'The implementation follow-up did not use the required status format.');
-		assert.deepEqual(result?.metadata.filesChanged, []);
-		assert.deepEqual(result?.metadata.commandsRun, []);
-		assert.deepEqual(result?.metadata.results, []);
-		assert.deepEqual(result?.metadata.blockers, ['Model response did not follow the required implementation status format.']);
-		assert.deepEqual(result?.metadata.unverified, []);
-		assert.equal(messages.some((message) => message.includes('treating it as blocked')), true);
+		assert.equal(openedCommand, 'github.copilot.cli.newSession');
+		assert.equal(clipboardText?.includes('AGENTS.md'), true);
+		assert.equal(messages.length, 1);
+		assert.equal(messages[0]?.includes('Opened an agent session'), true);
 	});
 });

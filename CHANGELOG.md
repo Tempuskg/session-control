@@ -9,10 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added `@session-control /analyze` to review saved chat sessions from a selected timeframe or only chats that have not been analyzed yet, with markdown reports persisted under `.chat/analysis/`.
-- Added an `@session-control /implement` follow-up path after analysis so the latest saved analysis report can be reused as implementation context in the same chat thread.
+- Added `@session-control /handoff` to open a generated implementation prompt in chat or an agent session using the latest saved analysis report.
+- Added the `Session Control: Handoff Latest Analysis` command so the newest saved analysis report can be handed off from the command palette without relying on chat-thread metadata.
 
 ### Changed
 - When choosing an interactive date range for `@session-control /analyze`, the participant now asks whether to analyze only unanalyzed chats in that range or re-analyze every chat in that range.
+- Analysis results now offer a **Handoff to Agent** follow-up that opens the generated coding-agent handoff prompt.
+
+### Removed
+- Removed `@session-control /implement`; saved-chat analysis now transitions only through the handoff flow.
 
 ## [0.1.24] - 2026-04-25
 

@@ -12,6 +12,7 @@ A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON f
 - **Save sessions** — Capture the active Copilot Chat session as a JSON file in `.chat/`, enriched with branch and commit metadata.
 - **Resume sessions** — Use `@session-control /resume <name>` to reload a saved conversation as LLM context in a new chat.
 - **Analyze saved chats** — Use `@session-control /analyze` to review a timeframe of saved sessions or only chats that have not been analyzed yet.
+- **Handoff implementation work** — Use `@session-control /handoff` to open a generated implementation prompt in chat or an agent session.
 - **Browse, preview, delete** — Manage saved sessions via the Session Explorer and command palette.
 - **Resume from viewer** — When viewing a saved session, click the ▶ icon in the editor title bar to resume it directly in chat.
 - **Auto-save on chat response** — Optionally save the active session automatically after every Copilot chat response.
@@ -75,7 +76,19 @@ When you pick a date-based range interactively, Session Control now asks whether
 
 The participant reviews saved sessions from the configured storage folder, streams a report back into chat, and writes a markdown report under `.chat/analysis/reports/`. It also keeps an analysis index in `.chat/analysis/index.json` so the **Needs Analysis** mode only selects chats that have not been analyzed yet or whose content has changed since the last analysis.
 
-After the report is generated, Session Control suggests an **Implement Recommendations** follow-up in chat. Clicking it sends `@session-control /implement` with the latest saved analysis report as context so you can continue from analysis into implementation guidance in the same thread.
+After the report is generated, Session Control suggests a **Handoff to Agent** follow-up in chat.
+
+`@session-control /handoff` generates a compact implementation prompt that points a coding agent at the saved analysis report file. It opens a new chat with that prompt prefilled by default, and when a supported agent-session opener is available it can open that surface and copy the prompt to the clipboard.
+
+### Handoff the latest saved analysis from the command palette
+
+Run:
+
+```
+Session Control: Handoff Latest Analysis
+```
+
+This command looks across the open workspace folders, finds the newest saved analysis report that still exists on disk, and opens the same lightweight handoff flow used by `@session-control /handoff`. If an agent-session opener is available, you can send the generated prompt there; otherwise it opens a new chat with the prompt prefilled.
 
 ### View a saved session in the web viewer
 

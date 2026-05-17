@@ -1,17 +1,20 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { createAnalysisStore } from './analysisStore';
 import { registerChatParticipant } from './chatParticipant';
 import { getGitContext } from './gitIntegration';
 import { CopilotSession, deriveChatSessionsPath, readCopilotSessions } from './sessionReader';
+import { buildImplementationHandoffPrompt } from './sessionAnalysis';
 import { SessionExplorerProvider, SessionExplorerSessionItem } from './sessionExplorer';
 import { SessionViewerPanel } from './sessionViewer';
 import { createSessionStore, SessionFileNameOptions, SessionPruneAction } from './sessionStore';
 import { applySaveBloatControls, createChatSession, SaveOverflowStrategy } from './sessionWriter';
-import { isChatSession } from './types';
+import { type AnalysisReportReference, isChatSession } from './types';
 import { parseFileSize } from './utils';
 
 const sessionStore = createSessionStore();
+const analysisStore = createAnalysisStore();
 
 function isAbsolutePathLike(value: string): boolean {
 	return path.isAbsolute(value) || path.win32.isAbsolute(value);
@@ -33,6 +36,16 @@ interface SavedSessionPickItem extends vscode.QuickPickItem {
 interface OpenSessionTarget {
 	storageDirectory: string;
 	fileName: string;
+}
+
+type ImplementationHandoffTarget = 'chat' | 'agentSession';
+
+interface LatestAnalysisReportTarget {
+	storageDirectory: string;
+	reportPath: string;
+	createdAt: string;
+	selectionLabel: string;
+	workspaceFolder: vscode.WorkspaceFolder;
 }
 
 interface SaveSessionFlowDeps {
@@ -97,6 +110,21 @@ interface ViewSessionFileDeps {
 	getActiveEditor: () => vscode.TextEditor | undefined;
 	showSession: (session: ReturnType<typeof createChatSession>, extensionUri: vscode.Uri, storageDirectory: string, fileName: string) => void;
 	showInformationMessage: (message: string) => Thenable<unknown>;
+}
+
+interface HandoffLatestAnalysisDeps {
+	getWorkspaceFolders: () => readonly vscode.WorkspaceFolder[] | undefined;
+	getStoragePath: (workspaceFolder: vscode.WorkspaceFolder) => string;
+	readIndex: (storageDirectory: string) => Promise<{ reports: AnalysisReportReference[] }>;
+	readReport: (storageDirectory: string, reportPath: string) => Promise<string>;
+	buildPrompt: (reportFilePath: string, userPrompt: string) => string;
+	getCommands: () => Promise<readonly string[]>;
+	pickTarget: (agentSessionAvailable: boolean) => Promise<ImplementationHandoffTarget | undefined>;
+	openChat: (prompt: string) => Promise<void>;
+	openAgentSession: (commandId: string) => Promise<void>;
+	writeClipboard: (text: string) => Promise<void>;
+	showInformationMessage: (message: string) => Thenable<unknown>;
+	showWarningMessage: (message: string) => Thenable<unknown>;
 }
 
 type ParsedSessionDocument =
@@ -297,6 +325,119 @@ export async function listSessionsAcrossWorkspaceFolders(
 	);
 
 	return results.flat().sort((a, b) => Date.parse(b.detail.split('|')[0]?.trim() ?? '') - Date.parse(a.detail.split('|')[0]?.trim() ?? ''));
+}
+
+function findAgentSessionCommandId(commands: readonly string[]): string | undefined {
+	const preferred = [
+		'workbench.action.chat.openSessions',
+		'workbench.action.chat.openSessionsInNewWindow',
+		'workbench.action.chat.openAgentsWindow',
+		'workbench.action.chat.openAgents',
+		'github.copilot.cli.newSession',
+	];
+
+	for (const candidate of preferred) {
+		if (commands.includes(candidate)) {
+			return candidate;
+		}
+	}
+
+	return commands.find((command) => {
+		const normalized = command.toLowerCase();
+		if (normalized.includes('debug')) {
+			return false;
+		}
+
+		return normalized.startsWith('workbench.action.chat.')
+			&& normalized.includes('open')
+			&& (normalized.includes('agent') || normalized.includes('session'));
+	});
+}
+
+function createDefaultHandoffLatestAnalysisDeps(): HandoffLatestAnalysisDeps {
+	return {
+		getWorkspaceFolders: () => vscode.workspace.workspaceFolders,
+		getStoragePath,
+		readIndex: async (storageDirectory: string) => analysisStore.readIndex(storageDirectory),
+		readReport: async (storageDirectory: string, reportPath: string) => analysisStore.readReport(storageDirectory, reportPath),
+		buildPrompt: (reportFilePath: string, userPrompt: string) => buildImplementationHandoffPrompt(reportFilePath, userPrompt),
+		getCommands: async () => vscode.commands.getCommands(true),
+		pickTarget: async (agentSessionAvailable: boolean) => {
+			if (!agentSessionAvailable) {
+				return 'chat';
+			}
+
+			const pick = await vscode.window.showQuickPick<
+				vscode.QuickPickItem & { target: ImplementationHandoffTarget }
+			>([
+				{
+					label: 'Chat',
+					description: 'Prefill a new chat with the generated implementation handoff prompt',
+					target: 'chat',
+				},
+				{
+					label: 'Agent Session',
+					description: 'Open an agent session and copy the generated handoff prompt to the clipboard',
+					target: 'agentSession',
+				},
+			], {
+				title: 'Open latest analysis handoff in',
+			});
+
+			return pick?.target;
+		},
+		openChat: async (prompt: string) => {
+			await vscode.commands.executeCommand('workbench.action.chat.open', { query: prompt });
+		},
+		openAgentSession: async (commandId: string) => {
+			await vscode.commands.executeCommand(commandId);
+		},
+		writeClipboard: async (text: string) => vscode.env.clipboard.writeText(text),
+		showInformationMessage: (message: string) => vscode.window.showInformationMessage(message),
+		showWarningMessage: (message: string) => vscode.window.showWarningMessage(message),
+	};
+}
+
+async function findLatestUsableAnalysisReport(
+	workspaceFolders: readonly vscode.WorkspaceFolder[],
+	deps: HandoffLatestAnalysisDeps,
+): Promise<{ report?: LatestAnalysisReportTarget; warnings: string[] }> {
+	const candidates: LatestAnalysisReportTarget[] = [];
+	const warnings: string[] = [];
+
+	for (const workspaceFolder of workspaceFolders) {
+		const storageDirectory = deps.getStoragePath(workspaceFolder);
+
+		try {
+			const index = await deps.readIndex(storageDirectory);
+			for (const report of index.reports) {
+				candidates.push({
+					storageDirectory,
+					reportPath: report.reportPath,
+					createdAt: report.createdAt,
+					selectionLabel: report.selection.label,
+					workspaceFolder,
+				});
+			}
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			warnings.push(`${workspaceFolder.name}: ${message}`);
+		}
+	}
+
+	candidates.sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+
+	for (const candidate of candidates) {
+		try {
+			await deps.readReport(candidate.storageDirectory, candidate.reportPath);
+			return { report: candidate, warnings };
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			warnings.push(`${candidate.workspaceFolder.name}: ${message}`);
+		}
+	}
+
+	return { warnings };
 }
 
 function toSessionQuickPickItem(session: CopilotSession): CopilotSessionPickItem {
@@ -576,6 +717,63 @@ export async function runViewSessionFileCommand(
 
 	const filePath = document.uri.fsPath;
 	deps.showSession(parsed.session, context.extensionUri, path.dirname(filePath), path.basename(filePath));
+}
+
+export async function runHandoffLatestAnalysisCommand(
+	depsOverrides: Partial<HandoffLatestAnalysisDeps> = {},
+): Promise<void> {
+	const deps = {
+		...createDefaultHandoffLatestAnalysisDeps(),
+		...depsOverrides,
+	};
+
+	const workspaceFolders = deps.getWorkspaceFolders();
+	if (!workspaceFolders?.length) {
+		await deps.showInformationMessage('Open a workspace folder before handing off a saved analysis.');
+		return;
+	}
+
+	const latest = await findLatestUsableAnalysisReport(workspaceFolders, deps);
+	if (!latest.report) {
+		if (latest.warnings.length > 0) {
+			await deps.showWarningMessage(`No usable saved analysis report was found. ${latest.warnings[0] ?? ''}`.trim());
+			return;
+		}
+
+		await deps.showInformationMessage('No saved analysis reports found. Run @session-control /analyze first.');
+		return;
+	}
+
+	const prompt = deps.buildPrompt(path.join(latest.report.storageDirectory, latest.report.reportPath), '');
+	const agentSessionCommandId = findAgentSessionCommandId(await deps.getCommands());
+	const target = await deps.pickTarget(agentSessionCommandId !== undefined);
+	if (!target) {
+		return;
+	}
+
+	if (target === 'agentSession' && agentSessionCommandId) {
+		try {
+			await deps.writeClipboard(prompt);
+			await deps.openAgentSession(agentSessionCommandId);
+			await deps.showInformationMessage(
+				`Opened an agent session for the latest analysis handoff from ${latest.report.workspaceFolder.name}. The generated prompt is on the clipboard.`,
+			);
+			return;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await deps.showWarningMessage(`Failed to open an agent session (${message}). Opening chat instead.`);
+		}
+	}
+
+	try {
+		await deps.openChat(prompt);
+		await deps.showInformationMessage(
+			`Opened chat with an implementation handoff prompt for ${latest.report.selectionLabel}.`,
+		);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		await deps.showWarningMessage(`Failed to open chat with the generated handoff prompt: ${message}`);
+	}
 }
 
 function parseSessionDocument(text: string): ParsedSessionDocument {
@@ -868,6 +1066,9 @@ export function activate(context: vscode.ExtensionContext): void {
 		}),
 		vscode.commands.registerCommand('session-control.resumeSessionFromViewer', async () => {
 			await runResumeSessionFromViewerCommand();
+		}),
+		vscode.commands.registerCommand('session-control.handoffLatestAnalysis', async () => {
+			await runHandoffLatestAnalysisCommand();
 		}),
 		vscode.commands.registerCommand('session-control.deleteSessionFromExplorer', async (item: SessionExplorerSessionItem) => {
 			const confirmation = await vscode.window.showWarningMessage(

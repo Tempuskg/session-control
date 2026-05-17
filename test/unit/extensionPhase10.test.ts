@@ -7,6 +7,7 @@ import {
 	createStorageGitignoreEntry,
 	ensureStoragePathInGitignore,
 	listSessionsAcrossWorkspaceFolders,
+	runHandoffLatestAnalysisCommand,
 	runOpenSavedSessionCommand,
 	runResumeSessionFromViewerCommand,
 	runViewSessionFileCommand,
@@ -17,6 +18,7 @@ import { SessionViewerPanel } from '../../src/sessionViewer';
 import { createSessionStore } from '../../src/sessionStore';
 import { createChatSession } from '../../src/sessionWriter';
 import { CopilotSession } from '../../src/sessionReader';
+import { AnalysisReportReference } from '../../src/types';
 
 function createWorkspaceFolder(rootPath: string, name: string, index: number): vscode.WorkspaceFolder {
 	return {
@@ -48,6 +50,28 @@ function createCopilotSession(title: string): CopilotSession {
 				timestamp: '2026-04-12T12:01:00.000Z',
 			},
 		],
+	};
+}
+
+function createAnalysisReportReference(overrides: Partial<AnalysisReportReference> = {}): AnalysisReportReference {
+	return {
+		id: overrides.id ?? 'report-1',
+		createdAt: overrides.createdAt ?? '2026-05-17T18:00:00.000Z',
+		selection: overrides.selection ?? {
+			mode: 'needsAnalysis',
+			label: 'Needs Analysis',
+			range: null,
+		},
+		promptVersion: overrides.promptVersion ?? '1',
+		reportPath: overrides.reportPath ?? 'analysis/reports/report-1.md',
+		contributingWorkspaces: overrides.contributingWorkspaces ?? ['repo'],
+		analyzedFingerprints: overrides.analyzedFingerprints ?? ['fingerprint-1'],
+		...(overrides.sessionCount === undefined ? {} : { sessionCount: overrides.sessionCount }),
+		...(overrides.ownerWorkspaceName === undefined ? {} : { ownerWorkspaceName: overrides.ownerWorkspaceName }),
+		...(overrides.repositories === undefined ? {} : { repositories: overrides.repositories }),
+		...(overrides.sourceSessions === undefined ? {} : { sourceSessions: overrides.sourceSessions }),
+		...(overrides.status === undefined ? {} : { status: overrides.status }),
+		...(overrides.warnings === undefined ? {} : { warnings: overrides.warnings }),
 	};
 }
 
@@ -320,5 +344,154 @@ suite('runResumeSessionFromViewerCommand', () => {
 			(vscode.commands as any).executeCommand = originalExecuteCommand;
 			(SessionViewerPanel as any).currentPanel = originalCurrentPanel;
 		}
+	});
+});
+
+suite('runHandoffLatestAnalysisCommand', () => {
+	test('shows guidance when no workspace is open', async () => {
+		const infoMessages: string[] = [];
+
+		await runHandoffLatestAnalysisCommand({
+			getWorkspaceFolders: () => undefined,
+			showInformationMessage: async (message: string) => {
+				infoMessages.push(message);
+				return undefined;
+			},
+			showWarningMessage: async () => undefined,
+		});
+
+		assert.deepEqual(infoMessages, ['Open a workspace folder before handing off a saved analysis.']);
+	});
+
+	test('shows guidance when no saved analysis reports exist', async () => {
+		const infoMessages: string[] = [];
+		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
+
+		await runHandoffLatestAnalysisCommand({
+			getWorkspaceFolders: () => [workspaceFolder],
+			getStoragePath: () => 'C:/repo/.chat',
+			readIndex: async () => ({ reports: [] }),
+			readReport: async () => '# report',
+			showInformationMessage: async (message: string) => {
+				infoMessages.push(message);
+				return undefined;
+			},
+			showWarningMessage: async () => undefined,
+		});
+
+		assert.deepEqual(infoMessages, ['No saved analysis reports found. Run @session-control /analyze first.']);
+	});
+
+	test('opens chat with the latest usable saved analysis report', async () => {
+		const infoMessages: string[] = [];
+		const workspaceA = createWorkspaceFolder('C:/repo-a', 'alpha', 0);
+		const workspaceB = createWorkspaceFolder('C:/repo-b', 'beta', 1);
+		let openedPrompt: string | undefined;
+
+		await runHandoffLatestAnalysisCommand({
+			getWorkspaceFolders: () => [workspaceA, workspaceB],
+			getStoragePath: (workspaceFolder) => path.join(workspaceFolder.uri.fsPath, '.chat'),
+			readIndex: async (storageDirectory: string) => {
+				if (storageDirectory.toLowerCase().includes('repo-a')) {
+					return {
+						reports: [createAnalysisReportReference({
+							id: 'alpha-report',
+							createdAt: '2026-05-17T17:00:00.000Z',
+							reportPath: 'analysis/reports/alpha-report.md',
+							selection: {
+								mode: 'needsAnalysis',
+								label: 'Alpha report',
+								range: null,
+							},
+						})],
+					};
+				}
+
+				return {
+					reports: [createAnalysisReportReference({
+						id: 'beta-report',
+						createdAt: '2026-05-17T18:00:00.000Z',
+						reportPath: 'analysis/reports/beta-report.md',
+						selection: {
+							mode: 'last7Days',
+							label: 'Beta report',
+							range: {
+								start: '2026-05-10T00:00:00.000Z',
+								end: '2026-05-17T23:59:59.999Z',
+							},
+						},
+					})],
+				};
+			},
+			readReport: async (storageDirectory: string, reportPath: string) => {
+				if (storageDirectory.toLowerCase().includes('repo-b')) {
+					throw new Error(`ENOENT ${reportPath}`);
+				}
+
+				return '# Chat Analysis Report';
+			},
+			buildPrompt: (reportFilePath: string) => `HANDOFF ${reportFilePath}`,
+			getCommands: async () => [],
+			pickTarget: async (_agentSessionAvailable: boolean): Promise<'chat'> => 'chat',
+			openChat: async (prompt: string) => {
+				openedPrompt = prompt;
+			},
+			openAgentSession: async () => undefined,
+			writeClipboard: async () => undefined,
+			showInformationMessage: async (message: string) => {
+				infoMessages.push(message);
+				return undefined;
+			},
+			showWarningMessage: async () => undefined,
+		});
+
+		assert.equal(
+			openedPrompt?.toLowerCase(),
+			`HANDOFF ${path.join('C:/repo-a/.chat', 'analysis/reports/alpha-report.md')}`.toLowerCase(),
+		);
+		assert.deepEqual(infoMessages, ['Opened chat with an implementation handoff prompt for Alpha report.']);
+	});
+
+	test('opens an agent session and copies the latest analysis handoff prompt when available', async () => {
+		const infoMessages: string[] = [];
+		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
+		let openedCommand: string | undefined;
+		let clipboardText: string | undefined;
+
+		await runHandoffLatestAnalysisCommand({
+			getWorkspaceFolders: () => [workspaceFolder],
+			getStoragePath: () => 'C:/repo/.chat',
+			readIndex: async () => ({
+				reports: [createAnalysisReportReference({
+					selection: {
+						mode: 'needsAnalysis',
+						label: 'Needs Analysis',
+						range: null,
+					},
+				})],
+			}),
+			readReport: async () => '# Chat Analysis Report',
+			buildPrompt: (reportFilePath: string) => `HANDOFF ${reportFilePath}`,
+			getCommands: async () => ['github.copilot.cli.newSession'],
+			pickTarget: async (_agentSessionAvailable: boolean): Promise<'agentSession'> => 'agentSession',
+			openChat: async () => undefined,
+			openAgentSession: async (commandId: string) => {
+				openedCommand = commandId;
+			},
+			writeClipboard: async (text: string) => {
+				clipboardText = text;
+			},
+			showInformationMessage: async (message: string) => {
+				infoMessages.push(message);
+				return undefined;
+			},
+			showWarningMessage: async () => undefined,
+		});
+
+		assert.equal(openedCommand, 'github.copilot.cli.newSession');
+		assert.equal(clipboardText, `HANDOFF ${path.join('C:/repo/.chat', 'analysis/reports/report-1.md')}`);
+		assert.deepEqual(infoMessages, [
+			'Opened an agent session for the latest analysis handoff from repo. The generated prompt is on the clipboard.',
+		]);
 	});
 });

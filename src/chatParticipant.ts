@@ -8,10 +8,9 @@ import {
 } from './analysisOrchestrator';
 import { createSessionStore } from './sessionStore';
 import {
-	parseImplementationResponse,
 	buildAnalysisPrompt,
 	buildAnalysisSynthesisPrompt,
-	buildImplementationPrompt,
+	buildImplementationHandoffPrompt,
 	createCustomRangeSelection,
 	createNeedsAnalysisSelection,
 	createPresetAnalysisSelection,
@@ -21,9 +20,7 @@ import {
 	type AnalysisCandidateSession,
 } from './sessionAnalysis';
 import {
-	AnalysisImplementationResultMetadata,
 	AnalysisReportResultMetadata,
-	AnalysisSelection,
 	ChatSession,
 	SavedTurn,
 	SessionMeta,
@@ -57,18 +54,19 @@ export interface ReassembledSessionResult {
 	partFiles: string[];
 }
 
-export interface ImplementRecommendationsFlowResult {
-	metadata: AnalysisImplementationResultMetadata;
-}
+type ImplementationHandoffTarget = 'chat' | 'agentSession';
 
-export interface ImplementRecommendationsFlowDeps {
+export interface ImplementationHandoffFlowDeps {
 	findAnalysisReportMeta: (history: readonly (vscode.ChatRequestTurn | vscode.ChatResponseTurn)[]) => {
 		analysisReportPath: string;
 		analysisStorageDirectory: string;
 	} | null;
-	readReport: (storageDirectory: string, reportPath: string) => Promise<string>;
-	buildPrompt: (reportMarkdown: string, userPrompt: string) => string;
-	runModelPrompt: (prompt: string, streamOutput: boolean) => Promise<string>;
+	buildPrompt: (reportFilePath: string, userPrompt: string) => string;
+	getCommands: () => Promise<readonly string[]>;
+	pickTarget: (agentSessionAvailable: boolean) => Promise<ImplementationHandoffTarget | undefined>;
+	openChat: (prompt: string) => Promise<void>;
+	openAgentSession: (commandId: string) => Promise<void>;
+	writeClipboard: (text: string) => Promise<void>;
 	streamMarkdown: (markdown: string) => void;
 }
 
@@ -378,118 +376,136 @@ function createDefaultAnalyzeSessionsFlowDeps(
 	};
 }
 
-function createDefaultImplementRecommendationsFlowDeps(
-	request: vscode.ChatRequest,
+function findAgentSessionCommandId(commands: readonly string[]): string | undefined {
+	const preferred = [
+		'workbench.action.chat.openSessions',
+		'workbench.action.chat.openSessionsInNewWindow',
+		'workbench.action.chat.openAgentsWindow',
+		'workbench.action.chat.openAgents',
+		'github.copilot.cli.newSession',
+	];
+
+	for (const candidate of preferred) {
+		if (commands.includes(candidate)) {
+			return candidate;
+		}
+	}
+
+	return commands.find((command) => {
+		const normalized = command.toLowerCase();
+		if (normalized.includes('debug')) {
+			return false;
+		}
+
+		return normalized.startsWith('workbench.action.chat.')
+			&& normalized.includes('open')
+			&& (normalized.includes('agent') || normalized.includes('session'));
+	});
+}
+
+function createDefaultImplementationHandoffFlowDeps(
 	stream: vscode.ChatResponseStream,
-	token: vscode.CancellationToken,
-): ImplementRecommendationsFlowDeps {
+): ImplementationHandoffFlowDeps {
 	return {
 		findAnalysisReportMeta: (history) => findLatestAnalysisReportMeta(history),
-		readReport: async (storageDirectory: string, reportPath: string) => analysisStore.readReport(storageDirectory, reportPath),
-		buildPrompt: (reportMarkdown: string, userPrompt: string) => buildImplementationPrompt(reportMarkdown, userPrompt),
-		runModelPrompt: async (prompt: string, streamOutput: boolean) => collectModelText(request, streamOutput ? stream : undefined, token, prompt),
+		buildPrompt: (reportFilePath: string, userPrompt: string) => buildImplementationHandoffPrompt(reportFilePath, userPrompt),
+		getCommands: async () => vscode.commands.getCommands(true),
+		pickTarget: async (agentSessionAvailable: boolean) => {
+			if (!agentSessionAvailable) {
+				return 'chat';
+			}
+
+			const pick = await vscode.window.showQuickPick<
+				vscode.QuickPickItem & { target: ImplementationHandoffTarget }
+			>([
+				{
+					label: 'Chat',
+					description: 'Prefill a new chat with the generated implementation handoff prompt',
+					target: 'chat',
+				},
+				{
+					label: 'Agent Session',
+					description: 'Open an agent session and copy the generated handoff prompt to the clipboard',
+					target: 'agentSession',
+				},
+			], {
+				title: 'Open implementation handoff in',
+			});
+
+			return pick?.target;
+		},
+		openChat: async (prompt: string) => {
+			await vscode.commands.executeCommand('workbench.action.chat.open', { query: prompt });
+		},
+		openAgentSession: async (commandId: string) => {
+			await vscode.commands.executeCommand(commandId);
+		},
+		writeClipboard: async (text: string) => vscode.env.clipboard.writeText(text),
 		streamMarkdown: (markdown: string) => stream.markdown(markdown),
 	};
 }
 
-export async function runImplementRecommendationsFlow(
+export async function runImplementationHandoffFlow(
 	requestPrompt: string,
 	history: readonly (vscode.ChatRequestTurn | vscode.ChatResponseTurn)[],
-	depsOverrides: Partial<ImplementRecommendationsFlowDeps> = {},
-): Promise<ImplementRecommendationsFlowResult | undefined> {
-	const deps = {
+	depsOverrides: Partial<ImplementationHandoffFlowDeps> = {},
+): Promise<void> {
+	const deps: ImplementationHandoffFlowDeps = {
+		findAnalysisReportMeta: () => null,
+		buildPrompt: (reportFilePath: string, userPrompt: string) => buildImplementationHandoffPrompt(reportFilePath, userPrompt),
+		getCommands: async () => [],
+		pickTarget: async () => 'chat',
+		openChat: async () => undefined,
+		openAgentSession: async () => undefined,
+		writeClipboard: async () => undefined,
+		streamMarkdown: () => undefined,
 		...depsOverrides,
-	} as ImplementRecommendationsFlowDeps;
+	};
 
 	const analysisMeta = deps.findAnalysisReportMeta(history);
 	if (!analysisMeta) {
-		deps.streamMarkdown('Use @session-control /analyze first, then ask me to implement the recommendations.');
+		deps.streamMarkdown('Use @session-control /analyze first, then ask me to hand off the recommendations.');
 		return;
 	}
 
-	let reportMarkdown: string;
+	const reportFilePath = path.join(analysisMeta.analysisStorageDirectory, analysisMeta.analysisReportPath);
+	const prompt = deps.buildPrompt(reportFilePath, requestPrompt);
+	const agentSessionCommandId = findAgentSessionCommandId(await deps.getCommands());
+	const target = await deps.pickTarget(agentSessionCommandId !== undefined);
+	if (!target) {
+		return;
+	}
+
+	if (target === 'agentSession' && agentSessionCommandId) {
+		try {
+			await deps.writeClipboard(prompt);
+			await deps.openAgentSession(agentSessionCommandId);
+			deps.streamMarkdown('Opened an agent session and copied the generated implementation handoff prompt to the clipboard. Paste it into the new session to continue.');
+			return;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			deps.streamMarkdown(`Failed to open an agent session (${message}). Opening chat with the generated handoff prompt instead.\n\n`);
+		}
+	}
+
 	try {
-		reportMarkdown = await deps.readReport(analysisMeta.analysisStorageDirectory, analysisMeta.analysisReportPath);
+		await deps.openChat(prompt);
+		deps.streamMarkdown('Opened chat with a generated implementation handoff prompt.');
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		deps.streamMarkdown(`Failed to read the saved analysis report: ${message}`);
-		return;
+		deps.streamMarkdown(`Failed to open chat with the generated handoff prompt: ${message}`);
 	}
-
-	deps.streamMarkdown(`Using analysis report **${analysisMeta.analysisReportPath}** as implementation context.\n\n`);
-	const response = await deps.runModelPrompt(deps.buildPrompt(reportMarkdown, requestPrompt), true);
-	if (!response.trim().length) {
-		deps.streamMarkdown('The implementation follow-up completed, but the model returned no response.');
-		return;
-	}
-
-	const parsed = parseImplementationResponse(
-		response,
-		analysisMeta.analysisReportPath,
-		analysisMeta.analysisStorageDirectory,
-	);
-	if (!parsed) {
-		deps.streamMarkdown(
-			'\n\nImplementation follow-up did not return a parseable status block; treating it as blocked.',
-		);
-		return {
-			metadata: {
-				resultType: 'analysis-implementation',
-				implementationStatus: 'blocked',
-				analysisReportPath: analysisMeta.analysisReportPath,
-				analysisStorageDirectory: analysisMeta.analysisStorageDirectory,
-				summary: 'The implementation follow-up did not use the required status format.',
-				filesChanged: [],
-				commandsRun: [],
-				results: [],
-				blockers: ['Model response did not follow the required implementation status format.'],
-				unverified: [],
-			},
-		};
-	}
-
-	return {
-		metadata: parsed,
-	};
-	}
-
-function buildBlockedImplementationPrompt(metadata: Partial<AnalysisImplementationResultMetadata>): string {
-	const blocker = metadata.blockers?.find((value) => value.trim().length > 0);
-	if (blocker) {
-		return `Resolve this implementation blocker and continue with the next concrete step: ${blocker}`;
-	}
-
-	const summary = metadata.summary?.trim();
-	if (summary) {
-		return `Continue the blocked implementation and resolve this blocker: ${summary}`;
-	}
-
-	return 'Resolve the implementation blocker and continue with the next concrete step.';
 }
 
 export function buildParticipantFollowups(result: vscode.ChatResult): vscode.ChatFollowup[] {
-	const metadata = result.metadata as Partial<AnalysisReportResultMetadata> | Partial<AnalysisImplementationResultMetadata> | undefined;
+	const metadata = result.metadata as Partial<AnalysisReportResultMetadata> | undefined;
 
 	if (metadata?.resultType === 'analysis-report' && metadata.analysisReportPath && metadata.analysisStorageDirectory) {
 		return [{
-			label: 'Implement Recommendations',
-			prompt: 'Implement the highest-priority recommendations from this analysis report.',
+			label: 'Handoff to Agent',
+			prompt: 'Open a generated implementation handoff prompt for this analysis report.',
 			participant: CHAT_PARTICIPANT_ID,
-			command: 'implement',
-		}];
-	}
-
-	if (
-		metadata?.resultType === 'analysis-implementation'
-		&& metadata.implementationStatus === 'blocked'
-		&& metadata.analysisReportPath
-		&& metadata.analysisStorageDirectory
-	) {
-		return [{
-			label: 'Resolve Blocker',
-			prompt: buildBlockedImplementationPrompt(metadata),
-			participant: CHAT_PARTICIPANT_ID,
-			command: 'implement',
+			command: 'handoff',
 		}];
 	}
 
@@ -903,11 +919,11 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 			);
 		}
 
-		if (request.command === 'implement') {
-			return runImplementRecommendationsFlow(
+		if (request.command === 'handoff') {
+			return runImplementationHandoffFlow(
 				request.prompt,
 				chatContext.history,
-				createDefaultImplementRecommendationsFlowDeps(request, stream, token),
+				createDefaultImplementationHandoffFlowDeps(stream),
 			);
 		}
 
@@ -963,11 +979,8 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 
 		const analysisReportMeta = findLatestAnalysisReportMeta(chatContext.history);
 		if (analysisReportMeta) {
-			return runImplementRecommendationsFlow(
-				request.prompt,
-				chatContext.history,
-				createDefaultImplementRecommendationsFlowDeps(request, stream, token),
-			);
+			stream.markdown('Use @session-control /handoff to continue from the latest saved analysis report.');
+			return;
 		}
 
 		const resumedSessionMeta = findResumedSessionMeta(chatContext.history);

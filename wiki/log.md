@@ -83,3 +83,15 @@ Pages touched: chat-participant.md, file-manifest.md, log.md
 ## [2026-05-17] update | Date Range Analyze Scope Choice
 Updated the interactive `@session-control /analyze` date-range flow so it now asks whether to analyze only unanalyzed chats within the selected date range or re-analyze every chat in that range. Persisted reports now record whether the run was limited to unanalyzed chats.
 Pages touched: chat-participant.md, log.md
+
+## [2026-05-17] update | Analysis Handoff Command
+Added `@session-control /handoff` as a lighter bridge from saved analysis into a coding-agent workflow. The participant now offers a **Handoff to Agent** follow-up after analysis, builds a compact handoff prompt that points the next agent session at the saved analysis report and repository instructions, opens chat by default, and can copy the prompt for an agent session when that surface is available.
+Pages touched: chat-participant.md, file-manifest.md, overview.md, log.md
+
+## [2026-05-17] update | Latest Analysis Handoff Command
+Added the `Session Control: Handoff Latest Analysis` command so users can launch the lightweight handoff flow from the command palette without depending on prior chat-thread metadata. The command scans open workspaces for the newest usable saved analysis report, then opens chat or an agent session with the generated prompt.
+Pages touched: README.md, chat-participant.md, file-manifest.md, log.md
+
+## [2026-05-17] update | Remove Implement Command
+Removed `@session-control /implement` from the chat participant so saved-chat analysis now flows only into the handoff surfaces. Updated the participant follow-up behavior, manifest, README, changelog, and wiki pages to point users at `@session-control /handoff` or `Session Control: Handoff Latest Analysis` instead.
+Pages touched: README.md, CHANGELOG.md, chat-participant.md, file-manifest.md, log.md
