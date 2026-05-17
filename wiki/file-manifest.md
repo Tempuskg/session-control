@@ -24,14 +24,14 @@ Planned source files for the session-control extension, their roles, and depende
 |------|------|-------------|
 | `package.json` | Extension manifest: commands, settings, chat participant, menus | — |
 | `src/extension.ts` | Entry point: registers commands, chat participant, and auto-save listeners (exports `registerAutoSaveOnChatResponseListener`) | All modules |
-| `src/analysisStore.ts` | Persists analysis reports plus owner-workspace, repository, and source-session provenance, along with fingerprint-based analyzed-session state under `.chat/analysis/` | `types.ts` |
+| `src/analysisStore.ts` | Persists analysis reports and fingerprint-based analyzed-session state under `.chat/analysis/` | `types.ts` |
 | `src/sessionAnalysis.ts` | Pure helpers for analysis selection parsing, timeframe filtering, prompt construction, and batching | `types.ts` |
 | `src/sessionReader.ts` | Reads Copilot internal session files; handles format versioning | VS Code internal API |
 | `src/sessionWriter.ts` | Transforms raw sessions to [Session Format](session-format.md); writes to disk | `types.ts`, `gitIntegration.ts`, `utils.ts` |
 | `src/chatParticipant.ts` | `@session-control` chat participant handler for resume, list, analyze, and implement workflows | `sessionStore.ts`, `analysisStore.ts`, `sessionAnalysis.ts`, `types.ts` |
 | `src/gitIntegration.ts` | Git extension API wrapper: branch, SHA, commit listener | `vscode.git` extension API |
 | `src/sessionStore.ts` | CRUD operations on saved session files in `.chat/` | `types.ts`, `utils.ts` |
-| `src/types.ts` | TypeScript interfaces for saved chats plus analysis report/index provenance metadata | — |
+| `src/types.ts` | TypeScript interfaces for saved chats and analysis index metadata | — |
 | `src/sessionViewer.ts` | HTML webview panel for viewing saved sessions as formatted conversations | `types.ts`, `marked` |
 | `src/sessionExplorer.ts` | Tree data provider for the Session Explorer sidebar view | `sessionStore.ts` |
 | `src/utils.ts` | Utilities: slugify, timestamp formatting, fuzzy matching | — |

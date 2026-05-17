@@ -12,8 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added an `@session-control /implement` follow-up path after analysis so the latest saved analysis report can be reused as implementation context in the same chat thread.
 
 ### Changed
-- Analysis reports and index entries now persist owner-workspace, repository-context, and source-session provenance so saved analysis artifacts are easier to audit and reuse.
-- `@session-control /analyze` now ends with an explicit `@session-control /implement` handoff in the chat response in addition to the follow-up button.
+- When choosing an interactive date range for `@session-control /analyze`, the participant now asks whether to analyze only unanalyzed chats in that range or re-analyze every chat in that range.
 
 ## [0.1.24] - 2026-04-25
 

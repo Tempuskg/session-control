@@ -32,6 +32,7 @@ export interface AnalysisWriteReportInput {
 	analyzedFingerprints: string[];
 	content: string;
 	createdAt?: string;
+	sessionCount?: number;
 	ownerWorkspaceName?: string;
 	repositories?: AnalysisReportRepositorySummary[];
 	sourceSessions?: AnalysisReportSourceSession[];
@@ -136,7 +137,6 @@ function createReportFileName(createdAt: string, selection: AnalysisSelection, r
 }
 
 function renderReportMarkdown(report: AnalysisReportReference, content: string): string {
-	const sessionCount = report.sessionCount ?? report.analyzedFingerprints.length;
 	const lines = [
 		'# Chat Analysis Report',
 		'',
@@ -152,37 +152,35 @@ function renderReportMarkdown(report: AnalysisReportReference, content: string):
 	}
 
 	lines.push(`- Prompt Version: ${report.promptVersion}`);
-	lines.push(`- Owner Workspace: ${report.ownerWorkspaceName ?? 'n/a'}`);
+	lines.push(`- Only Unanalyzed: ${report.selection.onlyUnanalyzed === true ? 'yes' : 'no'}`);
+	if (report.ownerWorkspaceName) {
+		lines.push(`- Owner Workspace: ${report.ownerWorkspaceName}`);
+	}
+	if (report.sessionCount !== undefined) {
+		lines.push(`- Session Count: ${report.sessionCount}`);
+	}
 	lines.push(`- Workspaces: ${report.contributingWorkspaces.join(', ') || 'n/a'}`);
-	lines.push(`- Sessions Analyzed: ${sessionCount}`);
+	lines.push(`- Sessions Analyzed: ${report.analyzedFingerprints.length}`);
 
-	if (report.repositories?.length) {
+	if (report.repositories && report.repositories.length > 0) {
 		lines.push('');
-		lines.push('## Repository Context');
+		lines.push('## Repository Summary');
 		lines.push('');
 		for (const repository of report.repositories) {
-			const gitSummary = repository.branch && repository.commit
-				? `${repository.branch}@${repository.commit.slice(0, 12)} (${repository.dirty === true ? 'dirty' : repository.dirty === false ? 'clean' : 'unknown'})`
-				: 'n/a';
-			const suffix = repository.sessionCount === 1 ? 'session' : 'sessions';
-			lines.push(`- [${repository.workspaceName}] ${gitSummary} | ${repository.sessionCount} ${suffix}`);
-		}
-	}
-
-	if (report.sourceSessions?.length) {
-		lines.push('');
-		lines.push('## Source Sessions');
-		lines.push('');
-		for (const session of report.sourceSessions) {
-			const gitSummary = session.git
-				? `${session.git.branch}@${session.git.commit.slice(0, 12)}${session.git.dirty ? ' dirty' : ' clean'}`
-				: 'n/a';
 			lines.push(
-				`- [${session.workspaceName}] ${session.title} | ${session.savedAt} | ${session.rootFileName} | ${gitSummary} | ${session.fingerprint.slice(0, 12)}`,
+				`- ${repository.workspaceName}: branch ${repository.branch ?? 'n/a'}, commit ${repository.commit ?? 'n/a'}, dirty ${repository.dirty === null ? 'n/a' : repository.dirty ? 'yes' : 'no'}, sessions ${repository.sessionCount}`,
 			);
 		}
 	}
 
+	if (report.sourceSessions && report.sourceSessions.length > 0) {
+		lines.push('');
+		lines.push('## Source Sessions');
+		lines.push('');
+		for (const session of report.sourceSessions) {
+			lines.push(`- ${session.workspaceName} | ${session.title} | ${session.rootFileName} | ${session.savedAt}`);
+		}
+	}
 	lines.push('');
 	lines.push('## Findings');
 	lines.push('');
@@ -292,6 +290,7 @@ export function createAnalysisStore(overrides: Partial<AnalysisStoreDeps> = {}) 
 		const fileName = createReportFileName(createdAt, input.selection, reportId);
 		const reportFilePath = path.join(reportsDirectory, fileName);
 		const reportPath = normalizePathForStorage(path.relative(storageDirectory, reportFilePath));
+		const sessionCount = input.sessionCount ?? input.sourceSessions?.length ?? input.analyzedFingerprints.length;
 		const report: AnalysisReportReference = {
 			id: reportId,
 			createdAt,
@@ -300,10 +299,10 @@ export function createAnalysisStore(overrides: Partial<AnalysisStoreDeps> = {}) 
 			reportPath,
 			contributingWorkspaces: [...input.contributingWorkspaces],
 			analyzedFingerprints: [...input.analyzedFingerprints],
-			sessionCount: input.sourceSessions?.length ?? input.analyzedFingerprints.length,
-			...(input.ownerWorkspaceName ? { ownerWorkspaceName: input.ownerWorkspaceName } : {}),
-			...(input.repositories?.length ? { repositories: [...input.repositories] } : {}),
-			...(input.sourceSessions?.length ? { sourceSessions: [...input.sourceSessions] } : {}),
+			sessionCount,
+			...(input.ownerWorkspaceName === undefined ? {} : { ownerWorkspaceName: input.ownerWorkspaceName }),
+			...(input.repositories === undefined ? {} : { repositories: [...input.repositories] }),
+			...(input.sourceSessions === undefined ? {} : { sourceSessions: [...input.sourceSessions] }),
 		};
 
 		await writeAtomic(deps, reportFilePath, renderReportMarkdown(report, input.content));
@@ -340,8 +339,8 @@ export function createAnalysisStore(overrides: Partial<AnalysisStoreDeps> = {}) 
 				analyzedAt: report.createdAt,
 				reportPath: report.reportPath,
 				reportId: report.id,
-				...(session.rootFileName ? { rootFileName: session.rootFileName } : {}),
-				...(session.git !== undefined ? { git: session.git } : {}),
+				...(session.rootFileName === undefined ? {} : { rootFileName: session.rootFileName }),
+				...(session.git === undefined ? {} : { git: session.git }),
 			});
 		}
 

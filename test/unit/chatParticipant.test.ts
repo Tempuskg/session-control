@@ -91,8 +91,6 @@ function createAnalyzeReportReference(): AnalysisReportReference {
 		reportPath: 'analysis/reports/report-1.md',
 		contributingWorkspaces: ['workspace'],
 		analyzedFingerprints: ['fingerprint-1'],
-		sessionCount: 1,
-		ownerWorkspaceName: 'workspace',
 	};
 }
 
@@ -370,64 +368,6 @@ suite('chatParticipant analyze flow', () => {
 		assert.equal(messages.some((message) => message.includes('Analyzing 2 saved sessions across 2 batches')), true);
 		assert.equal(messages.some((message) => message.includes('_Synthesizing final report..._')), true);
 	});
-
-		test('writes analysis provenance metadata and streams implement guidance', async () => {
-			const messages: string[] = [];
-			let writeInput: {
-				ownerWorkspaceName?: string;
-				repositories?: Array<{ workspaceName: string; branch: string | null; commit: string | null; dirty: boolean | null; sessionCount: number }>;
-				sourceSessions?: Array<{ workspaceName: string; sessionId: string; title: string; savedAt: string; rootFileName: string; fingerprint: string; git: ChatSession['git'] }>;
-			} | undefined;
-			let recordedSessions: Array<{ rootFileName?: string; git?: ChatSession['git'] }> = [];
-
-			await runAnalyzeSessionsFlow(
-				'needs analysis',
-				[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
-				[{ ...createMeta(), workspaceFolder: createWorkspaceFolder('workspace', 'e:/workspace', 0), storageDirectory: 'e:/workspace/.chat', displayTitle: '[workspace] Fix auth bug' }],
-				createAnalyzeFlowDeps({
-					createCandidates: async () => [createAnalysisCandidate({
-						rootFileName: 'fix-auth-bug.json',
-						fingerprint: 'fingerprint-auth',
-						session: createChatSession({
-							id: 'session-auth',
-							title: 'Fix auth bug',
-							git: { branch: 'main', commit: 'abcdef1234567890', dirty: false },
-						}),
-					})],
-					writeReport: async (_storageDirectory, input) => {
-						writeInput = input;
-						return {
-							report: createAnalyzeReportReference(),
-							reportFilePath: 'e:/workspace/.chat/analysis/reports/report-1.md',
-						};
-					},
-					recordAnalysis: async (_storageDirectory, _report, sessions) => {
-						recordedSessions = sessions;
-						return {
-							version: 1,
-							updatedAt: '2026-05-17T13:00:00.000Z',
-							reports: [createAnalyzeReportReference()],
-							analyzedSessions: [],
-						};
-					},
-					streamMarkdown: (markdown: string) => {
-						messages.push(markdown);
-					},
-				}),
-			);
-
-			assert.equal(writeInput?.ownerWorkspaceName, 'workspace');
-			assert.equal(writeInput?.repositories?.length, 1);
-			assert.equal(writeInput?.repositories?.[0]?.workspaceName, 'workspace');
-			assert.equal(writeInput?.repositories?.[0]?.branch, 'main');
-			assert.equal(writeInput?.repositories?.[0]?.sessionCount, 1);
-			assert.equal(writeInput?.sourceSessions?.length, 1);
-			assert.equal(writeInput?.sourceSessions?.[0]?.rootFileName, 'fix-auth-bug.json');
-			assert.equal(writeInput?.sourceSessions?.[0]?.sessionId, 'session-auth');
-			assert.equal(recordedSessions[0]?.rootFileName, 'fix-auth-bug.json');
-			assert.equal(recordedSessions[0]?.git?.branch, 'main');
-			assert.equal(messages.some((message) => message.includes('@session-control /implement')), true);
-		});
 });
 
 suite('chatParticipant implementation followups', () => {

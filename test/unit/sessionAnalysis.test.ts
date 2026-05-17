@@ -87,6 +87,27 @@ suite('sessionAnalysis', () => {
 		const unanalyzed = filterCandidatesForAnalysis([recent, older], needsAnalysis, new Set<string>(['fingerprint-recent']));
 		assert.equal(unanalyzed.length, 1);
 		assert.equal(unanalyzed[0]?.session.id, 'older');
+
+		const last24UnanalyzedOnly = createPresetAnalysisSelection('last24Hours', now, true);
+		const withinRangeUnanalyzedOnly = filterCandidatesForAnalysis(
+			[recent, older],
+			last24UnanalyzedOnly,
+			new Set<string>(['fingerprint-recent']),
+		);
+		assert.equal(withinRangeUnanalyzedOnly.length, 0);
+
+		const customRangeUnanalyzedOnly = createCustomRangeSelection(
+			'2026-05-01T00:00:00.000Z',
+			'2026-05-18T00:00:00.000Z',
+			true,
+		);
+		const mixedRange = filterCandidatesForAnalysis(
+			[recent, older],
+			customRangeUnanalyzedOnly,
+			new Set<string>(['fingerprint-recent']),
+		);
+		assert.equal(mixedRange.length, 1);
+		assert.equal(mixedRange[0]?.session.id, 'older');
 	});
 
 	test('splitCandidatesIntoAnalysisBatches splits large candidate sets by evidence size', () => {

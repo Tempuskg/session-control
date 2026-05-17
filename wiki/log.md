@@ -80,6 +80,6 @@ Pages touched: chat-participant.md, file-manifest.md, overview.md, index.md, log
 Extended the saved-chat analysis flow so it now suggests an **Implement Recommendations** follow-up after `@session-control /analyze`. Added `/implement` to the participant command set, report-loading support in `analysisStore.ts`, and implementation-context prompt building in `sessionAnalysis.ts`. The participant can now reuse the latest saved analysis report in the same chat thread for implementation-oriented follow-ups.
 Pages touched: chat-participant.md, file-manifest.md, log.md
 
-## [2026-05-17] update | Analysis Provenance Metadata
-Expanded saved analysis artifacts so reports now retain owner-workspace, repository-context, and source-session provenance, and analysis index entries retain root-file and git metadata for audited sessions. The analyze flow now also prints the equivalent `@session-control /implement` next step in the chat response so the handoff remains visible even without using the follow-up button.
-Pages touched: README.md, CHANGELOG.md, chat-participant.md, overview.md, file-manifest.md, log.md
+## [2026-05-17] update | Date Range Analyze Scope Choice
+Updated the interactive `@session-control /analyze` date-range flow so it now asks whether to analyze only unanalyzed chats within the selected date range or re-analyze every chat in that range. Persisted reports now record whether the run was limited to unanalyzed chats.
+Pages touched: chat-participant.md, log.md

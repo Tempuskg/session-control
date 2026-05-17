@@ -22,7 +22,13 @@ Look for common mistakes AI was doing and other things that can be optimized.
 Look thoroughly through all conversations and make a plan for how we can optimize our flow in the future, both within each repository and cross-repositories.
 Also look for insights that would be useful for the coding agent to know beforehand, both before entering a repository and when working in multiple repositories at the same time.`;
 
-function createRangeSelection(mode: AnalysisSelectionMode, label: string, start: Date, end: Date): AnalysisSelection {
+function createRangeSelection(
+	mode: AnalysisSelectionMode,
+	label: string,
+	start: Date,
+	end: Date,
+	onlyUnanalyzed: boolean,
+): AnalysisSelection {
 	return {
 		mode,
 		label,
@@ -30,28 +36,30 @@ function createRangeSelection(mode: AnalysisSelectionMode, label: string, start:
 			start: start.toISOString(),
 			end: end.toISOString(),
 		},
+		onlyUnanalyzed,
 	};
 }
 
 export function createPresetAnalysisSelection(
 	mode: Extract<AnalysisSelectionMode, 'last24Hours' | 'last7Days' | 'last30Days'>,
 	now: Date = new Date(),
+	onlyUnanalyzed = false,
 ): AnalysisSelection {
 	const end = new Date(now);
 	const start = new Date(now);
 
 	if (mode === 'last24Hours') {
 		start.setTime(now.getTime() - (24 * 60 * 60 * 1000));
-		return createRangeSelection(mode, 'Last 24 Hours', start, end);
+		return createRangeSelection(mode, 'Last 24 Hours', start, end, onlyUnanalyzed);
 	}
 
 	if (mode === 'last7Days') {
 		start.setTime(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-		return createRangeSelection(mode, 'Last 7 Days', start, end);
+		return createRangeSelection(mode, 'Last 7 Days', start, end, onlyUnanalyzed);
 	}
 
 	start.setTime(now.getTime() - (30 * 24 * 60 * 60 * 1000));
-	return createRangeSelection(mode, 'Last 30 Days', start, end);
+	return createRangeSelection(mode, 'Last 30 Days', start, end, onlyUnanalyzed);
 }
 
 export function createNeedsAnalysisSelection(): AnalysisSelection {
@@ -59,10 +67,11 @@ export function createNeedsAnalysisSelection(): AnalysisSelection {
 		mode: 'needsAnalysis',
 		label: 'Needs Analysis',
 		range: null,
+		onlyUnanalyzed: true,
 	};
 }
 
-export function createCustomRangeSelection(startInput: string, endInput: string): AnalysisSelection {
+export function createCustomRangeSelection(startInput: string, endInput: string, onlyUnanalyzed = false): AnalysisSelection {
 	const start = new Date(startInput);
 	const end = new Date(endInput);
 
@@ -79,6 +88,7 @@ export function createCustomRangeSelection(startInput: string, endInput: string)
 		`${start.toISOString()} to ${end.toISOString()}`,
 		start,
 		end,
+		onlyUnanalyzed,
 	);
 }
 
@@ -112,21 +122,21 @@ export function filterCandidatesForAnalysis(
 	selection: AnalysisSelection,
 	analyzedFingerprints: ReadonlySet<string>,
 ): AnalysisCandidateSession[] {
-	if (selection.mode === 'needsAnalysis') {
-		return candidates.filter((candidate) => !analyzedFingerprints.has(candidate.fingerprint));
-	}
-
 	const range = selection.range;
-	if (!range) {
-		return candidates;
+	const rangeFiltered = !range
+		? candidates
+		: candidates.filter((candidate) => {
+			const savedAt = Date.parse(candidate.session.savedAt);
+			const startTime = Date.parse(range.start);
+			const endTime = Date.parse(range.end);
+			return savedAt >= startTime && savedAt <= endTime;
+		});
+
+	if (!selection.onlyUnanalyzed) {
+		return rangeFiltered;
 	}
 
-	const startTime = Date.parse(range.start);
-	const endTime = Date.parse(range.end);
-	return candidates.filter((candidate) => {
-		const savedAt = Date.parse(candidate.session.savedAt);
-		return savedAt >= startTime && savedAt <= endTime;
-	});
+	return rangeFiltered.filter((candidate) => !analyzedFingerprints.has(candidate.fingerprint));
 }
 
 function renderToolCalls(session: ChatSession): string[] {

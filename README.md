@@ -71,11 +71,11 @@ In VS Code Chat, type:
 
 You can either choose a timeframe interactively or use a quick alias such as `24h`, `7d`, `30d`, or `needs analysis`.
 
+When you pick a date-based range interactively, Session Control now asks whether it should analyze only chats in that range that have not been analyzed yet, or re-analyze everything in that range.
+
 The participant reviews saved sessions from the configured storage folder, streams a report back into chat, and writes a markdown report under `.chat/analysis/reports/`. It also keeps an analysis index in `.chat/analysis/index.json` so the **Needs Analysis** mode only selects chats that have not been analyzed yet or whose content has changed since the last analysis.
 
-Saved analysis reports now include the owner workspace, repository-context summaries, and the source session files that contributed to the report so later synthesis and implementation follow-ups have clearer provenance.
-
-After the report is generated, Session Control suggests an **Implement Recommendations** follow-up in chat and also prints the equivalent `@session-control /implement` next step in the response. Clicking the follow-up sends `@session-control /implement` with the latest saved analysis report as context so you can continue from analysis into implementation guidance in the same thread.
+After the report is generated, Session Control suggests an **Implement Recommendations** follow-up in chat. Clicking it sends `@session-control /implement` with the latest saved analysis report as context so you can continue from analysis into implementation guidance in the same thread.
 
 ### View a saved session in the web viewer
 

@@ -60,35 +60,14 @@ suite('analysisStore', () => {
 				promptVersion: '1',
 				contributingWorkspaces: ['workspace'],
 				analyzedFingerprints: ['fingerprint-a'],
-				ownerWorkspaceName: 'workspace',
-				repositories: [{
-					workspaceName: 'workspace',
-					branch: 'main',
-					commit: 'abcdef1234567890',
-					dirty: false,
-					sessionCount: 1,
-				}],
-				sourceSessions: [{
-					workspaceName: 'workspace',
-					sessionId: 'session-a',
-					title: 'Session A',
-					savedAt: '2026-05-17T10:00:00.000Z',
-					rootFileName: 'session-a.json',
-					fingerprint: 'fingerprint-a',
-					git: { branch: 'main', commit: 'abcdef1234567890', dirty: false },
-				}],
 				content: '## Findings\n\nA useful finding.',
 				createdAt: '2026-05-17T12:00:00.000Z',
 			});
 
 			const reportContent = await fs.readFile(persisted.reportFilePath, 'utf8');
 			assert.equal(persisted.report.reportPath.startsWith('analysis/reports/'), true);
-			assert.equal(persisted.report.ownerWorkspaceName, 'workspace');
-			assert.equal(persisted.report.sessionCount, 1);
 			assert.equal(reportContent.includes('# Chat Analysis Report'), true);
 			assert.equal(reportContent.includes('Needs Analysis'), true);
-			assert.equal(reportContent.includes('Owner Workspace: workspace'), true);
-			assert.equal(reportContent.includes('session-a.json'), true);
 		} finally {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}
@@ -115,17 +94,12 @@ suite('analysisStore', () => {
 					sessionId: 'session-a',
 					title: 'Session A',
 					savedAt: '2026-05-17T10:00:00.000Z',
-					rootFileName: 'session-a.json',
-					git: { branch: 'main', commit: 'abcdef1234567890', dirty: false },
 				},
 			]);
 
 			const index = await store.readIndex(storageDirectory);
 			assert.equal(index.reports.length, 1);
 			assert.equal(index.analyzedSessions.length, 1);
-			assert.equal(index.analyzedSessions[0]?.rootFileName, 'session-a.json');
-			assert.equal(index.analyzedSessions[0]?.reportId, persisted.report.id);
-			assert.equal(index.analyzedSessions[0]?.git?.branch, 'main');
 			assert.equal(await store.hasAnalyzedFingerprint(storageDirectory, 'fingerprint-a'), true);
 		} finally {
 			await fs.rm(tempRoot, { recursive: true, force: true });

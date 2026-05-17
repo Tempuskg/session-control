@@ -65,6 +65,7 @@ export interface AnalysisSelection {
 	mode: AnalysisSelectionMode;
 	label: string;
 	range: AnalysisTimeRange | null;
+	onlyUnanalyzed?: boolean;
 }
 
 export interface AnalysisReportRepositorySummary {
@@ -229,6 +230,7 @@ export function isAnalysisSelection(value: unknown): value is AnalysisSelection 
 
 	return isAnalysisSelectionMode(value.mode)
 		&& typeof value.label === 'string'
+		&& (value.onlyUnanalyzed === undefined || typeof value.onlyUnanalyzed === 'boolean')
 		&& (value.range === null || isAnalysisTimeRange(value.range));
 }
 

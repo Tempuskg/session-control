@@ -16,15 +16,7 @@ import {
 	splitCandidatesIntoAnalysisBatches,
 	type AnalysisCandidateSession,
 } from './sessionAnalysis';
-import {
-	AnalysisReportReference,
-	AnalysisReportRepositorySummary,
-	AnalysisReportSourceSession,
-	AnalysisSelection,
-	ChatSession,
-	SavedTurn,
-	SessionMeta,
-} from './types';
+import { AnalysisReportReference, AnalysisSelection, ChatSession, SavedTurn, SessionMeta } from './types';
 import { fuzzyMatchSessions } from './utils';
 
 const chatSessionStore = createSessionStore();
@@ -203,6 +195,26 @@ function normalizeDateInput(value: string, endOfDay: boolean): string {
 	return parsed.toISOString();
 }
 
+async function promptDateRangeAnalysisMode(): Promise<boolean | undefined> {
+	const pick = await vscode.window.showQuickPick(
+		[
+			{
+				label: 'Only unanalyzed items in this range',
+				description: 'Skip chats in the date range that were already analyzed unless their content changed',
+				onlyUnanalyzed: true,
+			},
+			{
+				label: 'Everything in this range',
+				description: 'Re-analyze all chats in the date range even if they were analyzed before',
+				onlyUnanalyzed: false,
+			},
+		],
+		{ title: 'Choose how to analyze the selected date range' },
+	);
+
+	return pick?.onlyUnanalyzed;
+}
+
 async function resolveAnalysisSelection(prompt: string): Promise<import('./types').AnalysisSelection | undefined> {
 	const parsed = parseAnalysisSelectionAlias(prompt);
 	if (parsed) {
@@ -225,7 +237,12 @@ async function resolveAnalysisSelection(prompt: string): Promise<import('./types
 	}
 
 	if (pick.mode === 'last24Hours' || pick.mode === 'last7Days' || pick.mode === 'last30Days') {
-		return createPresetAnalysisSelection(pick.mode);
+		const onlyUnanalyzed = await promptDateRangeAnalysisMode();
+		if (onlyUnanalyzed === undefined) {
+			return undefined;
+		}
+
+		return createPresetAnalysisSelection(pick.mode, new Date(), onlyUnanalyzed);
 	}
 
 	if (pick.mode === 'needsAnalysis') {
@@ -250,10 +267,16 @@ async function resolveAnalysisSelection(prompt: string): Promise<import('./types
 		return undefined;
 	}
 
+	const onlyUnanalyzed = await promptDateRangeAnalysisMode();
+	if (onlyUnanalyzed === undefined) {
+		return undefined;
+	}
+
 	try {
 		return createCustomRangeSelection(
 			normalizeDateInput(startInput, false),
 			normalizeDateInput(endInput, true),
+			onlyUnanalyzed,
 		);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -285,56 +308,6 @@ async function createAnalysisCandidates(workspaceSessions: WorkspaceSessionMeta[
 	}
 
 	return candidates.sort((a, b) => Date.parse(b.session.savedAt) - Date.parse(a.session.savedAt));
-}
-
-function buildAnalysisRepositorySummaries(candidates: AnalysisCandidateSession[]): AnalysisReportRepositorySummary[] {
-	const summaries = new Map<string, AnalysisReportRepositorySummary>();
-
-	for (const candidate of candidates) {
-		const branch = candidate.session.git?.branch ?? null;
-		const commit = candidate.session.git?.commit ?? null;
-		const dirty = candidate.session.git?.dirty ?? null;
-		const key = [candidate.workspaceName, branch ?? '', commit ?? '', dirty === null ? 'unknown' : String(dirty)].join('::');
-		const existing = summaries.get(key);
-		if (existing) {
-			existing.sessionCount += 1;
-			continue;
-		}
-
-		summaries.set(key, {
-			workspaceName: candidate.workspaceName,
-			branch,
-			commit,
-			dirty,
-			sessionCount: 1,
-		});
-	}
-
-	return [...summaries.values()].sort((left, right) => {
-		const workspaceComparison = left.workspaceName.localeCompare(right.workspaceName);
-		if (workspaceComparison !== 0) {
-			return workspaceComparison;
-		}
-
-		const branchComparison = (left.branch ?? '').localeCompare(right.branch ?? '');
-		if (branchComparison !== 0) {
-			return branchComparison;
-		}
-
-		return (left.commit ?? '').localeCompare(right.commit ?? '');
-	});
-}
-
-function buildAnalysisSourceSessions(candidates: AnalysisCandidateSession[]): AnalysisReportSourceSession[] {
-	return candidates.map((candidate) => ({
-		workspaceName: candidate.workspaceName,
-		sessionId: candidate.session.id,
-		title: candidate.session.title,
-		savedAt: candidate.session.savedAt,
-		rootFileName: candidate.rootFileName,
-		fingerprint: candidate.fingerprint,
-		git: candidate.session.git,
-	}));
 }
 
 async function loadAnalyzedFingerprintSet(candidates: AnalysisCandidateSession[]): Promise<Set<string>> {
@@ -388,6 +361,41 @@ function createStorageSpecificReportReference(
 		...report,
 		reportPath: normalizeRelativePath(path.relative(storageDirectory, reportFilePath)),
 	};
+}
+
+function summarizeRepositoriesForAnalysis(candidates: AnalysisCandidateSession[]): import('./types').AnalysisReportRepositorySummary[] {
+	const byWorkspace = new Map<string, AnalysisCandidateSession[]>();
+
+	for (const candidate of candidates) {
+		const existing = byWorkspace.get(candidate.workspaceName);
+		if (existing) {
+			existing.push(candidate);
+			continue;
+		}
+
+		byWorkspace.set(candidate.workspaceName, [candidate]);
+	}
+
+	return [...byWorkspace.entries()].map(([workspaceName, workspaceCandidates]) => {
+		const firstGit = workspaceCandidates[0]?.session.git ?? null;
+		const branch = workspaceCandidates.every((candidate) => candidate.session.git?.branch === firstGit?.branch)
+			? (firstGit?.branch ?? null)
+			: null;
+		const commit = workspaceCandidates.every((candidate) => candidate.session.git?.commit === firstGit?.commit)
+			? (firstGit?.commit ?? null)
+			: null;
+		const dirty = workspaceCandidates.every((candidate) => candidate.session.git?.dirty === firstGit?.dirty)
+			? (firstGit?.dirty ?? null)
+			: null;
+
+		return {
+			workspaceName,
+			branch,
+			commit,
+			dirty,
+			sessionCount: workspaceCandidates.length,
+		};
+	});
 }
 
 function findLatestAnalysisReportMeta(history: readonly (vscode.ChatRequestTurn | vscode.ChatResponseTurn)[]): {
@@ -526,16 +534,23 @@ export async function runAnalyzeSessionsFlow(
 	}
 
 	const ownerStorageDirectory = deps.getStoragePath(ownerWorkspace);
-	const repositorySummaries = buildAnalysisRepositorySummaries(filtered);
-	const sourceSessions = buildAnalysisSourceSessions(filtered);
 	const persisted = await deps.writeReport(ownerStorageDirectory, {
 		selection,
 		promptVersion: ANALYSIS_PROMPT_VERSION,
 		contributingWorkspaces: [...new Set(filtered.map((candidate) => candidate.workspaceName))],
 		analyzedFingerprints: filtered.map((candidate) => candidate.fingerprint),
+		sessionCount: filtered.length,
 		ownerWorkspaceName: ownerWorkspace.name,
-		repositories: repositorySummaries,
-		sourceSessions,
+		repositories: summarizeRepositoriesForAnalysis(filtered),
+		sourceSessions: filtered.map((candidate) => ({
+			workspaceName: candidate.workspaceName,
+			sessionId: candidate.session.id,
+			title: candidate.session.title,
+			savedAt: candidate.session.savedAt,
+			rootFileName: candidate.rootFileName,
+			fingerprint: candidate.fingerprint,
+			git: candidate.session.git,
+		})),
 		content: finalMarkdown,
 	});
 
@@ -570,7 +585,9 @@ export async function runAnalyzeSessionsFlow(
 		);
 	}
 
-	deps.streamMarkdown(`\n\nSaved analysis report to **${persisted.report.reportPath}** in workspace **${ownerWorkspace.name}**.\n\nUse the **Implement Recommendations** follow-up or run \`@session-control /implement\` to continue from this report.`);
+	deps.streamMarkdown(
+		`\n\nSaved analysis report to **${persisted.report.reportPath}** in workspace **${ownerWorkspace.name}**. Use **@session-control /implement** to apply the recommendations.`,
+	);
 	return {
 		metadata: {
 			resultType: 'analysis-report',
