@@ -7,6 +7,7 @@ import {
 	createNeedsAnalysisSelection,
 	createPresetAnalysisSelection,
 	filterCandidatesForAnalysis,
+	parseImplementationResponse,
 	parseAnalysisSelectionAlias,
 	splitCandidatesIntoAnalysisBatches,
 	type AnalysisCandidateSession,
@@ -148,5 +149,69 @@ suite('sessionAnalysis', () => {
 		assert.equal(prompt.includes('The user previously ran an analysis over saved chat sessions'), true);
 		assert.equal(prompt.includes('# Chat Analysis Report'), true);
 		assert.equal(prompt.includes('User request: Implement the highest-priority recommendation.'), true);
+		assert.equal(prompt.includes('## Status'), true);
+		assert.equal(prompt.includes('## Files Changed'), true);
+		assert.equal(prompt.includes('## Blockers'), true);
+	});
+
+	test('parseImplementationResponse extracts completed implementation metadata', () => {
+		const parsed = parseImplementationResponse(
+			[
+				'## Status',
+				'COMPLETED',
+				'',
+				'## Summary',
+				'Implemented the analysis orchestration changes.',
+				'',
+				'## Files Changed',
+				'- src/analysisOrchestrator.ts',
+				'- src/chatParticipant.ts',
+				'',
+				'## Commands Run',
+				'- npm test',
+				'',
+				'## Results',
+				'- All tests passed.',
+				'',
+				'## Unverified',
+				'- Manual Development Host smoke test',
+			].join('\n'),
+			'analysis/reports/report-1.md',
+			'e:/workspace/.chat',
+		);
+
+		assert.equal(parsed?.implementationStatus, 'completed');
+		assert.equal(parsed?.summary, 'Implemented the analysis orchestration changes.');
+		assert.deepEqual(parsed?.filesChanged, ['src/analysisOrchestrator.ts', 'src/chatParticipant.ts']);
+		assert.deepEqual(parsed?.commandsRun, ['npm test']);
+		assert.deepEqual(parsed?.results, ['All tests passed.']);
+		assert.deepEqual(parsed?.blockers, []);
+		assert.deepEqual(parsed?.unverified, ['Manual Development Host smoke test']);
+	});
+
+	test('parseImplementationResponse extracts blocked implementation metadata', () => {
+		const parsed = parseImplementationResponse(
+			[
+				'## Status',
+				'BLOCKED',
+				'',
+				'## Summary',
+				'Cannot continue until the workspace path is resolved.',
+				'',
+				'## Blockers',
+				'- Missing workspace folder',
+				'',
+				'## Unverified',
+				'- No compile run yet',
+			].join('\n'),
+			'analysis/reports/report-1.md',
+			'e:/workspace/.chat',
+		);
+
+		assert.equal(parsed?.implementationStatus, 'blocked');
+		assert.equal(parsed?.summary, 'Cannot continue until the workspace path is resolved.');
+		assert.deepEqual(parsed?.blockers, ['Missing workspace folder']);
+		assert.deepEqual(parsed?.unverified, ['No compile run yet']);
+		assert.deepEqual(parsed?.filesChanged, []);
 	});
 });

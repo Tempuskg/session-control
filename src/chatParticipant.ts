@@ -8,6 +8,7 @@ import {
 } from './analysisOrchestrator';
 import { createSessionStore } from './sessionStore';
 import {
+	parseImplementationResponse,
 	buildAnalysisPrompt,
 	buildAnalysisSynthesisPrompt,
 	buildImplementationPrompt,
@@ -19,7 +20,14 @@ import {
 	splitCandidatesIntoAnalysisBatches,
 	type AnalysisCandidateSession,
 } from './sessionAnalysis';
-import { AnalysisReportResultMetadata, AnalysisSelection, ChatSession, SavedTurn, SessionMeta } from './types';
+import {
+	AnalysisImplementationResultMetadata,
+	AnalysisReportResultMetadata,
+	AnalysisSelection,
+	ChatSession,
+	SavedTurn,
+	SessionMeta,
+} from './types';
 import { fuzzyMatchSessions } from './utils';
 
 export { runAnalyzeSessionsFlow } from './analysisOrchestrator';
@@ -50,11 +58,7 @@ export interface ReassembledSessionResult {
 }
 
 export interface ImplementRecommendationsFlowResult {
-	metadata: {
-		resultType: 'analysis-implementation';
-		analysisReportPath: string;
-		analysisStorageDirectory: string;
-	};
+	metadata: AnalysisImplementationResultMetadata;
 }
 
 export interface ImplementRecommendationsFlowDeps {
@@ -419,12 +423,33 @@ export async function runImplementRecommendationsFlow(
 		return;
 	}
 
+	const parsed = parseImplementationResponse(
+		response,
+		analysisMeta.analysisReportPath,
+		analysisMeta.analysisStorageDirectory,
+	);
+	if (!parsed) {
+		deps.streamMarkdown(
+			'\n\nImplementation follow-up did not return a parseable status block; treating it as blocked.',
+		);
+		return {
+			metadata: {
+				resultType: 'analysis-implementation',
+				implementationStatus: 'blocked',
+				analysisReportPath: analysisMeta.analysisReportPath,
+				analysisStorageDirectory: analysisMeta.analysisStorageDirectory,
+				summary: 'The implementation follow-up did not use the required status format.',
+				filesChanged: [],
+				commandsRun: [],
+				results: [],
+				blockers: ['Model response did not follow the required implementation status format.'],
+				unverified: [],
+			},
+		};
+	}
+
 	return {
-		metadata: {
-			resultType: 'analysis-implementation',
-			analysisReportPath: analysisMeta.analysisReportPath,
-			analysisStorageDirectory: analysisMeta.analysisStorageDirectory,
-		},
+		metadata: parsed,
 	};
 	}
 

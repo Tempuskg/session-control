@@ -77,6 +77,21 @@ export interface AnalysisReportResultMetadata {
 	analysisStorageDirectory: string;
 }
 
+export type AnalysisImplementationStatus = 'completed' | 'blocked';
+
+export interface AnalysisImplementationResultMetadata {
+	resultType: 'analysis-implementation';
+	implementationStatus: AnalysisImplementationStatus;
+	analysisReportPath: string;
+	analysisStorageDirectory: string;
+	summary: string;
+	filesChanged: string[];
+	commandsRun: string[];
+	results: string[];
+	blockers: string[];
+	unverified: string[];
+}
+
 export interface AnalysisReportRepositorySummary {
 	workspaceName: string;
 	branch: string | null;

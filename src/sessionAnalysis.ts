@@ -1,4 +1,5 @@
 import {
+	AnalysisImplementationResultMetadata,
 	AnalysisSelection,
 	AnalysisSelectionMode,
 	ChatSession,
@@ -284,7 +285,39 @@ export function buildImplementationPrompt(reportMarkdown: string, userPrompt: st
 		'When the report includes multiple recommendations, prioritize the highest-impact changes that are feasible in the current repository.',
 		'If the request is broad, start with the first actionable implementation slice, make the change, and validate it with the narrowest relevant test or command before expanding scope.',
 		'If you cannot safely complete the next implementation step, explicitly say BLOCKED and name the blocker instead of giving another plan.',
-		'Close with the concrete outcome: files changed, commands run, results, and any remaining unverified items.',
+		'Return markdown using exactly one of these shapes so the result can be parsed reliably:',
+		'',
+		'## Status',
+		'COMPLETED',
+		'',
+		'## Summary',
+		'<brief summary>',
+		'',
+		'## Files Changed',
+		'- <file path or note>',
+		'',
+		'## Commands Run',
+		'- <command or note>',
+		'',
+		'## Results',
+		'- <test/build/result>',
+		'',
+		'## Unverified',
+		'- <remaining risk or none>',
+		'',
+		'Or, if blocked:',
+		'',
+		'## Status',
+		'BLOCKED',
+		'',
+		'## Summary',
+		'<brief summary>',
+		'',
+		'## Blockers',
+		'- <specific blocker>',
+		'',
+		'## Unverified',
+		'- <remaining risk or none>',
 		'',
 		'Analysis report:',
 		'',
@@ -292,4 +325,90 @@ export function buildImplementationPrompt(reportMarkdown: string, userPrompt: st
 		'',
 		`User request: ${normalizedPrompt}`,
 	].join('\n');
+}
+
+function parseImplementationSectionMap(markdown: string): Map<string, string> {
+	const normalized = markdown.replace(/\r\n/g, '\n').trim();
+	const headingPattern = /^##\s+(.+?)\s*$/gm;
+	const matches = [...normalized.matchAll(headingPattern)];
+	const sections = new Map<string, string>();
+
+	for (let index = 0; index < matches.length; index += 1) {
+		const match = matches[index];
+		if (!match || match.index === undefined) {
+			continue;
+		}
+
+		const rawHeading = match[1];
+		if (!rawHeading) {
+			continue;
+		}
+
+		const contentStart = match.index + match[0].length;
+		const nextMatch = matches[index + 1];
+		const contentEnd = nextMatch?.index ?? normalized.length;
+		sections.set(rawHeading.trim().toLowerCase(), normalized.slice(contentStart, contentEnd).trim());
+	}
+
+	return sections;
+}
+
+function parseImplementationItems(section: string | undefined): string[] {
+	if (!section) {
+		return [];
+	}
+
+	return section
+		.split('\n')
+		.map((line) => line.trim())
+		.filter((line) => line.length > 0)
+		.flatMap((line) => {
+			if (/^[-*+]\s+/.test(line)) {
+				const value = line.replace(/^[-*+]\s+/, '').trim();
+				return /^none$|^n\/a$/i.test(value) ? [] : [value];
+			}
+
+			return /^none$|^n\/a$/i.test(line) ? [] : [line];
+		});
+}
+
+export function parseImplementationResponse(
+	markdown: string,
+	analysisReportPath: string,
+	analysisStorageDirectory: string,
+): AnalysisImplementationResultMetadata | undefined {
+	const sections = parseImplementationSectionMap(markdown);
+	const statusSection = sections.get('status');
+	if (!statusSection) {
+		return undefined;
+	}
+
+	const normalizedStatus = statusSection.split(/\s+/)[0]?.trim().toUpperCase();
+	if (normalizedStatus !== 'COMPLETED' && normalizedStatus !== 'BLOCKED') {
+		return undefined;
+	}
+
+	const summary = sections.get('summary')?.trim();
+	if (!summary) {
+		return undefined;
+	}
+
+	const metadata: AnalysisImplementationResultMetadata = {
+		resultType: 'analysis-implementation',
+		implementationStatus: normalizedStatus === 'COMPLETED' ? 'completed' : 'blocked',
+		analysisReportPath,
+		analysisStorageDirectory,
+		summary,
+		filesChanged: parseImplementationItems(sections.get('files changed')),
+		commandsRun: parseImplementationItems(sections.get('commands run')),
+		results: parseImplementationItems(sections.get('results')),
+		blockers: parseImplementationItems(sections.get('blockers')),
+		unverified: parseImplementationItems(sections.get('unverified')),
+	};
+
+	if (metadata.implementationStatus === 'blocked' && metadata.blockers.length === 0) {
+		metadata.blockers.push('The model marked the implementation as blocked but did not provide a blocker list in the required format.');
+	}
+
+	return metadata;
 }

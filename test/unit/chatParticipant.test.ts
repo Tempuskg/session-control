@@ -515,7 +515,25 @@ suite('chatParticipant implementation followups', () => {
 			createImplementFlowDeps({
 				runModelPrompt: async (prompt: string, streamOutput: boolean) => {
 					prompts.push({ prompt, streamOutput });
-					return 'Implementation guidance';
+					return [
+						'## Status',
+						'COMPLETED',
+						'',
+						'## Summary',
+						'Implemented the highest-priority recommendation.',
+						'',
+						'## Files Changed',
+						'- src/chatParticipant.ts',
+						'',
+						'## Commands Run',
+						'- npm test',
+						'',
+						'## Results',
+						'- 134 passing',
+						'',
+						'## Unverified',
+						'- Manual Development Host smoke test',
+					].join('\n');
 				},
 				streamMarkdown: (markdown: string) => {
 					messages.push(markdown);
@@ -529,8 +547,39 @@ suite('chatParticipant implementation followups', () => {
 		assert.equal(prompts[0]?.prompt.includes('User request: Implement the highest-priority recommendation.'), true);
 		assert.equal(prompts[0]?.prompt.includes('stay in implementation mode for the current repository'), true);
 		assert.equal(prompts[0]?.prompt.includes('explicitly say BLOCKED and name the blocker'), true);
+		assert.equal(prompts[0]?.prompt.includes('Return markdown using exactly one of these shapes'), true);
 		assert.equal(messages[0]?.includes('Using analysis report **analysis/reports/report-1.md** as implementation context.'), true);
 		assert.equal(result?.metadata.resultType, 'analysis-implementation');
+		assert.equal(result?.metadata.implementationStatus, 'completed');
 		assert.equal(result?.metadata.analysisReportPath, 'analysis/reports/report-1.md');
+		assert.deepEqual(result?.metadata.filesChanged, ['src/chatParticipant.ts']);
+		assert.deepEqual(result?.metadata.commandsRun, ['npm test']);
+		assert.deepEqual(result?.metadata.results, ['134 passing']);
+		assert.deepEqual(result?.metadata.blockers, []);
+		assert.deepEqual(result?.metadata.unverified, ['Manual Development Host smoke test']);
+	});
+
+	test('treats an unparseable implementation response as blocked metadata', async () => {
+		const messages: string[] = [];
+		const result = await runImplementRecommendationsFlow(
+			'Implement the highest-priority recommendation.',
+			[],
+			createImplementFlowDeps({
+				runModelPrompt: async () => 'Implementation guidance without the required structure',
+				streamMarkdown: (markdown: string) => {
+					messages.push(markdown);
+				},
+			}),
+		);
+
+		assert.equal(result?.metadata.resultType, 'analysis-implementation');
+		assert.equal(result?.metadata.implementationStatus, 'blocked');
+		assert.equal(result?.metadata.summary, 'The implementation follow-up did not use the required status format.');
+		assert.deepEqual(result?.metadata.filesChanged, []);
+		assert.deepEqual(result?.metadata.commandsRun, []);
+		assert.deepEqual(result?.metadata.results, []);
+		assert.deepEqual(result?.metadata.blockers, ['Model response did not follow the required implementation status format.']);
+		assert.deepEqual(result?.metadata.unverified, []);
+		assert.equal(messages.some((message) => message.includes('treating it as blocked')), true);
 	});
 });
