@@ -9,16 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added `@session-control /analyze` to review saved chat sessions from a selected timeframe or only chats that have not been analyzed yet, with markdown reports persisted under `.chat/analysis/`.
-- Added `@session-control /handoff` to open a generated implementation prompt in chat or an agent session using the latest saved analysis report.
-- Added the `Session Control: Handoff Latest Analysis` command so the newest saved analysis report can be handed off from the command palette without relying on chat-thread metadata.
+- Added `@session-control /implement` to open a generated implementation prompt in chat or an agent session using the latest saved analysis report.
+- Added the `Session Control: Implement Latest Analysis` command so the newest saved analysis report can be opened from the command palette without relying on chat-thread metadata.
 
 ### Changed
 - When choosing an interactive date range for `@session-control /analyze`, the participant now asks whether to analyze only unanalyzed chats in that range or re-analyze every chat in that range.
-- Analysis results now offer a **Handoff to Agent** follow-up that opens the generated coding-agent handoff prompt.
+- Analysis results now offer an **Implement Recommendations** follow-up that opens the generated coding-agent implementation prompt.
 - Analysis prompts and handoff prompts now restrict recommendations and implementation follow-up to AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and similar repository-local instruction files.
-
-### Removed
-- Removed `@session-control /implement`; saved-chat analysis now transitions only through the handoff flow.
+- Renamed the lightweight post-analysis slash command from `@session-control /handoff` to `@session-control /implement`.
+- Renamed the command-palette entry from `Session Control: Handoff Latest Analysis` (`session-control.handoffLatestAnalysis`) to `Session Control: Implement Latest Analysis` (`session-control.implementLatestAnalysis`).
 
 ## [0.1.24] - 2026-04-25
 

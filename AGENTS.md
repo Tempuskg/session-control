@@ -12,7 +12,7 @@ When the request is to implement, continue implementation, or generate a handoff
 4. Before the first edit, use at most one repo-wide search and one targeted search. Prefer owner-file reads over broad exploration, and avoid subagents unless blocked or intentionally parallelized.
 5. After preflight, make the smallest safe edit in the same turn or state one concrete blocker. Investigation-only implementation turns are not sufficient.
 6. Once an owner file is identified, stop adjacent filename fishing and only reopen the same hotspot with a new hypothesis.
-7. If workspace access is unavailable, reply once with the blocker and one recovery path: request full access, ask for pasted files, or generate a handoff prompt. Reuse a fresh referenced analysis report for `/handoff`; do not require `/analyze` again unless no current report exists.
+7. If workspace access is unavailable, reply once with the blocker and one recovery path: request full access, ask for pasted files, or generate an implementation prompt. Reuse a fresh referenced analysis report for `/implement`; do not require `/analyze` again unless no current report exists.
 8. Validate in this order when applicable: touched-file diagnostics, `npm run compile-tests`, focused relevant tests, `npm test`, then a Development Host smoke test for interactive behavior. Do not use plain `node --test`, and treat direct Mocha runs as unreliable in this repo. If `dist-test` disagrees with source, rebuild before diagnosing deeper.
 9. Delay `README`, `wiki`, and `CHANGELOG` edits until command names and UX are stable unless the user explicitly asks for docs now.
 10. Batch progress into milestone summaries instead of progress-only narration unless blocked or waiting for input.

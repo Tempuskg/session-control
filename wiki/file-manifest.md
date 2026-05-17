@@ -25,10 +25,10 @@ Planned source files for the session-control extension, their roles, and depende
 | `package.json` | Extension manifest: commands, settings, chat participant, menus | — |
 | `src/extension.ts` | Entry point: registers commands, chat participant, and auto-save listeners (exports `registerAutoSaveOnChatResponseListener`) | All modules |
 | `src/analysisStore.ts` | Persists analysis reports and fingerprint-based analyzed-session state under `.chat/analysis/` | `types.ts` |
-| `src/sessionAnalysis.ts` | Pure helpers for analysis selection parsing, timeframe filtering, AI-control-file-scoped analysis and handoff prompt construction, and batching | `types.ts` |
+| `src/sessionAnalysis.ts` | Pure helpers for analysis selection parsing, timeframe filtering, AI-control-file-scoped analysis and implementation prompt construction, and batching | `types.ts` |
 | `src/sessionReader.ts` | Reads Copilot internal session files; handles format versioning | VS Code internal API |
 | `src/sessionWriter.ts` | Transforms raw sessions to [Session Format](session-format.md); writes to disk | `types.ts`, `gitIntegration.ts`, `utils.ts` |
-| `src/chatParticipant.ts` | `@session-control` chat participant handler for resume, list, analyze, and handoff workflows | `sessionStore.ts`, `analysisStore.ts`, `sessionAnalysis.ts`, `types.ts` |
+| `src/chatParticipant.ts` | `@session-control` chat participant handler for resume, list, analyze, and lightweight implementation workflows | `sessionStore.ts`, `analysisStore.ts`, `sessionAnalysis.ts`, `types.ts` |
 | `src/gitIntegration.ts` | Git extension API wrapper: branch, SHA, commit listener | `vscode.git` extension API |
 | `src/sessionStore.ts` | CRUD operations on saved session files in `.chat/` | `types.ts`, `utils.ts` |
 | `src/types.ts` | TypeScript interfaces for saved chats and analysis index metadata | — |
@@ -96,14 +96,14 @@ graph TD
 - `session-control.openSessionFromExplorer` — "Open Saved Session" (Session Explorer inline action)
 - `session-control.deleteSessionFromExplorer` — "Delete Saved Session" (Session Explorer inline action)
 - `session-control.refreshSessionExplorer` — "Refresh Session Explorer"
-- `session-control.handoffLatestAnalysis` — "Session Control: Handoff Latest Analysis"
+- `session-control.implementLatestAnalysis` — "Session Control: Implement Latest Analysis"
 - `session-control.toggleAutoSave` — "Toggle Auto-Save" (toggles `autoSaveOnChatResponse`)
 
 ### Chat Participant
 - **ID**: `session-control.resume`
 - **Name**: `session-control`
 - **Description**: "Resume a saved chat session"
-- **Commands**: `resume`, `list`, `analyze`, `handoff`
+- **Commands**: `resume`, `list`, `analyze`, `implement`
 
 ### Menus
 - "Save Chat Session" in `chat/context` menu or command palette

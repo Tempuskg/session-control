@@ -474,7 +474,7 @@ suite('chatParticipant analyze flow', () => {
 });
 
 suite('chatParticipant implementation followups', () => {
-	test('suggests a handoff followup after an analysis result', () => {
+	test('suggests an implement followup after an analysis result', () => {
 		const followups = buildParticipantFollowups({
 			metadata: {
 				resultType: 'analysis-report',
@@ -484,8 +484,8 @@ suite('chatParticipant implementation followups', () => {
 		} as vscode.ChatResult);
 
 		assert.equal(followups.length, 1);
-		assert.equal(followups[0]?.label, 'Handoff to Agent');
-		assert.equal(followups[0]?.command, 'handoff');
+		assert.equal(followups[0]?.label, 'Implement Recommendations');
+		assert.equal(followups[0]?.command, 'implement');
 	});
 
 	test('does not suggest implementation followups for unrelated results', () => {
@@ -493,7 +493,7 @@ suite('chatParticipant implementation followups', () => {
 		assert.equal(followups.length, 0);
 	});
 
-	test('shows guidance when handing off without a prior analysis result', async () => {
+	test('shows guidance when implementing without a prior analysis result', async () => {
 		const messages: string[] = [];
 
 		await runImplementationHandoffFlow(
@@ -507,7 +507,7 @@ suite('chatParticipant implementation followups', () => {
 			}),
 		);
 
-		assert.deepEqual(messages, ['Use @session-control /analyze first, then ask me to hand off the recommendations.']);
+		assert.deepEqual(messages, ['Use @session-control /analyze first, then ask me to implement the recommendations.']);
 	});
 
 	test('opens chat with a generated implementation handoff prompt by default', async () => {

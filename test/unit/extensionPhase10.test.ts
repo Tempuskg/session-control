@@ -7,7 +7,7 @@ import {
 	createStorageGitignoreEntry,
 	ensureStoragePathInGitignore,
 	listSessionsAcrossWorkspaceFolders,
-	runHandoffLatestAnalysisCommand,
+	runImplementLatestAnalysisCommand,
 	runOpenSavedSessionCommand,
 	runResumeSessionFromViewerCommand,
 	runViewSessionFileCommand,
@@ -347,11 +347,11 @@ suite('runResumeSessionFromViewerCommand', () => {
 	});
 });
 
-suite('runHandoffLatestAnalysisCommand', () => {
+suite('runImplementLatestAnalysisCommand', () => {
 	test('shows guidance when no workspace is open', async () => {
 		const infoMessages: string[] = [];
 
-		await runHandoffLatestAnalysisCommand({
+		await runImplementLatestAnalysisCommand({
 			getWorkspaceFolders: () => undefined,
 			showInformationMessage: async (message: string) => {
 				infoMessages.push(message);
@@ -360,14 +360,14 @@ suite('runHandoffLatestAnalysisCommand', () => {
 			showWarningMessage: async () => undefined,
 		});
 
-		assert.deepEqual(infoMessages, ['Open a workspace folder before handing off a saved analysis.']);
+		assert.deepEqual(infoMessages, ['Open a workspace folder before implementing from a saved analysis.']);
 	});
 
 	test('shows guidance when no saved analysis reports exist', async () => {
 		const infoMessages: string[] = [];
 		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
 
-		await runHandoffLatestAnalysisCommand({
+		await runImplementLatestAnalysisCommand({
 			getWorkspaceFolders: () => [workspaceFolder],
 			getStoragePath: () => 'C:/repo/.chat',
 			readIndex: async () => ({ reports: [] }),
@@ -388,7 +388,7 @@ suite('runHandoffLatestAnalysisCommand', () => {
 		const workspaceB = createWorkspaceFolder('C:/repo-b', 'beta', 1);
 		let openedPrompt: string | undefined;
 
-		await runHandoffLatestAnalysisCommand({
+		await runImplementLatestAnalysisCommand({
 			getWorkspaceFolders: () => [workspaceA, workspaceB],
 			getStoragePath: (workspaceFolder) => path.join(workspaceFolder.uri.fsPath, '.chat'),
 			readIndex: async (storageDirectory: string) => {
@@ -430,7 +430,7 @@ suite('runHandoffLatestAnalysisCommand', () => {
 
 				return '# Chat Analysis Report';
 			},
-			buildPrompt: (reportFilePath: string) => `HANDOFF ${reportFilePath}`,
+			buildPrompt: (reportFilePath: string) => `IMPLEMENT ${reportFilePath}`,
 			getCommands: async () => [],
 			pickTarget: async (_agentSessionAvailable: boolean): Promise<'chat'> => 'chat',
 			openChat: async (prompt: string) => {
@@ -447,18 +447,18 @@ suite('runHandoffLatestAnalysisCommand', () => {
 
 		assert.equal(
 			openedPrompt?.toLowerCase(),
-			`HANDOFF ${path.join('C:/repo-a/.chat', 'analysis/reports/alpha-report.md')}`.toLowerCase(),
+			`IMPLEMENT ${path.join('C:/repo-a/.chat', 'analysis/reports/alpha-report.md')}`.toLowerCase(),
 		);
-		assert.deepEqual(infoMessages, ['Opened chat with an implementation handoff prompt for Alpha report.']);
+		assert.deepEqual(infoMessages, ['Opened chat with an implementation prompt for Alpha report.']);
 	});
 
-	test('opens an agent session and copies the latest analysis handoff prompt when available', async () => {
+	test('opens an agent session and copies the latest analysis implementation prompt when available', async () => {
 		const infoMessages: string[] = [];
 		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
 		let openedCommand: string | undefined;
 		let clipboardText: string | undefined;
 
-		await runHandoffLatestAnalysisCommand({
+		await runImplementLatestAnalysisCommand({
 			getWorkspaceFolders: () => [workspaceFolder],
 			getStoragePath: () => 'C:/repo/.chat',
 			readIndex: async () => ({
@@ -471,7 +471,7 @@ suite('runHandoffLatestAnalysisCommand', () => {
 				})],
 			}),
 			readReport: async () => '# Chat Analysis Report',
-			buildPrompt: (reportFilePath: string) => `HANDOFF ${reportFilePath}`,
+			buildPrompt: (reportFilePath: string) => `IMPLEMENT ${reportFilePath}`,
 			getCommands: async () => ['github.copilot.cli.newSession'],
 			pickTarget: async (_agentSessionAvailable: boolean): Promise<'agentSession'> => 'agentSession',
 			openChat: async () => undefined,
@@ -489,9 +489,9 @@ suite('runHandoffLatestAnalysisCommand', () => {
 		});
 
 		assert.equal(openedCommand, 'github.copilot.cli.newSession');
-		assert.equal(clipboardText, `HANDOFF ${path.join('C:/repo/.chat', 'analysis/reports/report-1.md')}`);
+		assert.equal(clipboardText, `IMPLEMENT ${path.join('C:/repo/.chat', 'analysis/reports/report-1.md')}`);
 		assert.deepEqual(infoMessages, [
-			'Opened an agent session for the latest analysis handoff from repo. The generated prompt is on the clipboard.',
+			'Opened an agent session for the latest saved analysis from repo. The generated implementation prompt is on the clipboard.',
 		]);
 	});
 });

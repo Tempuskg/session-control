@@ -464,7 +464,7 @@ export async function runImplementationHandoffFlow(
 
 	const analysisMeta = deps.findAnalysisReportMeta(history);
 	if (!analysisMeta) {
-		deps.streamMarkdown('Use @session-control /analyze first, then ask me to hand off the recommendations.');
+		deps.streamMarkdown('Use @session-control /analyze first, then ask me to implement the recommendations.');
 		return;
 	}
 
@@ -502,10 +502,10 @@ export function buildParticipantFollowups(result: vscode.ChatResult): vscode.Cha
 
 	if (metadata?.resultType === 'analysis-report' && metadata.analysisReportPath && metadata.analysisStorageDirectory) {
 		return [{
-			label: 'Handoff to Agent',
-			prompt: 'Open a generated implementation handoff prompt for this analysis report.',
+			label: 'Implement Recommendations',
+			prompt: 'Open a generated implementation prompt for this analysis report.',
 			participant: CHAT_PARTICIPANT_ID,
-			command: 'handoff',
+			command: 'implement',
 		}];
 	}
 
@@ -919,7 +919,7 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 			);
 		}
 
-		if (request.command === 'handoff') {
+		if (request.command === 'implement' || request.command === 'handoff') {
 			return runImplementationHandoffFlow(
 				request.prompt,
 				chatContext.history,
@@ -979,7 +979,7 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 
 		const analysisReportMeta = findLatestAnalysisReportMeta(chatContext.history);
 		if (analysisReportMeta) {
-			stream.markdown('Use @session-control /handoff to continue from the latest saved analysis report.');
+			stream.markdown('Use @session-control /implement to continue from the latest saved analysis report.');
 			return;
 		}
 

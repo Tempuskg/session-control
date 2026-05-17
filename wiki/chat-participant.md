@@ -42,7 +42,7 @@ Registered at activation via `vscode.chat.createChatParticipant()` in `src/chatP
 | `/resume` | `@session-control /resume <name>` | Load and inject a saved session as context |
 | `/list` | `@session-control /list` | Show available saved sessions in chat response |
 | `/analyze` | `@session-control /analyze` | Analyze saved sessions from a timeframe or only sessions that have not been analyzed yet |
-| `/handoff` | `@session-control /handoff` | Open a generated implementation handoff prompt in chat or an agent session |
+| `/implement` | `@session-control /implement` | Open a generated implementation prompt in chat or an agent session |
 
 ### `/resume` Behavior
 1. Fuzzy match `<name>` against session titles and filenames in `.chat/`
@@ -65,11 +65,11 @@ Registered at activation via `vscode.chat.createChatParticipant()` in `src/chatP
 6. Restrict recommendation sections to AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and similar repository-local instruction files
 7. Stream the final report back into chat and persist it under `.chat/analysis/reports/`
 8. Update each contributing workspace's analysis index so unchanged chats are skipped by future "Needs Analysis" runs
-9. Offer a **Handoff to Agent** follow-up suggestion for continuing from the saved report
+9. Offer an **Implement Recommendations** follow-up suggestion for continuing from the saved report
 
-### `/handoff` Behavior
+### `/implement` Behavior
 1. Find the most recent analysis result in the current chat thread via result metadata
-2. Build a compact handoff prompt that points a coding agent at the saved markdown report file and relevant AI control files while keeping implementation scoped to those files
+2. Build a compact implementation prompt that points a coding agent at the saved markdown report file and relevant AI control files while keeping implementation scoped to those files
 3. Open a new chat with that prompt prefilled by default
 4. When a supported agent-session opener is available, optionally open that surface instead and copy the prompt to the clipboard
 
@@ -93,7 +93,7 @@ async function handler(
     // List all saved sessions
   } else if (request.command === 'analyze') {
     // Filter saved sessions, analyze them with the chat model, and persist the report
-  } else if (request.command === 'handoff') {
+  } else if (request.command === 'implement') {
     // Open a generated implementation prompt in chat or an agent session
   }
 }
@@ -117,6 +117,6 @@ On follow-up turns, this context is re-injected via `context.history` and the co
 ## Notes
 
 - The participant now serves two roles: resuming prior chat context and analyzing saved chats for recurring workflow problems.
-- After `/analyze`, the participant suggests a follow-up that hands the saved report off to a coding-agent surface, with both the report and handoff prompt scoped to AI control file recommendations.
+- After `/analyze`, the participant suggests a follow-up that opens a lightweight implementation flow, with both the report and prompt scoped to AI control file recommendations.
 - Analysis state is stored separately from saved session JSON documents so the saved session schema remains backward compatible.
-- A separate command-palette command, `Session Control: Handoff Latest Analysis`, can perform the same handoff using the newest persisted report on disk when the current chat thread does not already contain analysis metadata.
+- A separate command-palette command, `Session Control: Implement Latest Analysis`, can perform the same lightweight implementation flow using the newest persisted report on disk when the current chat thread does not already contain analysis metadata.

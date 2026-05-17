@@ -4,13 +4,13 @@
 
 - State: Implemented in source, tests, docs, and manifest contributions.
 - Last updated: 2026-05-17.
-- Current follow-up model: `@session-control /analyze` persists a saved report and offers `@session-control /handoff`; `Session Control: Handoff Latest Analysis` provides the same handoff from the command palette.
-- Implemented refinement: analysis recommendations and handoff implementation prompts are restricted to AI-specific control files only.
-- Remaining work: manually smoke-test the analyze and handoff flows in VS Code.
+- Current follow-up model: `@session-control /analyze` persists a saved report and offers `@session-control /implement`; `Session Control: Implement Latest Analysis` provides the same lightweight implementation flow from the command palette.
+- Implemented refinement: analysis recommendations and implementation prompts are restricted to AI-specific control files only.
+- Remaining work: manually smoke-test the analyze and implement flows in VS Code.
 
 ## Goal
 
-Implement an `@session-control /analyze` workflow that reads saved sessions from each workspace's configured `.chat` folder, lets the user choose either a timeframe or a "Needs Analysis" mode, reassembles split sessions, sends a batched analysis request through the current chat model, streams the result back into chat, and saves a durable markdown report plus analysis state. Existing saved session files remain unchanged; analysis tracking lives in a separate fingerprint-based index so unchanged chats are skipped and changed chats become eligible again. The saved report then becomes the handoff artifact for a coding-agent follow-up. Analysis recommendations should be restricted to AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and similar prompt, instruction, agent, or skill-definition files rather than general source-code changes.
+Implement an `@session-control /analyze` workflow that reads saved sessions from each workspace's configured `.chat` folder, lets the user choose either a timeframe or a "Needs Analysis" mode, reassembles split sessions, sends a batched analysis request through the current chat model, streams the result back into chat, and saves a durable markdown report plus analysis state. Existing saved session files remain unchanged; analysis tracking lives in a separate fingerprint-based index so unchanged chats are skipped and changed chats become eligible again. The saved report then becomes the artifact for a lightweight coding-agent implementation follow-up. Analysis recommendations should be restricted to AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and similar prompt, instruction, agent, or skill-definition files rather than general source-code changes.
 
 ## Delivered Scope
 
@@ -24,11 +24,11 @@ Implement an `@session-control /analyze` workflow that reads saved sessions from
 8. Completed: composed analysis prompts from the chosen timeframe label plus a fixed output structure so reports remain comparable.
 9. Completed: added character-budget batching with batch summaries plus a final synthesis pass when selected sessions exceed a single prompt budget.
 10. Completed: extended `src/chatParticipant.ts` with `/analyze` and kept the handler thin through injected dependencies for selection UI, session loading, persistence, and model execution.
-11. Completed: updated `package.json` so the participant advertises `/analyze`, and later added the handoff surfaces that reuse saved analysis reports.
+11. Completed: updated `package.json` so the participant advertises `/analyze`, and later added the lightweight implementation surface that reuses saved analysis reports.
 12. Completed: documented the feature in `README.md`, `CHANGELOG.md`, and the required wiki pages.
-13. Completed: added a lightweight handoff flow so analysis results can open a generated implementation prompt in chat or an agent-capable surface.
-14. Completed: removed the earlier in-thread `/implement` path and standardized the post-analysis continuation model on handoff-only flows.
-15. Completed: restricted analysis recommendations and handoff implementation prompts to AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and similar repository-local instruction files.
+13. Completed: added a lightweight implementation flow so analysis results can open a generated implementation prompt in chat or an agent-capable surface.
+14. Completed: removed the earlier in-thread `/implement` path and standardized the post-analysis continuation model on the lightweight implementation flow instead.
+15. Completed: restricted analysis recommendations and implementation prompts to AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and similar repository-local instruction files.
 
 ## Implemented Recommendation Scope Refinement
 
@@ -67,8 +67,8 @@ Implement an `@session-control /analyze` workflow that reads saved sessions from
 3. Completed: unit tests cover prompt composition and batching so the selected timeframe is reflected and oversized input falls back to batch summaries plus a final synthesis pass.
 4. Completed: chat participant tests cover analysis execution, empty selections, report persistence, and analysis follow-up behavior.
 5. Completed: `npm run compile-tests`, `npm run compile`, `npm test`, and `npm run lint` all passed on 2026-05-17.
-6. Completed: unit tests now verify that the analysis and handoff prompts restrict recommendations to AI-specific control files, including current repo targets `AGENTS.md` and `.github/copilot-instructions.md`, plus optional files such as `CLAUDE.md` when present.
-7. Remaining: manually smoke-test `@session-control /analyze`, verify report persistence under the analysis subdirectory, rerun to confirm unchanged sessions are skipped until content changes, confirm the handoff prompt opens as expected, and verify the resulting recommendations stay within the AI-control-file scope.
+6. Completed: unit tests now verify that the analysis and implementation prompts restrict recommendations to AI-specific control files, including current repo targets `AGENTS.md` and `.github/copilot-instructions.md`, plus optional files such as `CLAUDE.md` when present.
+7. Remaining: manually smoke-test `@session-control /analyze`, verify report persistence under the analysis subdirectory, rerun to confirm unchanged sessions are skipped until content changes, confirm the implementation prompt opens as expected, and verify the resulting recommendations stay within the AI-control-file scope.
 
 ## Decisions
 
@@ -77,5 +77,5 @@ Implement an `@session-control /analyze` workflow that reads saved sessions from
 - Reanalysis rule: fingerprint-based, so changed sessions are analyzed again
 - Cross-repo scope: current open multi-root workspace only, not global across unrelated workspaces
 - Storage strategy: dedicated analysis subdirectory under the configured storage path, not inline flags inside saved session JSON
-- Follow-up model: handoff-only via `@session-control /handoff` and `Session Control: Handoff Latest Analysis`
+- Follow-up model: lightweight implementation flow via `@session-control /implement` and `Session Control: Implement Latest Analysis`
 - Recommendation scope: only AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and other repository-local instruction or prompt control files

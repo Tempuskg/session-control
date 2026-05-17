@@ -99,3 +99,11 @@ Pages touched: README.md, CHANGELOG.md, chat-participant.md, file-manifest.md, l
 ## [2026-05-17] update | Restrict Analysis Recommendations To AI Control Files
 Restricted saved-chat analysis recommendations and handoff implementation prompts to AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and similar repository-local instruction files. Updated prompt construction, tests, README, changelog, and wiki pages to reflect the narrower scope.
 Pages touched: CHAT_ANALYSIS_PLAN.md, README.md, CHANGELOG.md, chat-participant.md, file-manifest.md, log.md
+
+## [2026-05-17] update | Rename Slash Command To Implement
+Renamed the chat-participant implementation follow-up command from `@session-control /handoff` to `@session-control /implement` while keeping `Session Control: Handoff Latest Analysis` as the command-palette entry point. Updated the manifest, participant follow-up wiring, guidance copy, tests, README, changelog, plan, and wiki pages to reflect the renamed slash command.
+Pages touched: CHAT_ANALYSIS_PLAN.md, README.md, CHANGELOG.md, chat-participant.md, file-manifest.md, log.md
+
+## [2026-05-17] update | Rename Latest Analysis Command To Implement
+Renamed the command-palette entry from `Session Control: Handoff Latest Analysis` (`session-control.handoffLatestAnalysis`) to `Session Control: Implement Latest Analysis` (`session-control.implementLatestAnalysis`). Updated the extension registration, tests, README, changelog, plan, and wiki pages to reflect the unified implementation terminology.
+Pages touched: CHAT_ANALYSIS_PLAN.md, README.md, CHANGELOG.md, chat-participant.md, file-manifest.md, log.md

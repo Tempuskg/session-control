@@ -356,7 +356,7 @@ export async function runAnalyzeSessionsFlow(
 
 	const savedLabel = generation.status === 'partial' ? 'Saved partial analysis report' : 'Saved analysis report';
 	deps.streamMarkdown(
-		`\n\n${savedLabel} to **${persisted.report.reportPath}** in workspace **${ownerWorkspace.name}**. Use **@session-control /handoff** to open a coding-agent handoff prompt.`,
+		`\n\n${savedLabel} to **${persisted.report.reportPath}** in workspace **${ownerWorkspace.name}**. Use **@session-control /implement** to open a coding-agent handoff prompt.`,
 	);
 	return {
 		metadata: {

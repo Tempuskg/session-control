@@ -112,7 +112,7 @@ interface ViewSessionFileDeps {
 	showInformationMessage: (message: string) => Thenable<unknown>;
 }
 
-interface HandoffLatestAnalysisDeps {
+interface ImplementLatestAnalysisDeps {
 	getWorkspaceFolders: () => readonly vscode.WorkspaceFolder[] | undefined;
 	getStoragePath: (workspaceFolder: vscode.WorkspaceFolder) => string;
 	readIndex: (storageDirectory: string) => Promise<{ reports: AnalysisReportReference[] }>;
@@ -354,7 +354,7 @@ function findAgentSessionCommandId(commands: readonly string[]): string | undefi
 	});
 }
 
-function createDefaultHandoffLatestAnalysisDeps(): HandoffLatestAnalysisDeps {
+function createDefaultImplementLatestAnalysisDeps(): ImplementLatestAnalysisDeps {
 	return {
 		getWorkspaceFolders: () => vscode.workspace.workspaceFolders,
 		getStoragePath,
@@ -372,16 +372,16 @@ function createDefaultHandoffLatestAnalysisDeps(): HandoffLatestAnalysisDeps {
 			>([
 				{
 					label: 'Chat',
-					description: 'Prefill a new chat with the generated implementation handoff prompt',
+					description: 'Prefill a new chat with the generated implementation prompt',
 					target: 'chat',
 				},
 				{
 					label: 'Agent Session',
-					description: 'Open an agent session and copy the generated handoff prompt to the clipboard',
+					description: 'Open an agent session and copy the generated implementation prompt to the clipboard',
 					target: 'agentSession',
 				},
 			], {
-				title: 'Open latest analysis handoff in',
+				title: 'Open latest analysis implementation in',
 			});
 
 			return pick?.target;
@@ -400,7 +400,7 @@ function createDefaultHandoffLatestAnalysisDeps(): HandoffLatestAnalysisDeps {
 
 async function findLatestUsableAnalysisReport(
 	workspaceFolders: readonly vscode.WorkspaceFolder[],
-	deps: HandoffLatestAnalysisDeps,
+	deps: ImplementLatestAnalysisDeps,
 ): Promise<{ report?: LatestAnalysisReportTarget; warnings: string[] }> {
 	const candidates: LatestAnalysisReportTarget[] = [];
 	const warnings: string[] = [];
@@ -719,17 +719,17 @@ export async function runViewSessionFileCommand(
 	deps.showSession(parsed.session, context.extensionUri, path.dirname(filePath), path.basename(filePath));
 }
 
-export async function runHandoffLatestAnalysisCommand(
-	depsOverrides: Partial<HandoffLatestAnalysisDeps> = {},
+export async function runImplementLatestAnalysisCommand(
+	depsOverrides: Partial<ImplementLatestAnalysisDeps> = {},
 ): Promise<void> {
 	const deps = {
-		...createDefaultHandoffLatestAnalysisDeps(),
+		...createDefaultImplementLatestAnalysisDeps(),
 		...depsOverrides,
 	};
 
 	const workspaceFolders = deps.getWorkspaceFolders();
 	if (!workspaceFolders?.length) {
-		await deps.showInformationMessage('Open a workspace folder before handing off a saved analysis.');
+		await deps.showInformationMessage('Open a workspace folder before implementing from a saved analysis.');
 		return;
 	}
 
@@ -756,7 +756,7 @@ export async function runHandoffLatestAnalysisCommand(
 			await deps.writeClipboard(prompt);
 			await deps.openAgentSession(agentSessionCommandId);
 			await deps.showInformationMessage(
-				`Opened an agent session for the latest analysis handoff from ${latest.report.workspaceFolder.name}. The generated prompt is on the clipboard.`,
+				`Opened an agent session for the latest saved analysis from ${latest.report.workspaceFolder.name}. The generated implementation prompt is on the clipboard.`,
 			);
 			return;
 		} catch (error) {
@@ -768,11 +768,11 @@ export async function runHandoffLatestAnalysisCommand(
 	try {
 		await deps.openChat(prompt);
 		await deps.showInformationMessage(
-			`Opened chat with an implementation handoff prompt for ${latest.report.selectionLabel}.`,
+			`Opened chat with an implementation prompt for ${latest.report.selectionLabel}.`,
 		);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		await deps.showWarningMessage(`Failed to open chat with the generated handoff prompt: ${message}`);
+		await deps.showWarningMessage(`Failed to open chat with the generated implementation prompt: ${message}`);
 	}
 }
 
@@ -1067,8 +1067,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand('session-control.resumeSessionFromViewer', async () => {
 			await runResumeSessionFromViewerCommand();
 		}),
-		vscode.commands.registerCommand('session-control.handoffLatestAnalysis', async () => {
-			await runHandoffLatestAnalysisCommand();
+		vscode.commands.registerCommand('session-control.implementLatestAnalysis', async () => {
+			await runImplementLatestAnalysisCommand();
 		}),
 		vscode.commands.registerCommand('session-control.deleteSessionFromExplorer', async (item: SessionExplorerSessionItem) => {
 			const confirmation = await vscode.window.showWarningMessage(

@@ -73,8 +73,8 @@
         "icon": "$(debug-start)"
       },
       {
-        "command": "session-control.handoffLatestAnalysis",
-        "title": "Session Control: Handoff Latest Analysis",
+        "command": "session-control.implementLatestAnalysis",
+        "title": "Session Control: Implement Latest Analysis",
         "category": "Session Control",
         "icon": "$(sparkle)"
       },
@@ -220,8 +220,8 @@
             "description": "Analyze saved chat sessions from a timeframe or only sessions that have not been analyzed yet"
           },
           {
-            "name": "handoff",
-            "description": "Open a generated implementation handoff prompt in chat or an agent session"
+            "name": "implement",
+            "description": "Open a generated implementation prompt in chat or an agent session"
           }
         ]
       }
