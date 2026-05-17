@@ -489,6 +489,28 @@ suite('chatParticipant implementation followups', () => {
 		assert.equal(followups.length, 0);
 	});
 
+	test('suggests a recovery followup after a blocked implementation result', () => {
+		const followups = buildParticipantFollowups({
+			metadata: {
+				resultType: 'analysis-implementation',
+				implementationStatus: 'blocked',
+				analysisReportPath: 'analysis/reports/report-1.md',
+				analysisStorageDirectory: 'e:/workspace/.chat',
+				summary: 'Cannot continue until the workspace folder is resolved.',
+				filesChanged: [],
+				commandsRun: [],
+				results: [],
+				blockers: ['Missing workspace folder'],
+				unverified: ['No compile run yet'],
+			},
+		} as vscode.ChatResult);
+
+		assert.equal(followups.length, 1);
+		assert.equal(followups[0]?.label, 'Resolve Blocker');
+		assert.equal(followups[0]?.command, 'implement');
+		assert.equal(followups[0]?.prompt.includes('Missing workspace folder'), true);
+	});
+
 	test('shows guidance when implementing without a prior analysis result', async () => {
 		const messages: string[] = [];
 		const result = await runImplementRecommendationsFlow(

@@ -453,13 +453,41 @@ export async function runImplementRecommendationsFlow(
 	};
 	}
 
+function buildBlockedImplementationPrompt(metadata: Partial<AnalysisImplementationResultMetadata>): string {
+	const blocker = metadata.blockers?.find((value) => value.trim().length > 0);
+	if (blocker) {
+		return `Resolve this implementation blocker and continue with the next concrete step: ${blocker}`;
+	}
+
+	const summary = metadata.summary?.trim();
+	if (summary) {
+		return `Continue the blocked implementation and resolve this blocker: ${summary}`;
+	}
+
+	return 'Resolve the implementation blocker and continue with the next concrete step.';
+}
+
 export function buildParticipantFollowups(result: vscode.ChatResult): vscode.ChatFollowup[] {
-	const metadata = result.metadata as Partial<AnalysisReportResultMetadata> | undefined;
+	const metadata = result.metadata as Partial<AnalysisReportResultMetadata> | Partial<AnalysisImplementationResultMetadata> | undefined;
 
 	if (metadata?.resultType === 'analysis-report' && metadata.analysisReportPath && metadata.analysisStorageDirectory) {
 		return [{
 			label: 'Implement Recommendations',
 			prompt: 'Implement the highest-priority recommendations from this analysis report.',
+			participant: CHAT_PARTICIPANT_ID,
+			command: 'implement',
+		}];
+	}
+
+	if (
+		metadata?.resultType === 'analysis-implementation'
+		&& metadata.implementationStatus === 'blocked'
+		&& metadata.analysisReportPath
+		&& metadata.analysisStorageDirectory
+	) {
+		return [{
+			label: 'Resolve Blocker',
+			prompt: buildBlockedImplementationPrompt(metadata),
 			participant: CHAT_PARTICIPANT_ID,
 			command: 'implement',
 		}];
