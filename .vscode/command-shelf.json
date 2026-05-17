@@ -9,6 +9,14 @@
       "group": null,
       "sortOrder": 0,
       "terminalMode": "dedicated"
+    },
+    {
+      "id": "7d8422cc-ac6a-4a96-ae44-b38406564ef7",
+      "label": "Increment Version",
+      "command": "npm run version:build",
+      "group": null,
+      "sortOrder": 1,
+      "terminalMode": "dedicated"
     }
   ]
 }
