@@ -17,6 +17,22 @@
       "group": null,
       "sortOrder": 1,
       "terminalMode": "dedicated"
+    },
+    {
+      "id": "2a64afa7-9d59-4049-9bc1-f9ae8e87b32a",
+      "label": "Publish Extension",
+      "command": "vsce publish",
+      "group": null,
+      "sortOrder": 2,
+      "terminalMode": "dedicated"
+    },
+    {
+      "id": "f6d4f2eb-0cc9-4078-82cd-38c854cb5d44",
+      "label": "Publish Open Vsx",
+      "command": "npx ovsx publish",
+      "group": null,
+      "sortOrder": 3,
+      "terminalMode": "dedicated"
     }
   ]
 }
