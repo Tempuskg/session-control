@@ -4,29 +4,43 @@ This file defines how the LLM maintains the wiki for the **session-control** VS 
 
 ## Coding Agent Workflow
 
-When the request is to implement, continue implementation, or generate a handoff for implementation work in this repo:
+For `/implement`, `/proceed`, direct implementation requests, or generated implementation handoffs in this repo:
 
 1. Read `AGENTS.md`, `.github/copilot-instructions.md`, any repo-local AI control files, any referenced analysis report, and `package.json` before the first edit.
 2. Acknowledge any user-referenced external instruction file and state whether it is accessible from the current workspace.
 3. Run `git status --short` and a scoped `git diff -- <candidate files>` before broad diagnostics or edits.
 4. Before the first edit, use at most one repo-wide search and one targeted search. Prefer owner-file reads over broad exploration, and avoid subagents unless blocked or intentionally parallelized.
-5. After preflight, make the smallest safe edit in the same turn or state one concrete blocker. Investigation-only implementation turns are not sufficient.
-6. Once an owner file is identified, stop adjacent filename fishing and only reopen the same hotspot with a new hypothesis.
-7. If workspace access is unavailable, reply once with the blocker and one recovery path: request full access, ask for pasted files, or generate an implementation prompt. Reuse a fresh referenced analysis report for `/implement`; do not require `/analyze` again unless no current report exists.
-8. Validate in this order when applicable: touched-file diagnostics, `npm run compile-tests`, focused relevant tests, `npm test`, then a Development Host smoke test for interactive behavior. Do not use plain `node --test`, and treat direct Mocha runs as unreliable in this repo. If `dist-test` disagrees with source, rebuild before diagnosing deeper.
-9. Delay `README`, `wiki`, and `CHANGELOG` edits until command names and UX are stable unless the user explicitly asks for docs now.
-10. Batch progress into milestone summaries instead of progress-only narration unless blocked or waiting for input.
-11. Analysis recommendations may target only repository-local AI control files: `AGENTS.md`, `.github/copilot-instructions.md`, and when present `CLAUDE.md`, `*.instructions.md`, `*.prompt.md`, `*.agent.md`, `SKILL.md`, and similar local AI instruction files. If evidence is insufficient, say so instead of recommending source, test, build, or general documentation changes.
-12. When multiple repositories are open, record repo name, branch or commit, dirty state, workspace scope, source-of-truth repo, artifact owner, and shared contract owner before acting.
-13. Re-read local AI instructions and `package.json` in every repo, and do not reuse commands, conventions, or assumptions from memory or another repo.
+5. If a request implies coding-agent behavior or implementation handoff, first verify whether the design uses a plain `request.model.sendRequest` call or a tool-enabled agent, tool, or MCP flow. If it is plain LM, warn that workspace files and tools will not be available before implementing.
+6. After preflight, make the smallest safe edit in the same turn or state one concrete blocker. Investigation-only implementation turns are not sufficient.
+7. Once an owner file is identified, stop adjacent filename fishing and only reopen the same hotspot with a new hypothesis.
+8. If workspace access is unavailable, reply once with the blocker and one recovery path: request full access, ask for pasted files, or generate a handoff prompt. Reuse a fresh referenced analysis report for `/handoff`; do not require `/analyze` again unless no current report exists.
+9. Validate in this order when applicable: touched-file diagnostics, `npm run compile-tests`, `npm run compile`, focused relevant tests, `npm test`, `npm run lint`, then a Development Host smoke test for interactive behavior. Do not use plain `node --test`, and treat direct Mocha runs as unreliable in this repo. If `dist-test` disagrees with source, rebuild before diagnosing deeper.
+10. For renames, enumerate slash commands, command-palette commands, followup labels, prompt text, tests, docs/wiki, plans, and AI control files. Ask whether the rename applies to all surfaces before editing. Do one final stale-reference sweep before reporting done.
+11. Delay `README`, `wiki`, and `CHANGELOG` edits until command names and UX are stable unless the user explicitly asks for docs now.
+12. Batch progress into milestone summaries instead of progress-only narration unless blocked or waiting for input.
+13. Analysis recommendations may target only repository-local AI control files: `AGENTS.md`, `.github/copilot-instructions.md`, and when present `CLAUDE.md`, `*.instructions.md`, `*.prompt.md`, `*.agent.md`, `SKILL.md`, and similar local AI instruction files. If evidence is insufficient, say so instead of recommending source, test, build, or general documentation changes.
+14. When multiple repositories are open, record repo name, branch or commit, dirty state, workspace scope, source-of-truth repo, artifact owner, and shared contract owner before acting.
+15. Re-read local AI instructions and `package.json` in every repo, and do not reuse commands, conventions, or assumptions from memory or another repo.
 
 ## Quick Start / Known Constraints
 
 - Before entering `chat-commit`, start with `AGENTS.md`, `.github/copilot-instructions.md`, the latest referenced analysis report, and `package.json`.
+- Start with `git status --short`, then a scoped `git diff -- <candidate files>` before broader diagnostics.
 - Common owner files for session-control and chat-command work are `src/chatParticipant.ts`, `src/analysisStore.ts`, `src/sessionAnalysis.ts`, `src/analysisOrchestrator.ts`, `src/extension.ts`, `src/types.ts`, `package.json`, and the nearest unit tests.
 - `src/chatParticipant.ts` is a hotspot; interactive chat or command changes need a Development Host smoke test.
+- Validate in this order when applicable: touched-file diagnostics, `npm run compile-tests`, `npm run compile`, focused relevant tests, `npm test`, `npm run lint`, then a Development Host smoke test.
+- Check both slash-command and command-palette surfaces for drift before closing rename or command work.
+- Use plain relative file paths in summaries and handoffs.
 - Strict optional-property typing is active in this repo, so omit optional keys rather than passing `undefined`.
 - Plain chat participants are not coding agents unless tool and workspace access are explicitly wired.
+- Evidenced local AI files here are `AGENTS.md` and `.github/copilot-instructions.md`; `CLAUDE.md` was not evidenced.
+
+## Multi-Repo Preload Packet
+
+- Record repo name, branch or commit, dirty state, workspace scope, source-of-truth repo, artifact owner, and shared contract owner for each open repository before acting.
+- Re-read local AI instructions and `package.json` in every repository before applying repo-specific rules.
+- Keep assumptions, persistence rules, validation results, and closeouts isolated per repository until the user explicitly asks for cross-repo synthesis.
+- Do not carry command names, validation commands, or capability assumptions from memory or another repository.
 
 ---
 
