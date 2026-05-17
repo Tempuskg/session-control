@@ -2,6 +2,32 @@
 
 This file defines how the LLM maintains the wiki for the **session-control** VS Code extension project. It is the authoritative reference for structure, workflows, and conventions.
 
+## Coding Agent Workflow
+
+When the request is to implement, continue implementation, or generate a handoff for implementation work in this repo:
+
+1. Read `AGENTS.md`, `.github/copilot-instructions.md`, any repo-local AI control files, any referenced analysis report, and `package.json` before the first edit.
+2. Acknowledge any user-referenced external instruction file and state whether it is accessible from the current workspace.
+3. Run `git status --short` and a scoped `git diff -- <candidate files>` before broad diagnostics or edits.
+4. Before the first edit, use at most one repo-wide search and one targeted search. Prefer owner-file reads over broad exploration, and avoid subagents unless blocked or intentionally parallelized.
+5. After preflight, make the smallest safe edit in the same turn or state one concrete blocker. Investigation-only implementation turns are not sufficient.
+6. Once an owner file is identified, stop adjacent filename fishing and only reopen the same hotspot with a new hypothesis.
+7. If workspace access is unavailable, reply once with the blocker and one recovery path: request full access, ask for pasted files, or generate a handoff prompt. Reuse a fresh referenced analysis report for `/handoff`; do not require `/analyze` again unless no current report exists.
+8. Validate in this order when applicable: touched-file diagnostics, `npm run compile-tests`, focused relevant tests, `npm test`, then a Development Host smoke test for interactive behavior. Do not use plain `node --test`, and treat direct Mocha runs as unreliable in this repo. If `dist-test` disagrees with source, rebuild before diagnosing deeper.
+9. Delay `README`, `wiki`, and `CHANGELOG` edits until command names and UX are stable unless the user explicitly asks for docs now.
+10. Batch progress into milestone summaries instead of progress-only narration unless blocked or waiting for input.
+11. Analysis recommendations may target only repository-local AI control files: `AGENTS.md`, `.github/copilot-instructions.md`, and when present `CLAUDE.md`, `*.instructions.md`, `*.prompt.md`, `*.agent.md`, `SKILL.md`, and similar local AI instruction files. If evidence is insufficient, say so instead of recommending source, test, build, or general documentation changes.
+12. When multiple repositories are open, record repo name, branch or commit, dirty state, workspace scope, source-of-truth repo, artifact owner, and shared contract owner before acting.
+13. Re-read local AI instructions and `package.json` in every repo, and do not reuse commands, conventions, or assumptions from memory or another repo.
+
+## Quick Start / Known Constraints
+
+- Before entering `chat-commit`, start with `AGENTS.md`, `.github/copilot-instructions.md`, the latest referenced analysis report, and `package.json`.
+- Common owner files for session-control and chat-command work are `src/chatParticipant.ts`, `src/analysisStore.ts`, `src/sessionAnalysis.ts`, `src/analysisOrchestrator.ts`, `src/extension.ts`, `src/types.ts`, `package.json`, and the nearest unit tests.
+- `src/chatParticipant.ts` is a hotspot; interactive chat or command changes need a Development Host smoke test.
+- Strict optional-property typing is active in this repo, so omit optional keys rather than passing `undefined`.
+- Plain chat participants are not coding agents unless tool and workspace access are explicitly wired.
+
 ---
 
 ## Directory Layout
