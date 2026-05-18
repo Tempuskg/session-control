@@ -1,3 +1,4 @@
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { createAnalysisStore, createSessionAnalysisFingerprint } from './analysisStore';
@@ -35,6 +36,18 @@ const analysisStore = createAnalysisStore();
 
 const CHAT_PARTICIPANT_ID = 'session-control.resume';
 const MIN_AUTO_SELECT_SCORE = 60;
+const AI_RECOMMENDATION_FILE_PATTERNS = [
+	'AGENTS.md',
+	'.github/copilot-instructions.md',
+	'CLAUDE.md',
+	'**/SKILL.md',
+	'**/*.instructions.md',
+	'**/*.prompt.md',
+	'**/*.agent.md',
+] as const;
+const AI_RECOMMENDATION_EXCLUDE_GLOB = '**/{.git,node_modules,dist,dist-test,.vscode-test}/**';
+const MAX_AI_RECOMMENDATION_BASELINE_CHARS = 16000;
+const MAX_AI_RECOMMENDATION_FILE_CHARS = 4000;
 
 export type ResumeOverflowStrategy = 'summarize' | 'truncate' | 'recent-only';
 const SUMMARIZE_FALLBACK_NOTE = 'Summary generation failed - showing most recent turns only.';
@@ -114,6 +127,97 @@ function asWorkspaceMarkdownListItem(session: WorkspaceSessionMeta): string {
 	const commit = session.git?.commit ? session.git.commit.slice(0, 7) : 'n/a';
 	const branch = session.git?.branch ?? 'n/a';
 	return `- **[${session.workspaceFolder.name}] ${session.title}** | ${session.savedAt} | ${session.turnCount} turns | ${branch}@${commit}`;
+}
+
+function normalizeRelativePath(filePath: string): string {
+	return filePath.replace(/\\/g, '/');
+}
+
+function truncateText(value: string, maxChars: number): string {
+	if (value.length <= maxChars) {
+		return value;
+	}
+
+	return `${value.slice(0, Math.max(0, maxChars)).trimEnd()}\n...[truncated]`;
+}
+
+async function findExistingAiInstructionFiles(workspaceFolder: vscode.WorkspaceFolder): Promise<vscode.Uri[]> {
+	const matches = await Promise.all(
+		AI_RECOMMENDATION_FILE_PATTERNS.map(async (pattern) => vscode.workspace.findFiles(
+			new vscode.RelativePattern(workspaceFolder, pattern),
+			AI_RECOMMENDATION_EXCLUDE_GLOB,
+		)),
+	);
+
+	const deduped = new Map<string, vscode.Uri>();
+	for (const uri of matches.flat()) {
+		deduped.set(uri.fsPath.toLowerCase(), uri);
+	}
+
+	return [...deduped.values()].sort((left, right) => left.fsPath.localeCompare(right.fsPath));
+}
+
+async function loadRecommendationBaseline(
+	workspaceFolders: readonly vscode.WorkspaceFolder[],
+	candidates: AnalysisCandidateSession[],
+): Promise<string> {
+	const relevantStorageDirectories = new Set(candidates.map((candidate) => candidate.storageDirectory));
+	const relevantWorkspaces = workspaceFolders.filter((workspaceFolder) => {
+		try {
+			return relevantStorageDirectories.has(getStoragePath(workspaceFolder));
+		} catch {
+			return false;
+		}
+	});
+
+	if (!relevantWorkspaces.length) {
+		return '';
+	}
+
+	const lines: string[] = [];
+	let remainingChars = MAX_AI_RECOMMENDATION_BASELINE_CHARS;
+
+	for (const workspaceFolder of relevantWorkspaces) {
+		lines.push(`### Workspace: ${workspaceFolder.name}`);
+		lines.push('');
+
+		const files = await findExistingAiInstructionFiles(workspaceFolder);
+		if (!files.length) {
+			lines.push('No existing AI instruction or skill files found.');
+			lines.push('');
+			continue;
+		}
+
+		for (const file of files) {
+			if (remainingChars <= 0) {
+				lines.push('[Additional AI instruction or skill files omitted due to prompt budget.]');
+				lines.push('');
+				break;
+			}
+
+			const relativePath = normalizeRelativePath(path.relative(workspaceFolder.uri.fsPath, file.fsPath));
+			let content: string;
+			try {
+				content = await fs.readFile(file.fsPath, 'utf8');
+			} catch {
+				continue;
+			}
+
+			const normalizedContent = content.trim().length > 0 ? content : '[empty file]';
+			const maxCharsForFile = Math.min(MAX_AI_RECOMMENDATION_FILE_CHARS, remainingChars);
+			const truncatedContent = truncateText(normalizedContent, maxCharsForFile);
+			remainingChars -= truncatedContent.length;
+
+			lines.push(`#### ${relativePath}`);
+			lines.push('');
+			lines.push('```md');
+			lines.push(truncatedContent);
+			lines.push('```');
+			lines.push('');
+		}
+	}
+
+	return lines.join('\n').trim();
 }
 
 async function listSessionsAcrossWorkspaceFolders(
@@ -363,9 +467,15 @@ function createDefaultAnalyzeSessionsFlowDeps(
 		resolveSelection: async (prompt: string) => resolveAnalysisSelection(prompt),
 		createCandidates: async (workspaceSessions: WorkspaceSessionMeta[]) => createAnalysisCandidates(workspaceSessions),
 		loadAnalyzedFingerprints: async (candidates: AnalysisCandidateSession[]) => loadAnalyzedFingerprintSet(candidates),
+		loadRecommendationBaseline: async (
+			workspaceFolders: readonly vscode.WorkspaceFolder[],
+			candidates: AnalysisCandidateSession[],
+		) => loadRecommendationBaseline(workspaceFolders, candidates),
 		splitIntoBatches: (candidates, maxChars) => splitCandidatesIntoAnalysisBatches(candidates, maxChars),
-		buildPrompt: (selection, candidates) => buildAnalysisPrompt(selection, candidates),
-		buildSynthesisPrompt: (selection, batchSummaries) => buildAnalysisSynthesisPrompt(selection, batchSummaries),
+		buildPrompt: (selection, candidates, recommendationBaseline) =>
+			buildAnalysisPrompt(selection, candidates, recommendationBaseline),
+		buildSynthesisPrompt: (selection, batchSummaries, recommendationBaseline) =>
+			buildAnalysisSynthesisPrompt(selection, batchSummaries, recommendationBaseline),
 		runModelPrompt: async (prompt: string, streamOutput: boolean) => collectModelText(request, streamOutput ? stream : undefined, token, prompt),
 		streamMarkdown: (markdown: string) => stream.markdown(markdown),
 		pickOwnerWorkspace: (workspaceFolders: readonly vscode.WorkspaceFolder[]) => pickWorkspaceFolder() ?? workspaceFolders[0],

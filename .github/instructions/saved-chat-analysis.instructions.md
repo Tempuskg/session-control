@@ -7,6 +7,7 @@ description: "Use when implementing or updating saved chat analysis flows, analy
 
 - Keep changes scoped to repository-local AI control files unless the current report or user explicitly expands scope.
 - Read the referenced report, `AGENTS.md`, `.github/copilot-instructions.md`, and any relevant local instruction files before the first edit.
+- Before emitting gap-only recommendations, load `AGENTS.md`, `.github/copilot-instructions.md`, and the relevant local `*.instructions.md`, `*.prompt.md`, `*.agent.md`, and `SKILL.md` files. Summarize the existing guidance by theme, emit only net-new gaps with a target file and exact instruction text, and say the comparison is incomplete if relevant file contents are missing.
 - Start with `git status --short` and a scoped `git diff -- <candidate AI files>` before editing.
 - Update prompt scope, prompt version, report or index provenance, and status labels together when the change affects saved-analysis metadata.
 - Keep planned, shipped, partial, blocked, and manual-smoke-only states distinct in summaries and saved-analysis follow-ups.

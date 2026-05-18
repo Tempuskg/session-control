@@ -6,7 +6,7 @@ This file defines how the LLM maintains the wiki for the **session-control** VS 
 
 For `/implement`, `/proceed`, direct implementation requests, or generated implementation handoffs in this repo:
 
-1. Read `AGENTS.md`, `.github/copilot-instructions.md`, any repo-local AI control files, any referenced analysis report, and `package.json` before the first edit.
+1. Read `AGENTS.md`, `.github/copilot-instructions.md`, any repo-local AI control files, and any referenced analysis report before the first edit. Read `package.json` only when the task depends on commands, contribution points, versioning, or release metadata.
 2. Acknowledge any user-referenced external instruction file and state whether it is accessible from the current workspace, applied, ignored, or out of repo scope.
 3. Run `git status --short` and a scoped `git diff -- <candidate files>` before broad diagnostics or edits.
 4. Before the first edit, use at most one repo-wide search and one targeted search. Prefer owner-file reads over broad exploration, skip directory listings when exact paths are already known, and avoid subagents unless blocked or intentionally parallelized.
@@ -20,17 +20,18 @@ For `/implement`, `/proceed`, direct implementation requests, or generated imple
 12. Batch progress into milestone summaries instead of progress-only narration unless blocked or waiting for input.
 13. Analysis recommendations may target only repository-local AI control files: `AGENTS.md`, `.github/copilot-instructions.md`, and when present `CLAUDE.md`, `*.instructions.md`, `*.prompt.md`, `*.agent.md`, `SKILL.md`, and similar local AI instruction files. If evidence is insufficient, say so instead of recommending source, test, build, or general documentation changes.
 14. When multiple repositories are open, record repo name, branch or commit, dirty state, workspace scope, source-of-truth repo, artifact owner, and shared contract owner before acting.
-15. Re-read local AI instructions and `package.json` in every repo, and do not reuse commands, conventions, or assumptions from memory or another repo.
-16. Use memory or auxiliary tool reads only when the retrieved state changes the next step. Prefer targeted existence checks over broad wildcard scans.
+15. Re-read local AI instructions in every repo, and re-read `package.json` only when the task depends on repo metadata such as commands, contribution points, versioning, or release flow. Do not reuse commands, conventions, or assumptions from memory or another repo.
+16. Do not create or update Copilot memory or user-level repo notes during repository-local AI-control-file analysis or implementation. Persist durable guidance only in repo-local AI control files.
+17. Use memory or auxiliary tool reads only when the retrieved state changes the next step. Prefer targeted existence checks over broad wildcard scans.
 
 ## Quick Start / Known Constraints
 
-- Before entering `chat-commit`, start with `AGENTS.md`, `.github/copilot-instructions.md`, the latest referenced analysis report, and `package.json`.
+- Before entering `chat-commit`, start with `AGENTS.md`, `.github/copilot-instructions.md`, and the latest referenced analysis report. Read `package.json` only when the task depends on commands, contribution points, versioning, or release metadata.
 - Start with `git status --short`, then a scoped `git diff -- <candidate files>` before broader diagnostics.
 - Common owner files for session-control and chat-command work are `src/chatParticipant.ts`, `src/analysisStore.ts`, `src/sessionAnalysis.ts`, `src/analysisOrchestrator.ts`, `src/extension.ts`, `src/types.ts`, `package.json`, and the nearest unit tests.
 - `src/chatParticipant.ts` is a hotspot; interactive chat or command changes need a Development Host smoke test.
 - Validate in this order when applicable: touched-file diagnostics, `npm run compile-tests`, `npm run compile`, focused relevant tests, `npm test`, `npm run lint`, then a Development Host smoke test.
-- Check both slash-command and command-palette surfaces for drift before closing rename or command work.
+- Check both the current implementation handoff command surface and command-palette surfaces for drift before closing rename or command work.
 - For plan-only or AI-control-only requests, update only plan/control files and explicitly state that implementation code did not change.
 - Use plain relative file paths in summaries and handoffs.
 - Strict optional-property typing is active in this repo, so omit optional keys rather than passing `undefined`.
@@ -39,6 +40,8 @@ For `/implement`, `/proceed`, direct implementation requests, or generated imple
 - Release-relevant files are `package.json`, `package-lock.json`, `README.md`, and `scripts/bump-package-version.cjs`. Verify only the expected release files for versioning tasks.
 - On resumed chats, re-read the current version and workspace state before release steps, and prefer repo scripts or repo-local AI skills over generic CLI advice.
 - Evidenced local AI files here are `AGENTS.md` and `.github/copilot-instructions.md`; `CLAUDE.md` was not evidenced.
+
+- Defer `README.md`, `wiki/`, `CHANGELOG.md`, and plan/status-file sync until the changed surface passes one green targeted validation step, unless the user explicitly asks for docs now or an append-only log rule requires immediate logging.
 
 ## Multi-Repo Preload Packet
 

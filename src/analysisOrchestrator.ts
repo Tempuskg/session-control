@@ -35,9 +35,21 @@ export interface AnalyzeSessionsFlowDeps {
 	resolveSelection: (prompt: string) => Promise<AnalysisSelection | undefined>;
 	createCandidates: (workspaceSessions: WorkspaceSessionMeta[]) => Promise<AnalysisCandidateSession[]>;
 	loadAnalyzedFingerprints: (candidates: AnalysisCandidateSession[]) => Promise<Set<string>>;
+	loadRecommendationBaseline: (
+		workspaceFolders: readonly vscode.WorkspaceFolder[],
+		candidates: AnalysisCandidateSession[],
+	) => Promise<string>;
 	splitIntoBatches: (candidates: AnalysisCandidateSession[], maxChars?: number) => AnalysisCandidateSession[][];
-	buildPrompt: (selection: AnalysisSelection, candidates: AnalysisCandidateSession[]) => string;
-	buildSynthesisPrompt: (selection: AnalysisSelection, batchSummaries: string[]) => string;
+	buildPrompt: (
+		selection: AnalysisSelection,
+		candidates: AnalysisCandidateSession[],
+		recommendationBaseline: string,
+	) => string;
+	buildSynthesisPrompt: (
+		selection: AnalysisSelection,
+		batchSummaries: string[],
+		recommendationBaseline: string,
+	) => string;
 	runModelPrompt: (prompt: string, streamOutput: boolean) => Promise<string>;
 	streamMarkdown: (markdown: string) => void;
 	pickOwnerWorkspace: (workspaceFolders: readonly vscode.WorkspaceFolder[]) => vscode.WorkspaceFolder | undefined;
@@ -145,10 +157,11 @@ function buildFailedAnalysisMessage(warnings: readonly string[]): string {
 async function generateSingleBatchAnalysis(
 	selection: AnalysisSelection,
 	filtered: AnalysisCandidateSession[],
+	recommendationBaseline: string,
 	deps: AnalyzeSessionsFlowDeps,
 ): Promise<AnalysisGenerationResult> {
 	try {
-		const content = await deps.runModelPrompt(deps.buildPrompt(selection, filtered), true);
+		const content = await deps.runModelPrompt(deps.buildPrompt(selection, filtered, recommendationBaseline), true);
 		if (!content.trim().length) {
 			return {
 				status: 'failed',
@@ -178,6 +191,7 @@ async function generateBatchedAnalysis(
 	selection: AnalysisSelection,
 	filtered: AnalysisCandidateSession[],
 	batches: AnalysisCandidateSession[][],
+	recommendationBaseline: string,
 	deps: AnalyzeSessionsFlowDeps,
 ): Promise<AnalysisGenerationResult> {
 	deps.streamMarkdown(`Analyzing ${filtered.length} saved sessions across ${batches.length} batches. Final synthesis will follow.\n\n`);
@@ -193,7 +207,7 @@ async function generateBatchedAnalysis(
 
 		deps.streamMarkdown(`_Analyzing batch ${index + 1} of ${batches.length}..._\n\n`);
 		const batchPrompt = [
-			deps.buildPrompt(selection, batch),
+			deps.buildPrompt(selection, batch, recommendationBaseline),
 			'',
 			`This is batch ${index + 1} of ${batches.length}. Produce a concise findings summary that will be synthesized with the other batches into one final report.`,
 		].join('\n');
@@ -230,7 +244,7 @@ async function generateBatchedAnalysis(
 	let status: AnalysisReportStatus = warnings.length > 0 ? 'partial' : 'complete';
 	try {
 		content = await deps.runModelPrompt(
-			deps.buildSynthesisPrompt(selection, completedBatches.map((batch) => batch.summary)),
+			deps.buildSynthesisPrompt(selection, completedBatches.map((batch) => batch.summary), recommendationBaseline),
 			true,
 		);
 		if (!content.trim().length) {
@@ -260,6 +274,7 @@ export async function runAnalyzeSessionsFlow(
 ): Promise<AnalyzeSessionsFlowResult | undefined> {
 	const deps = {
 		batchCharBudget: DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET,
+		loadRecommendationBaseline: async () => '',
 		...depsOverrides,
 	} as AnalyzeSessionsFlowDeps;
 
@@ -283,10 +298,12 @@ export async function runAnalyzeSessionsFlow(
 		return;
 	}
 
-	const batches = deps.splitIntoBatches(filtered, deps.batchCharBudget);
+	const recommendationBaseline = await deps.loadRecommendationBaseline(workspaceFolders, filtered);
+	const effectiveBatchBudget = Math.max(4000, deps.batchCharBudget - recommendationBaseline.length);
+	const batches = deps.splitIntoBatches(filtered, effectiveBatchBudget);
 	const generation = batches.length <= 1
-		? await generateSingleBatchAnalysis(selection, filtered, deps)
-		: await generateBatchedAnalysis(selection, filtered, batches, deps);
+		? await generateSingleBatchAnalysis(selection, filtered, recommendationBaseline, deps)
+		: await generateBatchedAnalysis(selection, filtered, batches, recommendationBaseline, deps);
 	if (generation.status === 'failed') {
 		deps.streamMarkdown(`\n\n${buildFailedAnalysisMessage(generation.warnings)}`);
 		return;

@@ -123,13 +123,17 @@ suite('sessionAnalysis', () => {
 		const selection = createPresetAnalysisSelection('last7Days', new Date('2026-05-17T12:00:00.000Z'));
 		const prompt = buildAnalysisPrompt(selection, [
 			createCandidate('a', '2026-05-17T11:00:00.000Z', 'Alpha', 'Alpha content'),
-		]);
+		], '### Workspace: workspace\n\n#### AGENTS.md\n\n```md\nExisting instruction\n```');
 
 		assert.equal(prompt.includes('Review my last interactions with AI from Last 7 Days.'), true);
 		assert.equal(prompt.includes('Restrict all recommendations to AI-specific control files in the repository.'), true);
+		assert.equal(prompt.includes('Only list gaps that are not already covered there.'), true);
+		assert.equal(prompt.includes('If an instruction or skill already exists, omit it'), true);
 		assert.equal(prompt.includes('AGENTS.md and .github/copilot-instructions.md'), true);
 		assert.equal(prompt.includes('repeated workflows or recurring instructions'), true);
 		assert.equal(prompt.includes('Recommended AI Skills to Create'), true);
+		assert.equal(prompt.includes('Existing AI Instructions and Skills:'), true);
+		assert.equal(prompt.includes('Existing instruction'), true);
 		assert.equal(prompt.includes('Do not recommend application source-code changes'), true);
 		assert.equal(prompt.includes('Repository-Specific Findings'), true);
 		assert.equal(prompt.includes('Coding Agent Preload Insights'), true);
@@ -137,12 +141,18 @@ suite('sessionAnalysis', () => {
 
 	test('buildAnalysisSynthesisPrompt includes batch findings for final synthesis', () => {
 		const selection = createNeedsAnalysisSelection();
-		const prompt = buildAnalysisSynthesisPrompt(selection, ['Finding one', 'Finding two']);
+		const prompt = buildAnalysisSynthesisPrompt(
+			selection,
+			['Finding one', 'Finding two'],
+			'### Workspace: workspace\n\n#### SKILL.md\n\n```md\nExisting skill\n```',
+		);
 
 		assert.equal(prompt.includes('Needs Analysis'), true);
 		assert.equal(prompt.includes('CLAUDE.md'), true);
+		assert.equal(prompt.includes('Only list gaps that are not already covered there.'), true);
 		assert.equal(prompt.includes('recommend creating a specific skill file'), true);
 		assert.equal(prompt.includes('Recommended AI Skills to Create'), true);
+		assert.equal(prompt.includes('Existing skill'), true);
 		assert.equal(prompt.includes('say so instead of proposing general repository changes'), true);
 		assert.equal(prompt.includes('## Batch 1'), true);
 		assert.equal(prompt.includes('## Batch 2'), true);

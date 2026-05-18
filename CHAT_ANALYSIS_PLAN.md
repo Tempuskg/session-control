@@ -6,6 +6,7 @@
 - Last updated: 2026-05-17.
 - Current follow-up model: `@session-control /analyze` persists a saved report and offers `@session-control /implement`; `Session Control: Implement Latest Analysis` provides the same lightweight implementation flow from the command palette.
 - Implemented refinement: analysis recommendations and implementation prompts are restricted to AI-specific control files only.
+- Implemented refinement: analysis now compares candidate recommendations against the existing AI instruction and skill files and only reports gaps or concrete improvements that are not already covered there.
 - Implemented refinement: analysis also identifies reusable AI skills that ought to be created, and `/implement` prompts can direct the next coding-agent step to create those skills when the saved analysis recommends them.
 - Remaining work: manually smoke-test the analyze and implement flows in VS Code.
 
@@ -31,6 +32,7 @@ Implement an `@session-control /analyze` workflow that reads saved sessions from
 14. Completed: removed the earlier in-thread `/implement` path and standardized the post-analysis continuation model on the lightweight implementation flow instead.
 15. Completed: restricted analysis recommendations and implementation prompts to AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and similar repository-local instruction files.
 16. Completed: extended analysis prompts to recommend new reusable AI skills for repeated workflows and extended `/implement` prompts to create those repository-local skill files when recommended.
+17. Completed: added comparison against the existing AI instruction and skill files so analysis reports only list gaps or concrete improvements that are not already covered there.
 
 ## Implemented Recommendation Scope Refinement
 
@@ -47,6 +49,13 @@ Implement an `@session-control /analyze` workflow that reads saved sessions from
 3. Completed: updated the `/implement` flow so the generated implementation prompt can create the recommended AI skills, including new repository-local skill files when they are the highest-value next step.
 4. Completed: kept the skill-creation scope repository-local by preferring new or updated skill, prompt, instruction, and agent-definition files over source-code changes.
 5. Completed: updated tests so prompt construction covers both skill discovery during analysis and skill creation during `/implement`.
+
+## Implemented Gap Filtering Refinement
+
+1. Completed: passed the existing AI instruction and skill-file baseline into analysis prompt construction.
+2. Completed: instructed the analysis model to compare candidate recommendations against that baseline before listing report items.
+3. Completed: configured the report to list only gaps or concrete improvements that are not already covered by the current AI guidance.
+4. Completed: reduced the effective batch budget by the AI-guidance baseline length so the additional context is accounted for during batching.
 
 ## Relevant Files
 
@@ -80,7 +89,8 @@ Implement an `@session-control /analyze` workflow that reads saved sessions from
 5. Completed: `npm run compile-tests`, `npm run compile`, `npm test`, and `npm run lint` all passed on 2026-05-17.
 6. Completed: unit tests now verify that the analysis and implementation prompts restrict recommendations to AI-specific control files, including current repo targets `AGENTS.md` and `.github/copilot-instructions.md`, plus optional files such as `CLAUDE.md` when present.
 7. Completed: unit tests now verify that analysis can recommend creating new reusable AI skills and that `/implement` prompts can direct creation of those skill files when recommended.
-8. Remaining: manually smoke-test `@session-control /analyze`, verify report persistence under the analysis subdirectory, rerun to confirm unchanged sessions are skipped until content changes, confirm the implementation prompt opens as expected, and verify the resulting recommendations stay within the AI-control-file and AI-skill scope.
+8. Completed: analysis prompt construction now includes the existing AI instruction and skill-file baseline so the report can suppress already-covered guidance.
+9. Remaining: manually smoke-test `@session-control /analyze`, verify report persistence under the analysis subdirectory, rerun to confirm unchanged sessions are skipped until content changes, confirm the implementation prompt opens as expected, and verify the resulting recommendations stay within the AI-control-file and AI-skill scope.
 
 ## Decisions
 
@@ -92,3 +102,4 @@ Implement an `@session-control /analyze` workflow that reads saved sessions from
 - Follow-up model: lightweight implementation flow via `@session-control /implement` and `Session Control: Implement Latest Analysis`
 - Recommendation scope: only AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and other repository-local instruction or prompt control files
 - Skill creation scope: analysis may recommend new repository-local AI skills, and `/implement` should create those skill files when they are the best next improvement
+- Gap-filtering scope: analysis should suppress recommendations that are already covered by the current AI instruction and skill files unless the recommendation is a concrete improvement, consolidation, or removal

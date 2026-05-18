@@ -111,3 +111,7 @@ Pages touched: CHAT_ANALYSIS_PLAN.md, README.md, CHANGELOG.md, chat-participant.
 ## [2026-05-17] update | Add AI Skill Recommendations
 Extended the saved-chat analysis prompts so reports can recommend new reusable repository-local AI skills for repeated workflows. Updated the `/implement` prompt construction so the next coding-agent step can create those skill files, including `SKILL.md`, `*.instructions.md`, `*.prompt.md`, and `*.agent.md` when recommended.
 Pages touched: CHAT_ANALYSIS_PLAN.md, README.md, CHANGELOG.md, chat-participant.md, file-manifest.md, log.md
+
+## [2026-05-17] update | Filter Existing AI Guidance
+Extended the saved-chat analysis flow so it now compares candidate recommendations against the current AI instruction and skill files in the analyzed workspaces. Reports are now intended to list only gaps or concrete improvements that are not already covered by the existing AI guidance baseline.
+Pages touched: CHAT_ANALYSIS_PLAN.md, README.md, CHANGELOG.md, chat-participant.md, file-manifest.md, log.md

@@ -115,6 +115,7 @@ function createAnalyzeFlowDeps(overrides: Partial<Parameters<typeof runAnalyzeSe
 		resolveSelection: async () => createNeedsAnalysisSelection(),
 		createCandidates: async () => [createAnalysisCandidate()],
 		loadAnalyzedFingerprints: async () => new Set<string>(),
+		loadRecommendationBaseline: async () => '',
 		splitIntoBatches: (candidates: AnalysisCandidateSession[]) => [candidates],
 		buildPrompt: () => 'analysis prompt',
 		buildSynthesisPrompt: () => 'synthesis prompt',
@@ -340,12 +341,14 @@ suite('chatParticipant analyze flow', () => {
 	test('uses batch summaries then a synthesis pass when analysis input is split', async () => {
 		const prompts: Array<{ prompt: string; streamOutput: boolean }> = [];
 		const messages: string[] = [];
+		const recommendationBaselines: string[] = [];
 		await runAnalyzeSessionsFlow(
 			'7d',
 			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
 			[{ ...createMeta(), workspaceFolder: createWorkspaceFolder('workspace', 'e:/workspace', 0), storageDirectory: 'e:/workspace/.chat', displayTitle: '[workspace] Fix auth bug' }],
 			createAnalyzeFlowDeps({
 				resolveSelection: async () => createPresetAnalysisSelection('last7Days', new Date('2026-05-17T12:00:00.000Z')),
+				loadRecommendationBaseline: async () => 'existing-ai-baseline',
 				createCandidates: async () => [
 					createAnalysisCandidate({
 						fingerprint: 'fingerprint-a',
@@ -359,8 +362,14 @@ suite('chatParticipant analyze flow', () => {
 					}),
 				],
 				splitIntoBatches: (candidates: AnalysisCandidateSession[]) => candidates.map((candidate) => [candidate]),
-				buildPrompt: (_selection, candidates) => `batch:${candidates[0]?.fingerprint}`,
-				buildSynthesisPrompt: (_selection, batchSummaries) => `synthesis:${batchSummaries.join('|')}`,
+				buildPrompt: (_selection, candidates, recommendationBaseline) => {
+					recommendationBaselines.push(recommendationBaseline);
+					return `batch:${candidates[0]?.fingerprint}`;
+				},
+				buildSynthesisPrompt: (_selection, batchSummaries, recommendationBaseline) => {
+					recommendationBaselines.push(recommendationBaseline);
+					return `synthesis:${batchSummaries.join('|')}`;
+				},
 				runModelPrompt: async (prompt: string, streamOutput: boolean) => {
 					prompts.push({ prompt, streamOutput });
 					if (prompt.startsWith('batch:')) {
@@ -383,6 +392,7 @@ suite('chatParticipant analyze flow', () => {
 		assert.equal(prompts[2]?.streamOutput, true);
 		assert.equal(prompts[2]?.prompt.includes('synthesis:summary:batch:fingerprint-a'), true);
 		assert.equal(prompts[2]?.prompt.includes('summary:batch:fingerprint-b'), true);
+		assert.deepEqual(recommendationBaselines, ['existing-ai-baseline', 'existing-ai-baseline', 'existing-ai-baseline']);
 		assert.equal(messages.some((message) => message.includes('Analyzing 2 saved sessions across 2 batches')), true);
 		assert.equal(messages.some((message) => message.includes('_Synthesizing final report..._')), true);
 	});

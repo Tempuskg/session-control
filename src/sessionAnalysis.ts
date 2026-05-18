@@ -13,7 +13,7 @@ export interface AnalysisCandidateSession {
 	session: ChatSession;
 }
 
-export const ANALYSIS_PROMPT_VERSION = '3';
+export const ANALYSIS_PROMPT_VERSION = '4';
 export const DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET = 48000;
 
 const ANALYSIS_PROMPT_TEMPLATE = `Review my last interactions with AI from {user chosen timeframe}.
@@ -25,6 +25,9 @@ Also look for insights that would be useful for the coding agent to know beforeh
 function buildRecommendationScopeGuidance(): string {
 	return [
 		'Restrict all recommendations to AI-specific control files in the repository.',
+		'Before recommending anything, compare it against the existing AI instruction and skill files provided below.',
+		'Only list gaps that are not already covered there.',
+		'If an instruction or skill already exists, omit it unless you are recommending a concrete improvement, consolidation, or removal.',
 		'Prioritize AGENTS.md and .github/copilot-instructions.md when they exist.',
 		'If present, CLAUDE.md, *.instructions.md, *.prompt.md, *.agent.md, SKILL.md, and similar repository-local AI instruction files are also in scope.',
 		'Look for repeated workflows or recurring instructions that should be extracted into new reusable repository-local AI skills.',
@@ -32,6 +35,22 @@ function buildRecommendationScopeGuidance(): string {
 		'Do not recommend application source-code changes, test changes, build tooling changes, or general documentation edits unless the change is specifically to one of those AI control files.',
 		'If the evidence does not support a concrete AI-control-file recommendation, say so instead of proposing general repository changes.',
 		'For every recommendation, name the target AI control file and the instruction, prompt, or new skill content to create.',
+	].join('\n');
+}
+
+function buildExistingAiBaselineSection(existingAiFileBaseline: string): string {
+	if (!existingAiFileBaseline.trim()) {
+		return [
+			'Existing AI Instructions and Skills:',
+			'',
+			'No existing AI instruction or skill files were found in the analyzed workspaces.',
+		].join('\n');
+	}
+
+	return [
+		'Existing AI Instructions and Skills:',
+		'',
+		existingAiFileBaseline,
 	].join('\n');
 }
 
@@ -255,7 +274,11 @@ function buildRequiredSections(): string {
 	].join('\n');
 }
 
-export function buildAnalysisPrompt(selection: AnalysisSelection, candidates: AnalysisCandidateSession[]): string {
+export function buildAnalysisPrompt(
+	selection: AnalysisSelection,
+	candidates: AnalysisCandidateSession[],
+	existingAiFileBaseline = '',
+): string {
 	const instruction = ANALYSIS_PROMPT_TEMPLATE.replace('{user chosen timeframe}', selection.label);
 	const evidence = candidates.map((candidate) => buildSessionEvidence(candidate)).join('\n\n---\n\n');
 
@@ -266,13 +289,19 @@ export function buildAnalysisPrompt(selection: AnalysisSelection, candidates: An
 		'',
 		buildRequiredSections(),
 		'',
+		buildExistingAiBaselineSection(existingAiFileBaseline),
+		'',
 		'Chats to analyze:',
 		'',
 		evidence,
 	].join('\n');
 }
 
-export function buildAnalysisSynthesisPrompt(selection: AnalysisSelection, batchSummaries: string[]): string {
+export function buildAnalysisSynthesisPrompt(
+	selection: AnalysisSelection,
+	batchSummaries: string[],
+	existingAiFileBaseline = '',
+): string {
 	const instruction = ANALYSIS_PROMPT_TEMPLATE.replace('{user chosen timeframe}', selection.label);
 	return [
 		instruction,
@@ -283,6 +312,8 @@ export function buildAnalysisSynthesisPrompt(selection: AnalysisSelection, batch
 		buildRecommendationScopeGuidance(),
 		'',
 		buildRequiredSections(),
+		'',
+		buildExistingAiBaselineSection(existingAiFileBaseline),
 		'',
 		'Batch findings:',
 		'',
