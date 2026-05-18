@@ -107,3 +107,7 @@ Pages touched: CHAT_ANALYSIS_PLAN.md, README.md, CHANGELOG.md, chat-participant.
 ## [2026-05-17] update | Rename Latest Analysis Command To Implement
 Renamed the command-palette entry from `Session Control: Handoff Latest Analysis` (`session-control.handoffLatestAnalysis`) to `Session Control: Implement Latest Analysis` (`session-control.implementLatestAnalysis`). Updated the extension registration, tests, README, changelog, plan, and wiki pages to reflect the unified implementation terminology.
 Pages touched: CHAT_ANALYSIS_PLAN.md, README.md, CHANGELOG.md, chat-participant.md, file-manifest.md, log.md
+
+## [2026-05-17] update | Add AI Skill Recommendations
+Extended the saved-chat analysis prompts so reports can recommend new reusable repository-local AI skills for repeated workflows. Updated the `/implement` prompt construction so the next coding-agent step can create those skill files, including `SKILL.md`, `*.instructions.md`, `*.prompt.md`, and `*.agent.md` when recommended.
+Pages touched: CHAT_ANALYSIS_PLAN.md, README.md, CHANGELOG.md, chat-participant.md, file-manifest.md, log.md

@@ -13,7 +13,7 @@ export interface AnalysisCandidateSession {
 	session: ChatSession;
 }
 
-export const ANALYSIS_PROMPT_VERSION = '2';
+export const ANALYSIS_PROMPT_VERSION = '3';
 export const DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET = 48000;
 
 const ANALYSIS_PROMPT_TEMPLATE = `Review my last interactions with AI from {user chosen timeframe}.
@@ -27,9 +27,11 @@ function buildRecommendationScopeGuidance(): string {
 		'Restrict all recommendations to AI-specific control files in the repository.',
 		'Prioritize AGENTS.md and .github/copilot-instructions.md when they exist.',
 		'If present, CLAUDE.md, *.instructions.md, *.prompt.md, *.agent.md, SKILL.md, and similar repository-local AI instruction files are also in scope.',
+		'Look for repeated workflows or recurring instructions that should be extracted into new reusable repository-local AI skills.',
+		'When a new skill would help, recommend creating a specific skill file such as SKILL.md, *.instructions.md, *.prompt.md, or *.agent.md and explain what behavior it should capture.',
 		'Do not recommend application source-code changes, test changes, build tooling changes, or general documentation edits unless the change is specifically to one of those AI control files.',
 		'If the evidence does not support a concrete AI-control-file recommendation, say so instead of proposing general repository changes.',
-		'For every recommendation, name the target AI control file and the instruction or prompt change to make.',
+		'For every recommendation, name the target AI control file and the instruction, prompt, or new skill content to create.',
 	].join('\n');
 }
 
@@ -248,7 +250,8 @@ function buildRequiredSections(): string {
 		'3. Common AI Mistakes',
 		'4. Unnecessary Tool Usage',
 		'5. Workflow Optimizations',
-		'6. Coding Agent Preload Insights',
+		'6. Recommended AI Skills to Create',
+		'7. Coding Agent Preload Insights',
 	].join('\n');
 }
 
@@ -296,9 +299,11 @@ export function buildImplementationHandoffPrompt(reportFilePath: string, userPro
 		'Implement the AI-control-file recommendations from the latest Session Control analysis using full workspace access.',
 		`Start by reading this saved analysis report: "${reportFilePath}"`,
 		'Also read AGENTS.md, .github/copilot-instructions.md, CLAUDE.md when present, and any other repository-local AI control files relevant to the first actionable recommendation.',
+		'If the saved report recommends creating a new reusable AI skill, create the repository-local skill file and any supporting instruction, prompt, or agent-definition files needed for that skill.',
+		'This can include creating SKILL.md, *.instructions.md, *.prompt.md, or *.agent.md files when the report identifies them as the best next improvement.',
 		'Do not expand into application source files, tests, build tooling, or general documentation unless the saved report specifically calls for updating an AI control file that governs those workflows.',
 		'Inspect the current working tree first so you do not assume a clean baseline before editing or validating.',
-		'Make the next concrete implementation change in the relevant AI control file and validate it with focused checks before expanding scope.',
+		'Make the next concrete implementation change in the relevant AI control file or new AI skill file and validate it with focused checks before expanding scope.',
 		`User request: ${normalizedPrompt}`,
 	].join('\n');
 }

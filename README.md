@@ -74,11 +74,11 @@ You can either choose a timeframe interactively or use a quick alias such as `24
 
 When you pick a date-based range interactively, Session Control now asks whether it should analyze only chats in that range that have not been analyzed yet, or re-analyze everything in that range.
 
-The participant reviews saved sessions from the configured storage folder, streams a report back into chat, and writes a markdown report under `.chat/analysis/reports/`. It also keeps an analysis index in `.chat/analysis/index.json` so the **Needs Analysis** mode only selects chats that have not been analyzed yet or whose content has changed since the last analysis. The report's recommendation sections are intentionally limited to AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and similar repository-local instruction files.
+The participant reviews saved sessions from the configured storage folder, streams a report back into chat, and writes a markdown report under `.chat/analysis/reports/`. It also keeps an analysis index in `.chat/analysis/index.json` so the **Needs Analysis** mode only selects chats that have not been analyzed yet or whose content has changed since the last analysis. The report's recommendation sections are intentionally limited to AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and similar repository-local instruction files. When repeated workflows suggest a better reusable setup, the report can also recommend creating new AI skill files such as `SKILL.md`, `*.instructions.md`, `*.prompt.md`, or `*.agent.md`.
 
 After the report is generated, Session Control suggests an **Implement Recommendations** follow-up in chat.
 
-`@session-control /implement` generates a compact implementation prompt that points a coding agent at the saved analysis report file and keeps the next step focused on those AI control files. It opens a new chat with that prompt prefilled by default, and when a supported agent-session opener is available it can open that surface and copy the prompt to the clipboard.
+`@session-control /implement` generates a compact implementation prompt that points a coding agent at the saved analysis report file and keeps the next step focused on those AI control files. When the report recommends a new reusable AI skill, the generated prompt tells the next coding-agent step to create that skill file and any supporting instruction assets. It opens a new chat with that prompt prefilled by default, and when a supported agent-session opener is available it can open that surface and copy the prompt to the clipboard.
 
 ### Implement the latest saved analysis from the command palette
 

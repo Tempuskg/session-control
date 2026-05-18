@@ -128,6 +128,8 @@ suite('sessionAnalysis', () => {
 		assert.equal(prompt.includes('Review my last interactions with AI from Last 7 Days.'), true);
 		assert.equal(prompt.includes('Restrict all recommendations to AI-specific control files in the repository.'), true);
 		assert.equal(prompt.includes('AGENTS.md and .github/copilot-instructions.md'), true);
+		assert.equal(prompt.includes('repeated workflows or recurring instructions'), true);
+		assert.equal(prompt.includes('Recommended AI Skills to Create'), true);
 		assert.equal(prompt.includes('Do not recommend application source-code changes'), true);
 		assert.equal(prompt.includes('Repository-Specific Findings'), true);
 		assert.equal(prompt.includes('Coding Agent Preload Insights'), true);
@@ -139,6 +141,8 @@ suite('sessionAnalysis', () => {
 
 		assert.equal(prompt.includes('Needs Analysis'), true);
 		assert.equal(prompt.includes('CLAUDE.md'), true);
+		assert.equal(prompt.includes('recommend creating a specific skill file'), true);
+		assert.equal(prompt.includes('Recommended AI Skills to Create'), true);
 		assert.equal(prompt.includes('say so instead of proposing general repository changes'), true);
 		assert.equal(prompt.includes('## Batch 1'), true);
 		assert.equal(prompt.includes('## Batch 2'), true);
@@ -154,6 +158,8 @@ suite('sessionAnalysis', () => {
 		assert.equal(prompt.includes('AGENTS.md'), true);
 		assert.equal(prompt.includes('.github/copilot-instructions.md'), true);
 		assert.equal(prompt.includes('CLAUDE.md when present'), true);
+		assert.equal(prompt.includes('create the repository-local skill file'), true);
+		assert.equal(prompt.includes('SKILL.md, *.instructions.md, *.prompt.md, or *.agent.md'), true);
 		assert.equal(prompt.includes('Do not expand into application source files'), true);
 		assert.equal(prompt.includes('Inspect the current working tree first'), true);
 		assert.equal(prompt.includes('e:/workspace/.chat/analysis/reports/report-1.md'), true);

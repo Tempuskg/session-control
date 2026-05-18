@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - When choosing an interactive date range for `@session-control /analyze`, the participant now asks whether to analyze only unanalyzed chats in that range or re-analyze every chat in that range.
 - Analysis results now offer an **Implement Recommendations** follow-up that opens the generated coding-agent implementation prompt.
-- Analysis prompts and handoff prompts now restrict recommendations and implementation follow-up to AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and similar repository-local instruction files.
+- Analysis prompts and implementation prompts now restrict recommendations and implementation follow-up to AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and similar repository-local instruction files.
+- Analysis prompts now identify reusable AI skills that should be created for repeated workflows, and `/implement` prompts can direct the next coding-agent step to create those skill files.
 - Renamed the lightweight post-analysis slash command from `@session-control /handoff` to `@session-control /implement`.
 - Renamed the command-palette entry from `Session Control: Handoff Latest Analysis` (`session-control.handoffLatestAnalysis`) to `Session Control: Implement Latest Analysis` (`session-control.implementLatestAnalysis`).
 

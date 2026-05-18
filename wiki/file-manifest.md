@@ -25,7 +25,7 @@ Planned source files for the session-control extension, their roles, and depende
 | `package.json` | Extension manifest: commands, settings, chat participant, menus | — |
 | `src/extension.ts` | Entry point: registers commands, chat participant, and auto-save listeners (exports `registerAutoSaveOnChatResponseListener`) | All modules |
 | `src/analysisStore.ts` | Persists analysis reports and fingerprint-based analyzed-session state under `.chat/analysis/` | `types.ts` |
-| `src/sessionAnalysis.ts` | Pure helpers for analysis selection parsing, timeframe filtering, AI-control-file-scoped analysis and implementation prompt construction, and batching | `types.ts` |
+| `src/sessionAnalysis.ts` | Pure helpers for analysis selection parsing, timeframe filtering, AI-control-file and AI-skill-scoped analysis and implementation prompt construction, and batching | `types.ts` |
 | `src/sessionReader.ts` | Reads Copilot internal session files; handles format versioning | VS Code internal API |
 | `src/sessionWriter.ts` | Transforms raw sessions to [Session Format](session-format.md); writes to disk | `types.ts`, `gitIntegration.ts`, `utils.ts` |
 | `src/chatParticipant.ts` | `@session-control` chat participant handler for resume, list, analyze, and lightweight implementation workflows | `sessionStore.ts`, `analysisStore.ts`, `sessionAnalysis.ts`, `types.ts` |
