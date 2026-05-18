@@ -6,12 +6,14 @@ Session Control is a VS Code extension that saves and resumes GitHub Copilot Cha
 
 ## AI Execution Rules
 
-- Before designing or implementing repo-aware chat commands or implementation flows, verify whether the current surface has tool and workspace access. Plain chat-participant LM surfaces are prompt-only unless tool access is explicitly wired, and repo-aware implementation requests on non-tool surfaces should default to handoff-first.
+- Before designing or implementing repo-aware chat commands or implementation flows, verify whether the current surface has tool and workspace access. Plain chat-participant LM surfaces are prompt-only unless tool access is explicitly wired, and repo-aware implementation requests on non-tool surfaces should default to handoff-first. If a generated handoff prompt is later executed with full access, restate the operative user request before editing.
 - Analysis recommendations may target only repository-local AI control files: `AGENTS.md`, `.github/copilot-instructions.md`, and when present `CLAUDE.md`, `*.instructions.md`, `*.prompt.md`, `*.agent.md`, `SKILL.md`, and similar local AI instruction files. If evidence is insufficient, say so instead of recommending source, test, build, or general documentation changes.
 - Every implementation reply must end with: `Status: completed|partial|blocked`, `Changed files`, `Commands run`, `Results`, `Blockers`, `Unverified`, and `Next step`. A no-edit implementation turn must be marked `partial` or `blocked`.
 - Assume strict optional-property typing. Omit absent optional keys instead of passing `undefined`.
 - Use plain relative file paths in summaries and handoffs; do not rely on rendered anchor text.
 - When public documentation already shows that a supported API or command is unavailable, stop command-id hunting and choose the documented fallback.
+- When the user asks about publishing, answer with the repo's exact VS Marketplace and Open VSX flow first instead of generic marketplace guidance. On Windows, default to PowerShell syntax unless the user explicitly asks for `cmd` or bash.
+- Do not read unrelated prompt or policy files unless the active task explicitly depends on them.
 - When multiple repositories are in scope, return per-repo closeouts first and keep state, persistence assumptions, and conclusions isolated per workspace unless the user explicitly asks to merge them.
 
 ## Language & Build

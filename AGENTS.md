@@ -7,9 +7,9 @@ This file defines how the LLM maintains the wiki for the **session-control** VS 
 For `/implement`, `/proceed`, direct implementation requests, or generated implementation handoffs in this repo:
 
 1. Read `AGENTS.md`, `.github/copilot-instructions.md`, any repo-local AI control files, any referenced analysis report, and `package.json` before the first edit.
-2. Acknowledge any user-referenced external instruction file and state whether it is accessible from the current workspace.
+2. Acknowledge any user-referenced external instruction file and state whether it is accessible from the current workspace, applied, ignored, or out of repo scope.
 3. Run `git status --short` and a scoped `git diff -- <candidate files>` before broad diagnostics or edits.
-4. Before the first edit, use at most one repo-wide search and one targeted search. Prefer owner-file reads over broad exploration, and avoid subagents unless blocked or intentionally parallelized.
+4. Before the first edit, use at most one repo-wide search and one targeted search. Prefer owner-file reads over broad exploration, skip directory listings when exact paths are already known, and avoid subagents unless blocked or intentionally parallelized.
 5. If a request implies coding-agent behavior or implementation handoff, first verify whether the design uses a plain `request.model.sendRequest` call or a tool-enabled agent, tool, or MCP flow. If it is plain LM, warn that workspace files and tools will not be available before implementing.
 6. After preflight, make the smallest safe edit in the same turn or state one concrete blocker. Investigation-only implementation turns are not sufficient.
 7. Once an owner file is identified, stop adjacent filename fishing and only reopen the same hotspot with a new hypothesis.
@@ -21,6 +21,7 @@ For `/implement`, `/proceed`, direct implementation requests, or generated imple
 13. Analysis recommendations may target only repository-local AI control files: `AGENTS.md`, `.github/copilot-instructions.md`, and when present `CLAUDE.md`, `*.instructions.md`, `*.prompt.md`, `*.agent.md`, `SKILL.md`, and similar local AI instruction files. If evidence is insufficient, say so instead of recommending source, test, build, or general documentation changes.
 14. When multiple repositories are open, record repo name, branch or commit, dirty state, workspace scope, source-of-truth repo, artifact owner, and shared contract owner before acting.
 15. Re-read local AI instructions and `package.json` in every repo, and do not reuse commands, conventions, or assumptions from memory or another repo.
+16. Use memory or auxiliary tool reads only when the retrieved state changes the next step. Prefer targeted existence checks over broad wildcard scans.
 
 ## Quick Start / Known Constraints
 
@@ -30,9 +31,13 @@ For `/implement`, `/proceed`, direct implementation requests, or generated imple
 - `src/chatParticipant.ts` is a hotspot; interactive chat or command changes need a Development Host smoke test.
 - Validate in this order when applicable: touched-file diagnostics, `npm run compile-tests`, `npm run compile`, focused relevant tests, `npm test`, `npm run lint`, then a Development Host smoke test.
 - Check both slash-command and command-palette surfaces for drift before closing rename or command work.
+- For plan-only or AI-control-only requests, update only plan/control files and explicitly state that implementation code did not change.
 - Use plain relative file paths in summaries and handoffs.
 - Strict optional-property typing is active in this repo, so omit optional keys rather than passing `undefined`.
 - Plain chat participants are not coding agents unless tool and workspace access are explicitly wired.
+- Repo type: VS Code extension. For patch version bumps, prefer `npm run version:build`. For explicit version sets, use the documented exact `npm version` path without automatic git tag or commit creation.
+- Release-relevant files are `package.json`, `package-lock.json`, `README.md`, and `scripts/bump-package-version.cjs`. Verify only the expected release files for versioning tasks.
+- On resumed chats, re-read the current version and workspace state before release steps, and prefer repo scripts or repo-local AI skills over generic CLI advice.
 - Evidenced local AI files here are `AGENTS.md` and `.github/copilot-instructions.md`; `CLAUDE.md` was not evidenced.
 
 ## Multi-Repo Preload Packet
