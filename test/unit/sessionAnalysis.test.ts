@@ -13,7 +13,7 @@ import {
 } from '../../src/sessionAnalysis';
 import { ChatSession } from '../../src/types';
 
-function createSession(id: string, savedAt: string, title: string, content: string): ChatSession {
+function createSession(id: string, savedAt: string, title: string, content: string, requestPrompt = `Prompt for ${title}`): ChatSession {
 	return {
 		version: 1,
 		id,
@@ -30,7 +30,7 @@ function createSession(id: string, savedAt: string, title: string, content: stri
 			{
 				type: 'request',
 				participant: 'copilot',
-				prompt: `Prompt for ${title}`,
+				prompt: requestPrompt,
 				references: [],
 				timestamp: savedAt,
 			},
@@ -46,14 +46,14 @@ function createSession(id: string, savedAt: string, title: string, content: stri
 	};
 }
 
-function createCandidate(id: string, savedAt: string, title: string, content: string): AnalysisCandidateSession {
+function createCandidate(id: string, savedAt: string, title: string, content: string, requestPrompt?: string): AnalysisCandidateSession {
 	return {
 		workspaceName: 'workspace',
 		storageDirectory: 'storage',
 		fileName: `${id}.json`,
 		rootFileName: `${id}.json`,
 		fingerprint: `fingerprint-${id}`,
-		session: createSession(id, savedAt, title, content),
+		session: createSession(id, savedAt, title, content, requestPrompt),
 	};
 }
 
@@ -110,6 +110,33 @@ suite('sessionAnalysis', () => {
 		assert.equal(mixedRange[0]?.session.id, 'older');
 	});
 
+	test('filterCandidatesForAnalysis skips saved session-control analyze chats', () => {
+		const normal = createCandidate('normal', '2026-05-17T11:00:00.000Z', 'Fix auth bug', 'Normal content');
+		const analyze = createCandidate(
+			'analyze',
+			'2026-05-17T10:00:00.000Z',
+			'@session-control /analyze',
+			'Analyze content',
+			'@session-control /analyze',
+		);
+		const analyzeTypo = createCandidate(
+			'analyze-typo',
+			'2026-05-17T09:00:00.000Z',
+			'@session-control /analze',
+			'Analyze typo content',
+			'@session-control /analze',
+		);
+
+		const filtered = filterCandidatesForAnalysis(
+			[normal, analyze, analyzeTypo],
+			createNeedsAnalysisSelection(),
+			new Set<string>(),
+		);
+
+		assert.equal(filtered.length, 1);
+		assert.equal(filtered[0]?.session.id, 'normal');
+	});
+
 	test('splitCandidatesIntoAnalysisBatches splits large candidate sets by evidence size', () => {
 		const first = createCandidate('a', '2026-05-17T11:00:00.000Z', 'Alpha', 'x'.repeat(200));
 		const second = createCandidate('b', '2026-05-17T10:00:00.000Z', 'Beta', 'y'.repeat(200));
@@ -117,6 +144,21 @@ suite('sessionAnalysis', () => {
 		assert.equal(batches.length, 2);
 		assert.equal(batches[0]?.length, 1);
 		assert.equal(batches[1]?.length, 1);
+	});
+
+	test('buildAnalysisPrompt condenses oversized evidence for compact detail levels', () => {
+		const selection = createNeedsAnalysisSelection();
+		const oversizedText = `${'alpha '.repeat(900)}middle marker${'omega '.repeat(900)}`;
+		const candidate = createCandidate('oversized', '2026-05-17T11:00:00.000Z', 'Oversized', oversizedText, oversizedText);
+
+		const full = buildAnalysisPrompt(selection, [candidate]);
+		const compact = buildAnalysisPrompt(selection, [candidate], '', 'compact');
+		const summaryOnly = buildAnalysisPrompt(selection, [candidate], '', 'summaryOnly');
+
+		assert.equal(compact.length < full.length, true);
+		assert.equal(summaryOnly.length < compact.length, true);
+		assert.equal(compact.includes('Transcript (condensed due to size)'), true);
+		assert.equal(summaryOnly.includes('summary-only evidence'), true);
 	});
 
 	test('buildAnalysisPrompt includes timeframe label and required sections', () => {

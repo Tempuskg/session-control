@@ -472,8 +472,8 @@ function createDefaultAnalyzeSessionsFlowDeps(
 			candidates: AnalysisCandidateSession[],
 		) => loadRecommendationBaseline(workspaceFolders, candidates),
 		splitIntoBatches: (candidates, maxChars) => splitCandidatesIntoAnalysisBatches(candidates, maxChars),
-		buildPrompt: (selection, candidates, recommendationBaseline) =>
-			buildAnalysisPrompt(selection, candidates, recommendationBaseline),
+		buildPrompt: (selection, candidates, recommendationBaseline, detailLevel) =>
+			buildAnalysisPrompt(selection, candidates, recommendationBaseline, detailLevel),
 		buildSynthesisPrompt: (selection, batchSummaries, recommendationBaseline) =>
 			buildAnalysisSynthesisPrompt(selection, batchSummaries, recommendationBaseline),
 		runModelPrompt: async (prompt: string, streamOutput: boolean) => collectModelText(request, streamOutput ? stream : undefined, token, prompt),

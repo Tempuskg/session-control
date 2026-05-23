@@ -474,12 +474,205 @@ suite('chatParticipant analyze flow', () => {
 		assert.equal(result?.metadata.analysisStatus, 'partial');
 		assert.deepEqual(reportWrites, [{
 			status: 'partial',
-			warnings: ['Batch 2 of 2 failed: model unavailable'],
+			warnings: ['Batch 2 failed: model unavailable'],
 			fingerprints: ['fingerprint-a'],
 			content: '## Findings\n\nSynthesized partial report',
 		}]);
 		assert.deepEqual(recorded, [{ storageDirectory: 'e:/workspace/.chat', fingerprints: ['fingerprint-a'] }]);
 		assert.equal(messages.some((message) => message.includes('Saved partial analysis report')), true);
+	});
+
+	test('retries smaller batches when the initial analysis prompt exceeds the token limit', async () => {
+		const prompts: Array<{ prompt: string; streamOutput: boolean }> = [];
+		const messages: string[] = [];
+		const reportWrites: Array<{ status: string | undefined; warnings: readonly string[] | undefined; fingerprints: string[] }> = [];
+
+		const result = await runAnalyzeSessionsFlow(
+			'7d',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			[{ ...createMeta(), workspaceFolder: createWorkspaceFolder('workspace', 'e:/workspace', 0), storageDirectory: 'e:/workspace/.chat', displayTitle: '[workspace] Fix auth bug' }],
+			createAnalyzeFlowDeps({
+				resolveSelection: async () => createPresetAnalysisSelection('last7Days', new Date('2026-05-17T12:00:00.000Z')),
+				createCandidates: async () => [
+					createAnalysisCandidate({
+						fingerprint: 'fingerprint-a',
+						storageDirectory: 'e:/workspace/.chat',
+						session: createChatSession({ id: 'a', title: 'Session A' }),
+					}),
+					createAnalysisCandidate({
+						fingerprint: 'fingerprint-b',
+						storageDirectory: 'e:/workspace/.chat',
+						session: createChatSession({ id: 'b', title: 'Session B' }),
+					}),
+				],
+				splitIntoBatches: (candidates: AnalysisCandidateSession[]) => [candidates],
+				buildPrompt: (_selection, candidates) => `batch:${candidates.map((candidate) => candidate.fingerprint).join('|')}`,
+				buildSynthesisPrompt: (_selection, batchSummaries) => `synthesis:${batchSummaries.join('|')}`,
+				runModelPrompt: async (prompt: string, streamOutput: boolean) => {
+					prompts.push({ prompt, streamOutput });
+					if (prompt === 'batch:fingerprint-a|fingerprint-b') {
+						throw new Error('Message exceeds token limit.');
+					}
+
+					if (prompt.startsWith('batch:fingerprint-a')) {
+						return 'summary:a';
+					}
+
+					if (prompt.startsWith('batch:fingerprint-b')) {
+						return 'summary:b';
+					}
+
+					return '## Findings\n\nRecovered report';
+				},
+				streamMarkdown: (markdown: string) => {
+					messages.push(markdown);
+				},
+				writeReport: async (_storageDirectory, input) => {
+					reportWrites.push({
+						status: input.status,
+						warnings: input.warnings,
+						fingerprints: [...input.analyzedFingerprints],
+					});
+
+					return {
+						report: createAnalyzeReportReference({
+							analyzedFingerprints: [...input.analyzedFingerprints],
+							status: input.status,
+							...(input.warnings === undefined ? {} : { warnings: input.warnings }),
+						}),
+						reportFilePath: 'e:/workspace/.chat/analysis/reports/report-1.md',
+					};
+				},
+			}),
+		);
+
+		assert.equal(result?.metadata.analysisStatus, 'complete');
+		assert.equal(prompts[0]?.prompt, 'batch:fingerprint-a|fingerprint-b');
+		assert.equal(prompts[0]?.streamOutput, true);
+		assert.equal(prompts.some((entry) => entry.prompt.startsWith('batch:fingerprint-a\n\nThis is batch 1')), true);
+		assert.equal(prompts.some((entry) => entry.prompt.startsWith('batch:fingerprint-b\n\nThis is batch 2')), true);
+		assert.equal(prompts.some((entry) => entry.prompt === 'synthesis:summary:a|summary:b' && entry.streamOutput), true);
+		assert.deepEqual(reportWrites, [{
+			status: 'complete',
+			warnings: undefined,
+			fingerprints: ['fingerprint-a', 'fingerprint-b'],
+		}]);
+		assert.equal(messages.some((message) => message.includes('Retrying in smaller batches')), true);
+	});
+
+	test('retries a single oversized session with condensed evidence levels', async () => {
+		const prompts: Array<{ prompt: string; streamOutput: boolean }> = [];
+		const messages: string[] = [];
+
+		const result = await runAnalyzeSessionsFlow(
+			'7d',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			[{ ...createMeta(), workspaceFolder: createWorkspaceFolder('workspace', 'e:/workspace', 0), storageDirectory: 'e:/workspace/.chat', displayTitle: '[workspace] Fix auth bug' }],
+			createAnalyzeFlowDeps({
+				resolveSelection: async () => createPresetAnalysisSelection('last7Days', new Date('2026-05-17T12:00:00.000Z')),
+				createCandidates: async () => [
+					createAnalysisCandidate({
+						fingerprint: 'fingerprint-a',
+						storageDirectory: 'e:/workspace/.chat',
+						session: createChatSession({ id: 'a', title: 'Oversized Session' }),
+					}),
+				],
+				buildPrompt: (_selection, _candidates, _baseline, detailLevel) => `detail:${detailLevel ?? 'full'}`,
+				runModelPrompt: async (prompt: string, streamOutput: boolean) => {
+					prompts.push({ prompt, streamOutput });
+					if (prompt === 'detail:full' || prompt === 'detail:compact') {
+						throw new Error('Message exceeds token limit.');
+					}
+
+					return '## Findings\n\nRecovered report';
+				},
+				streamMarkdown: (markdown: string) => {
+					messages.push(markdown);
+				},
+			}),
+		);
+
+		assert.equal(result?.metadata.analysisStatus, 'complete');
+		assert.deepEqual(prompts, [
+			{ prompt: 'detail:full', streamOutput: true },
+			{ prompt: 'detail:compact', streamOutput: true },
+			{ prompt: 'detail:summaryOnly', streamOutput: true },
+		]);
+		assert.equal(messages.some((message) => message.includes('condensed session evidence')), true);
+		assert.equal(messages.some((message) => message.includes('summary-only evidence')), true);
+	});
+
+	test('retries synthesis in smaller groups when combined batch summaries exceed the token limit', async () => {
+		const prompts: Array<{ prompt: string; streamOutput: boolean }> = [];
+		const messages: string[] = [];
+
+		const result = await runAnalyzeSessionsFlow(
+			'7d',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			[{ ...createMeta(), workspaceFolder: createWorkspaceFolder('workspace', 'e:/workspace', 0), storageDirectory: 'e:/workspace/.chat', displayTitle: '[workspace] Fix auth bug' }],
+			createAnalyzeFlowDeps({
+				resolveSelection: async () => createPresetAnalysisSelection('last7Days', new Date('2026-05-17T12:00:00.000Z')),
+				createCandidates: async () => [
+					createAnalysisCandidate({
+						fingerprint: 'fingerprint-a',
+						storageDirectory: 'e:/workspace/.chat',
+						session: createChatSession({ id: 'a', title: 'Session A' }),
+					}),
+					createAnalysisCandidate({
+						fingerprint: 'fingerprint-b',
+						storageDirectory: 'e:/workspace/.chat',
+						session: createChatSession({ id: 'b', title: 'Session B' }),
+					}),
+					createAnalysisCandidate({
+						fingerprint: 'fingerprint-c',
+						storageDirectory: 'e:/workspace/.chat',
+						session: createChatSession({ id: 'c', title: 'Session C' }),
+					}),
+					createAnalysisCandidate({
+						fingerprint: 'fingerprint-d',
+						storageDirectory: 'e:/workspace/.chat',
+						session: createChatSession({ id: 'd', title: 'Session D' }),
+					}),
+				],
+				splitIntoBatches: (candidates: AnalysisCandidateSession[]) => candidates.map((candidate) => [candidate]),
+				buildPrompt: (_selection, candidates) => `batch:${candidates[0]?.fingerprint}`,
+				buildSynthesisPrompt: (_selection, batchSummaries) => `synthesis:${batchSummaries.join('|')}`,
+				runModelPrompt: async (prompt: string, streamOutput: boolean) => {
+					prompts.push({ prompt, streamOutput });
+					if (prompt.startsWith('batch:')) {
+						return `summary:${prompt.split('\n', 1)[0]}`;
+					}
+
+					if (prompt === 'synthesis:summary:batch:fingerprint-a|summary:batch:fingerprint-b|summary:batch:fingerprint-c|summary:batch:fingerprint-d') {
+						throw new Error('Message exceeds token limit.');
+					}
+
+					if (prompt === 'synthesis:summary:batch:fingerprint-a|summary:batch:fingerprint-b') {
+						return 'group:left';
+					}
+
+					if (prompt === 'synthesis:summary:batch:fingerprint-c|summary:batch:fingerprint-d') {
+						return 'group:right';
+					}
+
+					if (prompt === 'synthesis:group:left|group:right') {
+						return '## Findings\n\nSynthesized report';
+					}
+
+					throw new Error(`Unexpected prompt: ${prompt}`);
+				},
+				streamMarkdown: (markdown: string) => {
+					messages.push(markdown);
+				},
+			}),
+		);
+
+		assert.equal(result?.metadata.analysisStatus, 'complete');
+		assert.equal(prompts.some((entry) => entry.prompt === 'synthesis:summary:batch:fingerprint-a|summary:batch:fingerprint-b|summary:batch:fingerprint-c|summary:batch:fingerprint-d' && entry.streamOutput), true);
+		assert.equal(prompts.some((entry) => entry.prompt === 'synthesis:summary:batch:fingerprint-a|summary:batch:fingerprint-b' && !entry.streamOutput), true);
+		assert.equal(prompts.some((entry) => entry.prompt === 'synthesis:summary:batch:fingerprint-c|summary:batch:fingerprint-d' && !entry.streamOutput), true);
+		assert.equal(prompts.some((entry) => entry.prompt === 'synthesis:group:left|group:right' && entry.streamOutput), true);
+		assert.equal(messages.some((message) => message.includes('Final synthesis exceeded the model token limit')), true);
 	});
 });
 

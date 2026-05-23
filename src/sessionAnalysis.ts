@@ -2,6 +2,7 @@ import {
 	AnalysisSelection,
 	AnalysisSelectionMode,
 	ChatSession,
+	ToolCall,
 } from './types';
 
 export interface AnalysisCandidateSession {
@@ -13,8 +14,24 @@ export interface AnalysisCandidateSession {
 	session: ChatSession;
 }
 
+export type AnalysisEvidenceDetailLevel = 'full' | 'compact' | 'summaryOnly';
+
 export const ANALYSIS_PROMPT_VERSION = '4';
 export const DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET = 48000;
+const SESSION_CONTROL_ANALYZE_PROMPT_PATTERN = /^(?:@?session-control\s+)?\/anal(?:y)?ze\b/i;
+const ANALYSIS_COMPACT_SUMMARY_MAX_CHARS = 4000;
+const ANALYSIS_SUMMARY_ONLY_SUMMARY_MAX_CHARS = 2500;
+const ANALYSIS_COMPACT_TRANSCRIPT_MAX_CHARS = 5000;
+const ANALYSIS_SUMMARY_ONLY_TRANSCRIPT_MAX_CHARS = 1200;
+const ANALYSIS_COMPACT_TURN_MAX_CHARS = 800;
+const ANALYSIS_SUMMARY_ONLY_TURN_MAX_CHARS = 320;
+const ANALYSIS_COMPACT_MAX_TOOL_CALL_LINES = 16;
+const ANALYSIS_SUMMARY_ONLY_MAX_TOOL_CALL_LINES = 8;
+const ANALYSIS_COMPACT_TOOL_CALL_LINE_MAX_CHARS = 260;
+const ANALYSIS_SUMMARY_ONLY_TOOL_CALL_LINE_MAX_CHARS = 160;
+const ANALYSIS_COMPACT_TRANSCRIPT_HEAD_TURNS = 2;
+const ANALYSIS_COMPACT_TRANSCRIPT_TAIL_TURNS = 6;
+const ANALYSIS_SUMMARY_ONLY_TRANSCRIPT_TAIL_TURNS = 2;
 
 const ANALYSIS_PROMPT_TEMPLATE = `Review my last interactions with AI from {user chosen timeframe}.
 Look for any problems that I encountered, things that weren't working efficiently, and unnecessary tool calling.
@@ -52,6 +69,191 @@ function buildExistingAiBaselineSection(existingAiFileBaseline: string): string 
 		'',
 		existingAiFileBaseline,
 	].join('\n');
+}
+
+function truncateMiddle(value: string, maxChars: number): string {
+	if (value.length <= maxChars) {
+		return value;
+	}
+
+	if (maxChars <= 3) {
+		return '.'.repeat(Math.max(0, maxChars));
+	}
+
+	const marker = `\n...[${value.length - maxChars} chars omitted]...\n`;
+	const availableChars = maxChars - marker.length;
+	if (availableChars <= 8) {
+		return `${value.slice(0, maxChars - 3)}...`;
+	}
+
+	const headChars = Math.ceil(availableChars / 2);
+	const tailChars = Math.floor(availableChars / 2);
+	const tail = tailChars > 0 ? value.slice(-tailChars) : '';
+	return `${value.slice(0, headChars)}${marker}${tail}`;
+}
+
+function limitRenderedLines(lines: string[], maxLines: number): string[] {
+	if (lines.length <= maxLines) {
+		return lines;
+	}
+
+	const visibleSlots = Math.max(0, maxLines - 1);
+	const headCount = Math.ceil(visibleSlots / 2);
+	const tailCount = Math.floor(visibleSlots / 2);
+	const omittedCount = lines.length - headCount - tailCount;
+
+	return [
+		...lines.slice(0, headCount),
+		`- ... ${omittedCount} additional tool call(s) omitted ...`,
+		...(tailCount > 0 ? lines.slice(lines.length - tailCount) : []),
+	];
+}
+
+function renderToolCallLine(toolCall: ToolCall, detailLevel: AnalysisEvidenceDetailLevel): string {
+	const parts = [toolCall.name];
+	if (toolCall.summary?.trim()) {
+		parts.push(toolCall.summary.trim());
+	} else if (detailLevel === 'full') {
+		parts.push('no summary');
+	}
+
+	if (detailLevel === 'full') {
+		parts.push(toolCall.arguments ?? 'no arguments captured');
+	}
+
+	const line = `- ${parts.join(' | ')}`;
+	if (detailLevel === 'compact') {
+		return truncateMiddle(line, ANALYSIS_COMPACT_TOOL_CALL_LINE_MAX_CHARS);
+	}
+
+	if (detailLevel === 'summaryOnly') {
+		return truncateMiddle(line, ANALYSIS_SUMMARY_ONLY_TOOL_CALL_LINE_MAX_CHARS);
+	}
+
+	return line;
+}
+
+function renderToolCalls(session: ChatSession, detailLevel: AnalysisEvidenceDetailLevel = 'full'): string[] {
+	const lines: string[] = [];
+
+	for (const turn of session.turns) {
+		if (turn.type !== 'response' || turn.toolCalls.length === 0) {
+			continue;
+		}
+
+		for (const toolCall of turn.toolCalls) {
+			lines.push(renderToolCallLine(toolCall, detailLevel));
+		}
+	}
+
+	if (detailLevel === 'compact') {
+		return limitRenderedLines(lines, ANALYSIS_COMPACT_MAX_TOOL_CALL_LINES);
+	}
+
+	if (detailLevel === 'summaryOnly') {
+		return limitRenderedLines(lines, ANALYSIS_SUMMARY_ONLY_MAX_TOOL_CALL_LINES);
+	}
+
+	return lines;
+}
+
+function renderTranscriptTurn(turn: ChatSession['turns'][number], detailLevel: AnalysisEvidenceDetailLevel): string {
+	const maxChars = detailLevel === 'compact'
+		? ANALYSIS_COMPACT_TURN_MAX_CHARS
+		: detailLevel === 'summaryOnly'
+			? ANALYSIS_SUMMARY_ONLY_TURN_MAX_CHARS
+			: Number.MAX_SAFE_INTEGER;
+
+	if (turn.type === 'request') {
+		return `[${turn.timestamp}] User: ${truncateMiddle(turn.prompt, maxChars)}`;
+	}
+
+	const toolLines = turn.toolCalls.length
+		? `\nTool calls:\n${turn.toolCalls.map((toolCall) => renderToolCallLine(toolCall, detailLevel)).join('\n')}`
+		: '';
+	return `[${turn.timestamp}] Assistant: ${truncateMiddle(turn.content, maxChars)}${toolLines}`;
+}
+
+function selectTranscriptTurns(session: ChatSession, detailLevel: AnalysisEvidenceDetailLevel): {
+	turns: ChatSession['turns'];
+	omittedTurns: number;
+} {
+	if (detailLevel === 'full') {
+		return {
+			turns: session.turns,
+			omittedTurns: 0,
+		};
+	}
+
+	if (detailLevel === 'compact') {
+		const maxTurns = ANALYSIS_COMPACT_TRANSCRIPT_HEAD_TURNS + ANALYSIS_COMPACT_TRANSCRIPT_TAIL_TURNS;
+		if (session.turns.length <= maxTurns) {
+			return {
+				turns: session.turns,
+				omittedTurns: 0,
+			};
+		}
+
+		return {
+			turns: [
+				...session.turns.slice(0, ANALYSIS_COMPACT_TRANSCRIPT_HEAD_TURNS),
+				...session.turns.slice(-ANALYSIS_COMPACT_TRANSCRIPT_TAIL_TURNS),
+			],
+			omittedTurns: session.turns.length - maxTurns,
+		};
+	}
+
+	const tailTurns = Math.min(ANALYSIS_SUMMARY_ONLY_TRANSCRIPT_TAIL_TURNS, session.turns.length);
+	return {
+		turns: session.turns.slice(-tailTurns),
+		omittedTurns: session.turns.length - tailTurns,
+	};
+}
+
+function buildAnalysisTranscript(session: ChatSession, detailLevel: AnalysisEvidenceDetailLevel): string {
+	const { turns, omittedTurns } = selectTranscriptTurns(session, detailLevel);
+	const transcriptLines = turns.map((turn) => renderTranscriptTurn(turn, detailLevel));
+
+	if (detailLevel === 'full') {
+		return transcriptLines.join('\n\n');
+	}
+
+	const lines = [
+		detailLevel === 'compact'
+			? 'This transcript was condensed because the saved session exceeded the model token limit.'
+			: 'This transcript was heavily condensed because the saved session exceeded the model token limit. Prefer the saved summary and tool call summary above.',
+		...(omittedTurns > 0 ? [`${omittedTurns} turn(s) were omitted from the transcript.`] : []),
+		...transcriptLines,
+	];
+	const maxChars = detailLevel === 'compact'
+		? ANALYSIS_COMPACT_TRANSCRIPT_MAX_CHARS
+		: ANALYSIS_SUMMARY_ONLY_TRANSCRIPT_MAX_CHARS;
+
+	return truncateMiddle(lines.join('\n\n'), maxChars);
+}
+
+function buildAnalysisSummary(summary: string, detailLevel: AnalysisEvidenceDetailLevel): string {
+	if (detailLevel === 'compact') {
+		return truncateMiddle(summary, ANALYSIS_COMPACT_SUMMARY_MAX_CHARS);
+	}
+
+	if (detailLevel === 'summaryOnly') {
+		return truncateMiddle(summary, ANALYSIS_SUMMARY_ONLY_SUMMARY_MAX_CHARS);
+	}
+
+	return summary;
+}
+
+function buildEvidenceCompressionGuidance(detailLevel: AnalysisEvidenceDetailLevel): string | undefined {
+	if (detailLevel === 'compact') {
+		return 'Some saved-session evidence below was condensed to fit the model token limit. Prefer the saved summary and tool call summary when transcript snippets are abbreviated.';
+	}
+
+	if (detailLevel === 'summaryOnly') {
+		return 'Some saved-session evidence below uses summary-only evidence because the full transcript exceeded the model token limit. Prefer the saved summary, tool call summary, and preserved recent turns.';
+	}
+
+	return undefined;
 }
 
 function createRangeSelection(
@@ -154,10 +356,11 @@ export function filterCandidatesForAnalysis(
 	selection: AnalysisSelection,
 	analyzedFingerprints: ReadonlySet<string>,
 ): AnalysisCandidateSession[] {
+	const eligibleCandidates = candidates.filter((candidate) => !isSessionControlAnalyzeSession(candidate.session));
 	const range = selection.range;
 	const rangeFiltered = !range
-		? candidates
-		: candidates.filter((candidate) => {
+		? eligibleCandidates
+		: eligibleCandidates.filter((candidate) => {
 			const savedAt = Date.parse(candidate.session.savedAt);
 			const startTime = Date.parse(range.start);
 			const endTime = Date.parse(range.end);
@@ -171,38 +374,34 @@ export function filterCandidatesForAnalysis(
 	return rangeFiltered.filter((candidate) => !analyzedFingerprints.has(candidate.fingerprint));
 }
 
-function renderToolCalls(session: ChatSession): string[] {
-	const lines: string[] = [];
+function isSessionControlAnalyzeSession(session: ChatSession): boolean {
+	if (SESSION_CONTROL_ANALYZE_PROMPT_PATTERN.test(session.title.trim())) {
+		return true;
+	}
 
 	for (const turn of session.turns) {
-		if (turn.type !== 'response' || turn.toolCalls.length === 0) {
+		if (turn.type !== 'request') {
 			continue;
 		}
 
-		for (const toolCall of turn.toolCalls) {
-			lines.push(`- ${toolCall.name} | ${toolCall.summary ?? 'no summary'} | ${toolCall.arguments ?? 'no arguments captured'}`);
-		}
+		return SESSION_CONTROL_ANALYZE_PROMPT_PATTERN.test(turn.prompt.trim());
 	}
 
-	return lines;
+	return false;
 }
 
-export function buildSessionEvidence(candidate: AnalysisCandidateSession): string {
+export function buildSessionEvidence(
+	candidate: AnalysisCandidateSession,
+	detailLevel: AnalysisEvidenceDetailLevel = 'full',
+): string {
 	const gitSummary = candidate.session.git
 		? `${candidate.session.git.branch}@${candidate.session.git.commit.slice(0, 7)}${candidate.session.git.dirty ? ' dirty' : ''}`
 		: 'n/a';
-	const transcript = candidate.session.turns.map((turn) => {
-		if (turn.type === 'request') {
-			return `[${turn.timestamp}] User: ${turn.prompt}`;
-		}
-
-		const toolLines = turn.toolCalls.length
-			? `\nTool calls:\n${turn.toolCalls.map((toolCall) => `- ${toolCall.name} | ${toolCall.summary ?? 'no summary'} | ${toolCall.arguments ?? 'no arguments captured'}`).join('\n')}`
-			: '';
-		return `[${turn.timestamp}] Assistant: ${turn.content}${toolLines}`;
-	}).join('\n\n');
-
-	const toolSummary = renderToolCalls(candidate.session);
+	const transcript = buildAnalysisTranscript(candidate.session, detailLevel);
+	const toolSummary = renderToolCalls(candidate.session, detailLevel);
+	const summaryHeading = detailLevel === 'full' ? '### Saved Summary' : '### Saved Summary (condensed due to size)';
+	const toolSummaryHeading = detailLevel === 'full' ? '### Tool Call Summary' : '### Tool Call Summary (condensed due to size)';
+	const transcriptHeading = detailLevel === 'full' ? '### Transcript' : '### Transcript (condensed due to size)';
 
 	return [
 		`## [${candidate.workspaceName}] ${candidate.session.title}`,
@@ -214,15 +413,15 @@ export function buildSessionEvidence(candidate: AnalysisCandidateSession): strin
 		`- Total Turns: ${candidate.session.totalTurns}`,
 		`- Fingerprint: ${candidate.fingerprint}`,
 		'',
-		'### Saved Summary',
+		summaryHeading,
 		'',
-		candidate.session.markdownSummary,
+		buildAnalysisSummary(candidate.session.markdownSummary, detailLevel),
 		'',
-		'### Tool Call Summary',
+		toolSummaryHeading,
 		'',
 		toolSummary.length ? toolSummary.join('\n') : 'No tool calls recorded.',
 		'',
-		'### Transcript',
+		transcriptHeading,
 		'',
 		transcript,
 	].join('\n');
@@ -278,14 +477,17 @@ export function buildAnalysisPrompt(
 	selection: AnalysisSelection,
 	candidates: AnalysisCandidateSession[],
 	existingAiFileBaseline = '',
+	detailLevel: AnalysisEvidenceDetailLevel = 'full',
 ): string {
 	const instruction = ANALYSIS_PROMPT_TEMPLATE.replace('{user chosen timeframe}', selection.label);
-	const evidence = candidates.map((candidate) => buildSessionEvidence(candidate)).join('\n\n---\n\n');
+	const evidence = candidates.map((candidate) => buildSessionEvidence(candidate, detailLevel)).join('\n\n---\n\n');
+	const compressionGuidance = buildEvidenceCompressionGuidance(detailLevel);
 
 	return [
 		instruction,
 		'',
 		buildRecommendationScopeGuidance(),
+		...(compressionGuidance ? ['', compressionGuidance] : []),
 		'',
 		buildRequiredSections(),
 		'',

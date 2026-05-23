@@ -9,6 +9,7 @@ import {
 	ANALYSIS_PROMPT_VERSION,
 	DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET,
 	filterCandidatesForAnalysis,
+	type AnalysisEvidenceDetailLevel,
 	type AnalysisCandidateSession,
 } from './sessionAnalysis';
 import {
@@ -44,6 +45,7 @@ export interface AnalyzeSessionsFlowDeps {
 		selection: AnalysisSelection,
 		candidates: AnalysisCandidateSession[],
 		recommendationBaseline: string,
+		detailLevel?: AnalysisEvidenceDetailLevel,
 	) => string;
 	buildSynthesisPrompt: (
 		selection: AnalysisSelection,
@@ -59,10 +61,18 @@ export interface AnalyzeSessionsFlowDeps {
 	batchCharBudget: number;
 }
 
+const TOKEN_LIMIT_ERROR_PATTERN = /token limit|context length|too many tokens|maximum context|message exceeds/i;
+const MAX_SYNTHESIS_SPLIT_DEPTH = 12;
+
 interface CompletedAnalysisBatch {
-	batchIndex: number;
+	batchLabel: string;
 	candidates: AnalysisCandidateSession[];
 	summary: string;
+}
+
+interface BatchedSummaryResult {
+	completedBatches: CompletedAnalysisBatch[];
+	warnings: string[];
 }
 
 interface AnalysisGenerationResult {
@@ -126,6 +136,69 @@ function getErrorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
 
+function isTokenLimitErrorMessage(message: string): boolean {
+	return TOKEN_LIMIT_ERROR_PATTERN.test(message);
+}
+
+function splitItemsInHalf<T>(items: readonly T[]): [T[], T[]] {
+	const midpoint = Math.ceil(items.length / 2);
+	return [items.slice(0, midpoint), items.slice(midpoint)];
+}
+
+function getNextEvidenceDetailLevel(detailLevel: AnalysisEvidenceDetailLevel): AnalysisEvidenceDetailLevel | undefined {
+	if (detailLevel === 'full') {
+		return 'compact';
+	}
+
+	if (detailLevel === 'compact') {
+		return 'summaryOnly';
+	}
+
+	return undefined;
+}
+
+function buildEvidenceRetryMessage(nextDetailLevel: AnalysisEvidenceDetailLevel, batchLabel?: string): string {
+	const subject = batchLabel ? `Batch ${batchLabel}` : 'The saved session';
+	if (nextDetailLevel === 'compact') {
+		return `_${subject} exceeded the model token limit. Retrying with condensed session evidence..._\n\n`;
+	}
+
+	return `_${subject} still exceeded the model token limit with condensed evidence. Retrying with summary-only evidence..._\n\n`;
+}
+
+async function runAnalysisPromptWithSingleSessionFallbacks(
+	selection: AnalysisSelection,
+	candidates: AnalysisCandidateSession[],
+	recommendationBaseline: string,
+	deps: AnalyzeSessionsFlowDeps,
+	streamOutput: boolean,
+	extraInstruction?: string,
+	batchLabel?: string,
+): Promise<string> {
+	let detailLevel: AnalysisEvidenceDetailLevel = 'full';
+
+	while (true) {
+		try {
+			const prompt = [
+				deps.buildPrompt(selection, candidates, recommendationBaseline, detailLevel),
+				...(extraInstruction ? ['', extraInstruction] : []),
+			].join('\n');
+			return await deps.runModelPrompt(prompt, streamOutput);
+		} catch (error) {
+			const message = getErrorMessage(error);
+			const nextDetailLevel: AnalysisEvidenceDetailLevel | undefined = candidates.length === 1 && isTokenLimitErrorMessage(message)
+				? getNextEvidenceDetailLevel(detailLevel)
+				: undefined;
+			if (!nextDetailLevel) {
+				throw error;
+			}
+
+			deps.streamMarkdown(buildEvidenceRetryMessage(nextDetailLevel, batchLabel));
+			detailLevel = nextDetailLevel;
+		}
+	}
+}
+
 function buildPartialAnalysisContent(completedBatches: readonly CompletedAnalysisBatch[]): string {
 	const lines = [
 		'Partial analysis generated from the batches that completed successfully.',
@@ -133,7 +206,7 @@ function buildPartialAnalysisContent(completedBatches: readonly CompletedAnalysi
 	];
 
 	for (const batch of completedBatches) {
-		lines.push(`### Batch ${batch.batchIndex + 1}`);
+		lines.push(`### Batch ${batch.batchLabel}`);
 		lines.push('');
 		lines.push(batch.summary.trim());
 		lines.push('');
@@ -154,6 +227,127 @@ function buildFailedAnalysisMessage(warnings: readonly string[]): string {
 	return lines.join('\n');
 }
 
+async function generateBatchSummaryWithRetries(
+	selection: AnalysisSelection,
+	batch: AnalysisCandidateSession[],
+	recommendationBaseline: string,
+	deps: AnalyzeSessionsFlowDeps,
+	batchLabel: string,
+): Promise<BatchedSummaryResult> {
+	deps.streamMarkdown(`_Analyzing batch ${batchLabel}..._\n\n`);
+
+	try {
+		const summary = await runAnalysisPromptWithSingleSessionFallbacks(
+			selection,
+			batch,
+			recommendationBaseline,
+			deps,
+			false,
+			`This is batch ${batchLabel}. Produce a concise findings summary that will be synthesized with the other batches into one final report.`,
+			batchLabel,
+		);
+		if (!summary.trim().length) {
+			return {
+				completedBatches: [],
+				warnings: [`Batch ${batchLabel} returned no summary text.`],
+			};
+		}
+
+		return {
+			completedBatches: [{
+				batchLabel,
+				candidates: batch,
+				summary,
+			}],
+			warnings: [],
+		};
+	} catch (error) {
+		const message = getErrorMessage(error);
+		if (isTokenLimitErrorMessage(message) && batch.length > 1) {
+			const [firstHalf, secondHalf] = splitItemsInHalf(batch);
+			deps.streamMarkdown(
+				`_Batch ${batchLabel} exceeded the model token limit. Retrying as batches ${batchLabel}.1 and ${batchLabel}.2..._\n\n`,
+			);
+
+			const firstResult = await generateBatchSummaryWithRetries(
+				selection,
+				firstHalf,
+				recommendationBaseline,
+				deps,
+				`${batchLabel}.1`,
+			);
+			const secondResult = await generateBatchSummaryWithRetries(
+				selection,
+				secondHalf,
+				recommendationBaseline,
+				deps,
+				`${batchLabel}.2`,
+			);
+
+			return {
+				completedBatches: [...firstResult.completedBatches, ...secondResult.completedBatches],
+				warnings: [...firstResult.warnings, ...secondResult.warnings],
+			};
+		}
+
+		return {
+			completedBatches: [],
+			warnings: [isTokenLimitErrorMessage(message)
+				? `Batch ${batchLabel} exceeded the model token limit even after retrying with condensed evidence.`
+				: `Batch ${batchLabel} failed: ${message}`],
+		};
+	}
+}
+
+async function synthesizeBatchSummariesWithRetries(
+	selection: AnalysisSelection,
+	batchSummaries: string[],
+	recommendationBaseline: string,
+	deps: AnalyzeSessionsFlowDeps,
+	streamOutput: boolean,
+	depth = 0,
+): Promise<string> {
+	try {
+		return await deps.runModelPrompt(
+			deps.buildSynthesisPrompt(selection, batchSummaries, recommendationBaseline),
+			streamOutput,
+		);
+	} catch (error) {
+		const message = getErrorMessage(error);
+		if (!isTokenLimitErrorMessage(message) || batchSummaries.length <= 1 || depth >= MAX_SYNTHESIS_SPLIT_DEPTH) {
+			throw error;
+		}
+
+		deps.streamMarkdown('_Final synthesis exceeded the model token limit. Retrying in smaller groups..._\n\n');
+		const [firstHalf, secondHalf] = splitItemsInHalf(batchSummaries);
+		const firstSummary = await synthesizeBatchSummariesWithRetries(
+			selection,
+			firstHalf,
+			recommendationBaseline,
+			deps,
+			false,
+			depth + 1,
+		);
+		const secondSummary = await synthesizeBatchSummariesWithRetries(
+			selection,
+			secondHalf,
+			recommendationBaseline,
+			deps,
+			false,
+			depth + 1,
+		);
+
+		return synthesizeBatchSummariesWithRetries(
+			selection,
+			[firstSummary, secondSummary],
+			recommendationBaseline,
+			deps,
+			streamOutput,
+			depth + 1,
+		);
+	}
+}
+
 async function generateSingleBatchAnalysis(
 	selection: AnalysisSelection,
 	filtered: AnalysisCandidateSession[],
@@ -161,7 +355,13 @@ async function generateSingleBatchAnalysis(
 	deps: AnalyzeSessionsFlowDeps,
 ): Promise<AnalysisGenerationResult> {
 	try {
-		const content = await deps.runModelPrompt(deps.buildPrompt(selection, filtered, recommendationBaseline), true);
+		const content = await runAnalysisPromptWithSingleSessionFallbacks(
+			selection,
+			filtered,
+			recommendationBaseline,
+			deps,
+			true,
+		);
 		if (!content.trim().length) {
 			return {
 				status: 'failed',
@@ -178,10 +378,19 @@ async function generateSingleBatchAnalysis(
 			analyzedCandidates: filtered,
 		};
 	} catch (error) {
+		const message = getErrorMessage(error);
+		if (isTokenLimitErrorMessage(message) && filtered.length > 1) {
+			deps.streamMarkdown('_Analysis prompt exceeded the model token limit. Retrying in smaller batches..._\n\n');
+			const [firstHalf, secondHalf] = splitItemsInHalf(filtered);
+			return generateBatchedAnalysis(selection, filtered, [firstHalf, secondHalf], recommendationBaseline, deps);
+		}
+
 		return {
 			status: 'failed',
 			content: '',
-			warnings: [`Analysis failed: ${getErrorMessage(error)}`],
+			warnings: [`Analysis failed: ${isTokenLimitErrorMessage(message) && filtered.length === 1
+				? 'The saved session exceeds the model token limit even after retrying with condensed evidence.'
+				: message}`],
 			analyzedCandidates: [],
 		};
 	}
@@ -205,28 +414,15 @@ async function generateBatchedAnalysis(
 			continue;
 		}
 
-		deps.streamMarkdown(`_Analyzing batch ${index + 1} of ${batches.length}..._\n\n`);
-		const batchPrompt = [
-			deps.buildPrompt(selection, batch, recommendationBaseline),
-			'',
-			`This is batch ${index + 1} of ${batches.length}. Produce a concise findings summary that will be synthesized with the other batches into one final report.`,
-		].join('\n');
-
-		try {
-			const summary = await deps.runModelPrompt(batchPrompt, false);
-			if (!summary.trim().length) {
-				warnings.push(`Batch ${index + 1} of ${batches.length} returned no summary text.`);
-				continue;
-			}
-
-			completedBatches.push({
-				batchIndex: index,
-				candidates: batch,
-				summary,
-			});
-		} catch (error) {
-			warnings.push(`Batch ${index + 1} of ${batches.length} failed: ${getErrorMessage(error)}`);
-		}
+		const batchResult = await generateBatchSummaryWithRetries(
+			selection,
+			batch,
+			recommendationBaseline,
+			deps,
+			String(index + 1),
+		);
+		completedBatches.push(...batchResult.completedBatches);
+		warnings.push(...batchResult.warnings);
 	}
 
 	if (!completedBatches.length) {
@@ -243,8 +439,11 @@ async function generateBatchedAnalysis(
 	let content = '';
 	let status: AnalysisReportStatus = warnings.length > 0 ? 'partial' : 'complete';
 	try {
-		content = await deps.runModelPrompt(
-			deps.buildSynthesisPrompt(selection, completedBatches.map((batch) => batch.summary), recommendationBaseline),
+		content = await synthesizeBatchSummariesWithRetries(
+			selection,
+			completedBatches.map((batch) => batch.summary),
+			recommendationBaseline,
+			deps,
 			true,
 		);
 		if (!content.trim().length) {
