@@ -287,6 +287,24 @@ suite('chatParticipant analyze flow', () => {
 		assert.deepEqual(messages, ['No saved sessions found. Save chat sessions before running analysis.']);
 	});
 
+	test('shows guidance when no usable saved sessions remain after candidate loading', async () => {
+		const messages: string[] = [];
+		const result = await runAnalyzeSessionsFlow(
+			'needs analysis',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			[{ ...createMeta(), workspaceFolder: createWorkspaceFolder('workspace', 'e:/workspace', 0), storageDirectory: 'e:/workspace/.chat', displayTitle: '[workspace] Fix auth bug' }],
+			createAnalyzeFlowDeps({
+				createCandidates: async () => [],
+				streamMarkdown: (markdown: string) => {
+					messages.push(markdown);
+				},
+			}),
+		);
+
+		assert.equal(result, undefined);
+		assert.deepEqual(messages, ['No usable saved sessions found. Some saved sessions could not be read.']);
+	});
+
 	test('filters analyzed sessions in needs-analysis mode and persists only remaining sessions', async () => {
 		const recorded: Array<{ storageDirectory: string; fingerprints: string[] }> = [];
 		const reportWrites: string[][] = [];

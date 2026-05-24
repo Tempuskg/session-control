@@ -363,12 +363,25 @@ async function resolveAnalysisSelection(prompt: string): Promise<import('./types
 	}
 }
 
-async function createAnalysisCandidates(workspaceSessions: WorkspaceSessionMeta[]): Promise<AnalysisCandidateSession[]> {
+export async function createAnalysisCandidates(workspaceSessions: WorkspaceSessionMeta[]): Promise<AnalysisCandidateSession[]> {
 	const seenRoots = new Set<string>();
 	const candidates: AnalysisCandidateSession[] = [];
 
 	for (const session of workspaceSessions) {
-		const reassembled = await loadReassembledSession(session.storageDirectory, session.fileName);
+		let reassembled: ReassembledSessionResult;
+		try {
+			reassembled = await loadReassembledSession(session.storageDirectory, session.fileName);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			const recoverable = error instanceof SyntaxError
+				|| /no such file|cannot find|enoent|invalid session schema|detected cyclic (?:previous|next)partfile chain/i.test(message);
+			if (recoverable) {
+				continue;
+			}
+
+			throw error;
+		}
+
 		const rootKey = `${session.storageDirectory}::${reassembled.rootFileName}`;
 		if (seenRoots.has(rootKey)) {
 			continue;

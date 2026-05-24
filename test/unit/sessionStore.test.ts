@@ -92,6 +92,49 @@ suite('sessionStore', () => {
 		}
 	});
 
+	test('writeSessions preserves linked part filenames when title-only split names collide', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createSessionStore();
+
+		try {
+			await store.writeSession(storageDirectory, createSession('existing-a', '2026-04-12T10:00:00.000Z', 'Status Plan (Part 1/2)'), {
+				includeTimestampInFileName: false,
+			});
+			await store.writeSession(storageDirectory, createSession('existing-b', '2026-04-12T10:00:00.000Z', 'Status Plan (Part 2/2)'), {
+				includeTimestampInFileName: false,
+			});
+
+			const partOne = {
+				...createSession('split-session', '2026-04-12T10:00:00.000Z', 'Status Plan (Part 1/2)'),
+				part: 1,
+				totalParts: 2,
+				nextPartFile: 'placeholder-part-2.json',
+			};
+			const partTwo = {
+				...createSession('split-session', '2026-04-12T10:00:00.000Z', 'Status Plan (Part 2/2)'),
+				part: 2,
+				totalParts: 2,
+				previousPartFile: 'placeholder-part-1.json',
+			};
+
+			const writtenFiles = await store.writeSessions(storageDirectory, [partOne, partTwo], {
+				includeTimestampInFileName: false,
+			});
+
+			assert.equal(writtenFiles[0], 'status-plan-part-1-2-split-sessio.json');
+			assert.equal(writtenFiles[1], 'status-plan-part-2-2-split-sessio.json');
+
+			const restoredPartOne = await store.readSession(storageDirectory, writtenFiles[0] as string);
+			const restoredPartTwo = await store.readSession(storageDirectory, writtenFiles[1] as string);
+
+			assert.equal(restoredPartOne.nextPartFile, writtenFiles[1]);
+			assert.equal(restoredPartTwo.previousPartFile, writtenFiles[0]);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
 	test('writeSession persists session atomically and readSession restores it', async () => {
 		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
 		const storageDirectory = path.join(tempRoot, '.chat');

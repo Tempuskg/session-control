@@ -60,9 +60,9 @@ interface SaveSessionFlowDeps {
 	getPruneConfiguration: (workspaceFolder: vscode.WorkspaceFolder) => PruneConfiguration;
 	writeSession: (
 		storageDirectory: string,
-		session: ReturnType<typeof createChatSession>,
+		sessions: ReturnType<typeof createChatSession>[],
 		options: SessionFileNameOptions,
-	) => Promise<string>;
+	) => Promise<string[]>;
 	pruneSessions: (storageDirectory: string, maxSavedSessions: number, action: SessionPruneAction) => Promise<{ archived: number; deleted: number }>;
 	showInformationMessage: (message: string) => Thenable<unknown>;
 }
@@ -474,8 +474,8 @@ function createDefaultSaveFlowDeps(): SaveSessionFlowDeps {
 			.get<boolean>('includeInGitignore', false),
 		ensureGitignoreEntry: ensureStoragePathInGitignore,
 		getPruneConfiguration,
-		writeSession: async (storageDirectory, session, options) =>
-			sessionStore.writeSession(storageDirectory, session, options),
+		writeSession: async (storageDirectory, sessions, options) =>
+			sessionStore.writeSessions(storageDirectory, sessions, options),
 		pruneSessions: async (storageDirectory, maxSavedSessions, action) =>
 			sessionStore.pruneSessions(storageDirectory, maxSavedSessions, action),
 		showInformationMessage: (message: string) => vscode.window.showInformationMessage(message),
@@ -521,13 +521,9 @@ export async function runSaveSessionFlow(
 		stripToolOutput: saveConfig.stripToolOutput,
 	});
 
-	const writtenFiles: string[] = [];
-	for (const sessionToWrite of saveResult.sessions) {
-		const fileName = await deps.writeSession(storageDirectory, sessionToWrite, {
-			includeTimestampInFileName: saveConfig.includeTimestampInFileName,
-		});
-		writtenFiles.push(fileName);
-	}
+	const writtenFiles = await deps.writeSession(storageDirectory, saveResult.sessions, {
+		includeTimestampInFileName: saveConfig.includeTimestampInFileName,
+	});
 
 	if (deps.getIncludeInGitignore(workspaceFolder)) {
 		await deps.ensureGitignoreEntry(workspaceFolder, storageDirectory);

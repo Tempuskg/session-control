@@ -2,8 +2,10 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import * as vscode from 'vscode';
 import {
 	buildResumePrompt,
+	createAnalysisCandidates,
 	loadReassembledSession,
 	renderSessionListMarkdown,
 	selectSessionForResume,
@@ -155,6 +157,124 @@ suite('chatParticipant integration', () => {
 			assert.equal(prompt.includes('Continue from merged context'), true);
 			assert.equal(prompt.includes('First user question about auth bug.'), true);
 			assert.equal(prompt.includes('Second assistant answer proposing token refresh fix.'), true);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('createAnalysisCandidates skips unreadable multipart sessions and keeps usable sessions', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-chat-participant-analysis-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createSessionStore();
+		const workspaceFolder = {
+			uri: vscode.Uri.file(tempRoot),
+			name: 'workspace',
+			index: 0,
+		} as vscode.WorkspaceFolder;
+
+		try {
+			const broken = {
+				...createChatSession(createCopilotSession(), {
+				title: 'Broken multipart session',
+				savedAt: '2026-04-12T12:30:00.000Z',
+				vscodeVersion: '1.115.0',
+				}),
+				id: 'broken-session',
+				previousPartFile: 'missing-part.json',
+			};
+			const valid = {
+				...createChatSession(createCopilotSession(), {
+				title: 'Valid session',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+				}),
+				id: 'valid-session',
+			};
+
+			const brokenFileName = await store.writeSession(storageDirectory, broken);
+			const validFileName = await store.writeSession(storageDirectory, valid);
+			const listed = await store.listSessions(storageDirectory);
+			const brokenMeta = listed.find((session) => session.fileName === brokenFileName);
+			const validMeta = listed.find((session) => session.fileName === validFileName);
+
+			assert.ok(brokenMeta);
+			assert.ok(validMeta);
+
+			const candidates = await createAnalysisCandidates([
+				{
+					...brokenMeta,
+					workspaceFolder,
+					storageDirectory,
+					displayTitle: `[workspace] ${brokenMeta.title}`,
+				},
+				{
+					...validMeta,
+					workspaceFolder,
+					storageDirectory,
+					displayTitle: `[workspace] ${validMeta.title}`,
+				},
+			]);
+
+			assert.equal(candidates.length, 1);
+			assert.equal(candidates[0]?.session.id, 'valid-session');
+			assert.equal(candidates[0]?.rootFileName, validFileName);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('loadReassembledSession follows collision-resolved title-only part filenames', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-chat-participant-title-only-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createSessionStore();
+
+		try {
+			await store.writeSession(storageDirectory, createChatSession(createCopilotSession(), {
+				title: 'Status Plan (Part 1/2)',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}), {
+				includeTimestampInFileName: false,
+			});
+			await store.writeSession(storageDirectory, createChatSession(createCopilotSession(), {
+				title: 'Status Plan (Part 2/2)',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}), {
+				includeTimestampInFileName: false,
+			});
+
+			const source = createCopilotSession();
+			for (const turn of source.turns) {
+				if (turn.type === 'request') {
+					turn.prompt = `${turn.prompt} ${'x'.repeat(240)}`;
+				} else {
+					turn.content = `${turn.content} ${'y'.repeat(240)}`;
+				}
+			}
+
+			const saved = createChatSession(source, {
+				title: 'Status Plan',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			});
+			const split = applySaveBloatControls(saved, {
+				maxFileSizeBytes: 1400,
+				overflowStrategy: 'split',
+				stripToolOutput: false,
+			});
+
+			const writtenFiles = await store.writeSessions(storageDirectory, split.sessions, {
+				includeTimestampInFileName: false,
+			});
+			const secondPart = writtenFiles[1];
+
+			assert.ok(secondPart);
+
+			const reassembled = await loadReassembledSession(storageDirectory, secondPart as string);
+			assert.equal(reassembled.rootFileName, writtenFiles[0]);
+			assert.equal(reassembled.partFiles.length, writtenFiles.length);
+			assert.equal(reassembled.session.turns.length, saved.turns.length);
 		} finally {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}

@@ -488,6 +488,11 @@ export async function runAnalyzeSessionsFlow(
 	}
 
 	const candidates = await deps.createCandidates(workspaceSessions);
+	if (!candidates.length) {
+		deps.streamMarkdown('No usable saved sessions found. Some saved sessions could not be read.');
+		return;
+	}
+
 	const analyzedFingerprints = await deps.loadAnalyzedFingerprints(candidates);
 	const filtered = filterCandidatesForAnalysis(candidates, selection, analyzedFingerprints);
 	if (!filtered.length) {

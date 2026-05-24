@@ -97,6 +97,37 @@ function createConflictResolvedFileName(
 	return `${slug}-${suffix}.json`;
 }
 
+function stripJsonExtension(fileName: string): string {
+	return fileName.replace(/\.json$/i, '');
+}
+
+function resolveUniqueSessionFileName(
+	session: Pick<ChatSession, 'savedAt' | 'title' | 'id'>,
+	options: SessionFileNameOptions,
+	reservedFileNames: Set<string>,
+): string {
+	const preferredFileName = createSessionFileNameWithOptions(session, options);
+	if (!reservedFileNames.has(preferredFileName.toLowerCase())) {
+		return preferredFileName;
+	}
+
+	const conflictResolvedFileName = createConflictResolvedFileName(session, options);
+	if (!reservedFileNames.has(conflictResolvedFileName.toLowerCase())) {
+		return conflictResolvedFileName;
+	}
+
+	const baseName = stripJsonExtension(conflictResolvedFileName);
+	let duplicateIndex = 2;
+	while (true) {
+		const candidate = `${baseName}-${duplicateIndex}.json`;
+		if (!reservedFileNames.has(candidate.toLowerCase())) {
+			return candidate;
+		}
+
+		duplicateIndex += 1;
+	}
+}
+
 export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 	const deps = {
 		...createDefaultDeps(),
@@ -112,13 +143,16 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 		session: ChatSession,
 		options: SessionFileNameOptions = { includeTimestampInFileName: true },
 	): Promise<string> {
-		await ensureStorageDirectory(storageDirectory);
+		const [fileName] = await writeSessions(storageDirectory, [session], options);
+		if (!fileName) {
+			throw new Error('Session write produced no file name.');
+		}
 
-		const preferredFileName = createSessionFileNameWithOptions(session, options);
-		const preferredPath = path.join(storageDirectory, preferredFileName);
-		const fileName = (await deps.exists(preferredPath))
-			? createConflictResolvedFileName(session, options)
-			: preferredFileName;
+		return fileName;
+	}
+
+	async function writeSessionToFile(storageDirectory: string, fileName: string, session: ChatSession): Promise<void> {
+		await ensureStorageDirectory(storageDirectory);
 		const filePath = path.join(storageDirectory, fileName);
 		const tempPath = path.join(storageDirectory, createTempName(fileName));
 		const content = JSON.stringify(session, null, 2);
@@ -130,8 +164,49 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 			await deps.unlink(tempPath).catch(() => undefined);
 			throw error;
 		}
+	}
 
-		return fileName;
+	async function writeSessions(
+		storageDirectory: string,
+		sessions: readonly ChatSession[],
+		options: SessionFileNameOptions = { includeTimestampInFileName: true },
+	): Promise<string[]> {
+		await ensureStorageDirectory(storageDirectory);
+
+		const existingFiles = await deps.readdir(storageDirectory).catch((error: unknown) => {
+			const message = error instanceof Error ? error.message : String(error);
+			if (/no such file|cannot find|enoent/i.test(message)) {
+				return [];
+			}
+
+			throw error;
+		});
+		const reservedFileNames = new Set(existingFiles.map((fileName) => fileName.toLowerCase()));
+		const fileNames = sessions.map((session) => {
+			const fileName = resolveUniqueSessionFileName(session, options, reservedFileNames);
+			reservedFileNames.add(fileName.toLowerCase());
+			return fileName;
+		});
+
+		const sessionsToWrite = sessions.length > 1
+			? sessions.map((session, index) => ({
+				...session,
+				previousPartFile: index > 0 ? (fileNames[index - 1] ?? null) : null,
+				nextPartFile: index + 1 < fileNames.length ? (fileNames[index + 1] ?? null) : null,
+			}))
+			: [...sessions];
+
+		for (let index = 0; index < sessionsToWrite.length; index += 1) {
+			const session = sessionsToWrite[index];
+			const fileName = fileNames[index];
+			if (!session || !fileName) {
+				continue;
+			}
+
+			await writeSessionToFile(storageDirectory, fileName, session);
+		}
+
+		return fileNames;
 	}
 
 	async function readSession(storageDirectory: string, fileName: string): Promise<ChatSession> {
@@ -234,6 +309,7 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 	return {
 		ensureStorageDirectory,
 		writeSession,
+		writeSessions,
 		readSession,
 		listSessions,
 		deleteSession,
