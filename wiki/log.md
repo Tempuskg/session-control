@@ -115,3 +115,7 @@ Pages touched: CHAT_ANALYSIS_PLAN.md, README.md, CHANGELOG.md, chat-participant.
 ## [2026-05-17] update | Filter Existing AI Guidance
 Extended the saved-chat analysis flow so it now compares candidate recommendations against the current AI instruction and skill files in the analyzed workspaces. Reports are now intended to list only gaps or concrete improvements that are not already covered by the existing AI guidance baseline.
 Pages touched: CHAT_ANALYSIS_PLAN.md, README.md, CHANGELOG.md, chat-participant.md, file-manifest.md, log.md
+
+## [2026-06-06] query | Codex Session Saving Feasibility
+Answered whether Session Control can save Codex sessions like Copilot sessions. Reviewed the save-system, resume-system, chat-participant, architecture pages, README, current source reader/writer behavior, and official Codex manual notes about local transcripts, resume, and app-server thread APIs.
+Pages touched: log.md
