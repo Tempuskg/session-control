@@ -47,6 +47,12 @@ suite('extension auto-save on chat response', () => {
 			{ appendLine: (value: string) => outputLines.push(value) } as unknown as vscode.OutputChannel,
 			{
 				getStorageUri: () => undefined,
+				getImplicitWorkspaceFolder: () => ({
+					uri: vscode.Uri.file('e:/session-control'),
+					name: 'session-control',
+					index: 0,
+				}),
+				getSaveProvider: () => 'copilot',
 			},
 		);
 
@@ -72,7 +78,10 @@ suite('extension auto-save on chat response', () => {
 					name: 'session-control',
 					index: 0,
 				}),
+				getSaveProvider: () => 'copilot',
+				getCursorProjectsPath: () => 'C:/Users/test/.cursor/projects',
 				readCopilotSessions: async () => [{
+					provider: 'copilot',
 					id: 'session-1',
 					title: 'My Session',
 					lastMessageDate: new Date().toISOString(),
@@ -82,6 +91,7 @@ suite('extension auto-save on chat response', () => {
 					],
 					sourceFile: 'session-1.jsonl',
 				}],
+				readCursorSessions: async () => [],
 				saveSessionSilently: async (workspaceFolder, storageDirectory) => {
 					saveCalls.push({ workspaceFolder, storageDirectory });
 					return 'saved-session.json';
@@ -127,13 +137,17 @@ suite('extension auto-save on chat response', () => {
 					name: 'session-control',
 					index: 0,
 				}),
+				getSaveProvider: () => 'copilot',
+				getCursorProjectsPath: () => 'C:/Users/test/.cursor/projects',
 				readCopilotSessions: async () => [{
+					provider: 'copilot',
 					id: 'session-1',
 					title: 'My Session',
 					lastMessageDate: new Date().toISOString(),
 					turns,
 					sourceFile: 'session-1.jsonl',
 				}],
+				readCursorSessions: async () => [],
 				saveSessionSilently: async (workspaceFolder, storageDirectory) => {
 					saveCalls.push({ workspaceFolder, storageDirectory });
 					return 'saved-session.json';
@@ -180,7 +194,10 @@ suite('extension auto-save on chat response', () => {
 					name: 'session-control',
 					index: 0,
 				}),
+				getSaveProvider: () => 'copilot',
+				getCursorProjectsPath: () => 'C:/Users/test/.cursor/projects',
 				readCopilotSessions: async () => [{
+					provider: 'copilot',
 					id: 'session-1',
 					title: 'My Session',
 					lastMessageDate: new Date().toISOString(),
@@ -195,6 +212,7 @@ suite('extension auto-save on chat response', () => {
 					})) as never[],
 					sourceFile: 'session-1.jsonl',
 				}],
+				readCursorSessions: async () => [],
 				saveSessionSilently: async () => {
 					saveCounter++;
 					return `saved-v${saveCounter}.json`;
@@ -246,9 +264,12 @@ suite('extension auto-save on chat response', () => {
 					name: 'session-control',
 					index: 0,
 				}),
+				getSaveProvider: () => 'copilot',
+				getCursorProjectsPath: () => 'C:/Users/test/.cursor/projects',
 				readCopilotSessions: async () => {
 					throw new Error('read failed');
 				},
+				readCursorSessions: async () => [],
 				saveSessionSilently: async () => 'saved.json',
 				deleteOldAutoSave: async () => undefined,
 				showWarningMessage: async (message: string) => {
@@ -273,5 +294,69 @@ suite('extension auto-save on chat response', () => {
 		// Second change should be ignored (disabled)
 		watcher.emitChange();
 		assert.equal(scheduledCallbacks.length, 1, 'No new callback scheduled after disable');
+	});
+
+	test('triggers save when Cursor agent transcript changes', async () => {
+		const watcher = createFakeWatcher();
+		const scheduledCallbacks: Array<() => void> = [];
+		const saveCalls: Array<{ workspaceFolder: vscode.WorkspaceFolder; storageDirectory: string }> = [];
+		const watchedTargets: Array<{ directory: string; glob: string }> = [];
+		const outputLines: string[] = [];
+		const subscriptions: vscode.Disposable[] = [];
+
+		registerAutoSaveOnChatResponseListener(
+			{ subscriptions } as unknown as vscode.ExtensionContext,
+			{ appendLine: (value: string) => outputLines.push(value) } as unknown as vscode.OutputChannel,
+			{
+				getStorageUri: () => ({ fsPath: 'e:/storage/workspace-id' }),
+				createWatcher: (directory: string, glob: string) => {
+					watchedTargets.push({ directory, glob });
+					return watcher;
+				},
+				getImplicitWorkspaceFolder: () => ({
+					uri: vscode.Uri.file('e:/chat-commit'),
+					name: 'chat-commit',
+					index: 0,
+				}),
+				getSaveProvider: () => 'cursor',
+				getCursorProjectsPath: () => 'C:/Users/test/.cursor/projects',
+				readCopilotSessions: async () => [],
+				readCursorSessions: async () => [{
+					provider: 'cursor',
+					id: 'cursor-session-1',
+					title: 'Implement Cursor auto-save',
+					lastMessageDate: new Date().toISOString(),
+					turns: [
+						{ type: 'request', participant: 'user', prompt: 'implement autosave', references: [], timestamp: new Date().toISOString() },
+						{ type: 'response', participant: 'cursor', content: 'working on it', toolCalls: [], timestamp: new Date().toISOString() },
+					],
+					sourceFile: 'cursor-session-1',
+				}],
+				saveSessionSilently: async (workspaceFolder, storageDirectory) => {
+					saveCalls.push({ workspaceFolder, storageDirectory });
+					return 'cursor-auto-save.json';
+				},
+				deleteOldAutoSave: async () => undefined,
+				showWarningMessage: async () => undefined,
+				schedule: (callback: () => void) => {
+					scheduledCallbacks.push(callback);
+					return callback as unknown as ReturnType<typeof setTimeout>;
+				},
+				clearSchedule: () => undefined,
+			},
+		);
+
+		assert.equal(watchedTargets.length, 1);
+		assert.equal(watchedTargets[0]?.directory.replace(/\\/g, '/'), 'C:/Users/test/.cursor/projects/e-chat-commit');
+		assert.equal(watchedTargets[0]?.glob, 'agent-transcripts/**/*.jsonl');
+
+		watcher.emitCreate();
+		assert.equal(scheduledCallbacks.length, 1);
+
+		scheduledCallbacks[0]?.();
+		await drainAsyncWork();
+		assert.equal(saveCalls.length, 1);
+		assert.equal(saveCalls[0]?.workspaceFolder.name, 'chat-commit');
+		assert.equal(outputLines.some((line) => line.includes('Implement Cursor auto-save')), true);
 	});
 });

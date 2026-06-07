@@ -1,0 +1,5 @@
+{"role":"user","message":{"content":[{"type":"text","text":"<user_query>\nAdd Cursor session import support\n</user_query>"}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"I'll add a Cursor provider that reads agent transcripts."},{"type":"tool_use","name":"ReadFile","input":{"path":"src/extension.ts"}}]}}
+{"type":"turn_ended","status":"success"}
+{"role":"user","message":{"content":[{"type":"text","text":"<user_query>\nUpdate version to 1.2.0\n</user_query>"}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"Updated the extension version to 1.2.0."}]}}

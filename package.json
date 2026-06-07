@@ -1,8 +1,8 @@
 {
   "name": "session-control",
   "displayName": "Session Control",
-  "description": "Save and resume GitHub Copilot Chat sessions linked to git commits",
-  "version": "1.1.2",
+  "description": "Save and resume GitHub Copilot, Cursor, and Codex chat sessions linked to git commits",
+  "version": "1.2.0",
   "publisher": "darrenjmcleod",
   "icon": "media/session-control.png",
   "license": "MIT",
@@ -23,6 +23,8 @@
   ],
   "keywords": [
     "copilot",
+    "cursor",
+    "codex",
     "chat",
     "git",
     "session",
@@ -37,6 +39,11 @@
       {
         "command": "session-control.saveSession",
         "title": "Session Control: Save Current Chat Session",
+        "category": "Session Control"
+      },
+      {
+        "command": "session-control.saveSessionFromProvider",
+        "title": "Session Control: Save Session From Provider...",
         "category": "Session Control"
       },
       {
@@ -73,10 +80,26 @@
         "icon": "$(debug-start)"
       },
       {
+        "command": "session-control.analyzeSavedChats",
+        "title": "Session Control: Analyze Saved Chats",
+        "category": "Session Control",
+        "icon": "$(search-sparkle)"
+      },
+      {
         "command": "session-control.implementLatestAnalysis",
         "title": "Session Control: Implement Latest Analysis",
         "category": "Session Control",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "session-control.importCopilotSkillsToCursor",
+        "title": "Session Control: Import Copilot Guidance as Cursor Skills",
+        "category": "Session Control"
+      },
+      {
+        "command": "session-control.importCopilotSkillsToCodex",
+        "title": "Session Control: Import Copilot Guidance as Codex Skills",
+        "category": "Session Control"
       },
       {
         "command": "session-control.deleteSessionFromExplorer",
@@ -97,6 +120,38 @@
           "type": "string",
           "default": ".chat",
           "description": "Folder (relative to workspace root) where chat sessions are saved.",
+          "scope": "resource"
+        },
+        "session-control.save.provider": {
+          "type": "string",
+          "enum": [
+            "copilot",
+            "codex"
+          ],
+          "enumDescriptions": [
+            "Save from VS Code Copilot chat storage. This remains the default and keeps existing workflows unchanged.",
+            "Import from local Codex session transcripts under CODEX_HOME or the configured Codex home path."
+          ],
+          "default": "copilot",
+          "description": "Explicit provider override used by Session Control: Save Current Chat Session. When unset, Session Control auto-detects Cursor and uses Cursor there; otherwise it defaults to Copilot.",
+          "scope": "resource"
+        },
+        "session-control.codex.homePath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional Codex home directory for importing local Codex sessions. When empty, Session Control uses CODEX_HOME or ~/.codex.",
+          "scope": "resource"
+        },
+        "session-control.cursor.userDataPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional Cursor user data directory for legacy workspace chatSessions JSONL import. When empty, Session Control uses the default Cursor user data location for this OS.",
+          "scope": "resource"
+        },
+        "session-control.cursor.projectsPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional Cursor projects directory for importing Agent transcript JSONL files. When empty, Session Control uses ~/.cursor/projects.",
           "scope": "resource"
         },
         "session-control.autoSaveOnChatResponse": {
@@ -250,10 +305,22 @@
           "command": "session-control.saveSession"
         },
         {
+          "command": "session-control.saveSessionFromProvider"
+        },
+        {
           "command": "session-control.listSessions"
         },
         {
+          "command": "session-control.analyzeSavedChats"
+        },
+        {
           "command": "session-control.deleteSession"
+        },
+        {
+          "command": "session-control.importCopilotSkillsToCursor"
+        },
+        {
+          "command": "session-control.importCopilotSkillsToCodex"
         },
         {
           "command": "session-control.toggleAutoSave"

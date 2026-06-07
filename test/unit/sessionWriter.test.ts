@@ -1,6 +1,7 @@
 import * as assert from 'node:assert';
 import { CopilotSession } from '../../src/sessionReader';
 import { applySaveBloatControls, createChatSession } from '../../src/sessionWriter';
+import { SourceChatSession } from '../../src/types';
 
 function createSourceSession(turnCount = 2): CopilotSession {
 	const turns = [] as CopilotSession['turns'];
@@ -22,6 +23,7 @@ function createSourceSession(turnCount = 2): CopilotSession {
 	}
 
 	return {
+		provider: 'copilot',
 		id: 'session-source',
 		title: 'Source title',
 		lastMessageDate: '2026-04-12T12:00:00.000Z',
@@ -49,6 +51,7 @@ suite('sessionWriter', () => {
 
 		assert.equal(result.version, 1);
 		assert.equal(result.id, 'session-source');
+		assert.equal(result.provider, 'copilot');
 		assert.equal(result.title, 'Fix login null pointer issue now please');
 		assert.equal(result.totalTurns, source.turns.length);
 		assert.equal(result.part, null);
@@ -77,6 +80,66 @@ suite('sessionWriter', () => {
 		assert.equal(result.markdownSummary.includes('### Turn 1 - User'), true);
 		assert.equal(result.markdownSummary.includes('### Turn 2 - Copilot'), true);
 		assert.equal(result.markdownSummary.includes('> **Tool calls:** read_file (src/auth.ts)'), true);
+	});
+
+	test('markdown summary labels Codex responses from the session provider', () => {
+		const source: SourceChatSession = {
+			...createSourceSession(1),
+			provider: 'codex',
+			turns: [
+				{
+					type: 'request',
+					participant: 'user',
+					prompt: 'Review the migration plan',
+					references: [],
+					timestamp: '2026-04-12T10:00:00.000Z',
+				},
+				{
+					type: 'response',
+					participant: 'codex',
+					content: 'The migration looks safe if we preserve the current defaults.',
+					toolCalls: [],
+					timestamp: '2026-04-12T10:00:30.000Z',
+				},
+			],
+		};
+
+		const result = createChatSession(source, {
+			savedAt: '2026-04-12T12:00:00.000Z',
+		});
+
+		assert.equal(result.provider, 'codex');
+		assert.equal(result.markdownSummary.includes('### Turn 2 - Codex'), true);
+	});
+
+	test('markdown summary labels Cursor responses from the session provider', () => {
+		const source: SourceChatSession = {
+			...createSourceSession(1),
+			provider: 'cursor',
+			turns: [
+				{
+					type: 'request',
+					participant: 'user',
+					prompt: 'Add Cursor session import',
+					references: [],
+					timestamp: '2026-04-12T10:00:00.000Z',
+				},
+				{
+					type: 'response',
+					participant: 'cursor',
+					content: 'I can add a cursor provider that reads workspace chatSessions JSONL files.',
+					toolCalls: [],
+					timestamp: '2026-04-12T10:00:30.000Z',
+				},
+			],
+		};
+
+		const result = createChatSession(source, {
+			savedAt: '2026-04-12T12:00:00.000Z',
+		});
+
+		assert.equal(result.provider, 'cursor');
+		assert.equal(result.markdownSummary.includes('### Turn 2 - Cursor'), true);
 	});
 
 	test('markdown summary limits turns and emits omission note', () => {

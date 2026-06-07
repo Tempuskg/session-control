@@ -16,6 +16,7 @@ import { CopilotSession } from '../../src/sessionReader';
 
 function createCopilotSession(): CopilotSession {
 	return {
+		provider: 'copilot',
 		id: 'resume-roundtrip',
 		title: 'Resume Round Trip',
 		lastMessageDate: '2026-04-12T13:00:00.000Z',
@@ -85,6 +86,7 @@ suite('chatParticipant integration', () => {
 
 			assert.equal(prompt.includes('User follow-up: What should I patch first?'), true);
 			assert.equal(prompt.includes('Second user question with reproduction steps.'), true);
+			assert.equal(prompt.includes('Copilot: Second assistant answer proposing token refresh fix.'), true);
 			assert.equal(prompt.includes('Second assistant answer proposing token refresh fix.'), true);
 			assert.equal(prompt.includes('First user question about auth bug.'), false);
 

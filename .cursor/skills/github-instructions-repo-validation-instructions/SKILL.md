@@ -1,7 +1,16 @@
 ---
-name: "Repo Validation"
-description: "Use when validating Session Control changes or deciding the smallest correct check after edits. Covers diagnostics, compile-tests, compile, focused tests, npm test, npm run lint, and Development Host smoke tests."
+name: github-instructions-repo-validation-instructions
+description: "Imported repository guidance from .github/instructions/repo-validation.instructions.md. Use when working in this repository and the original guidance is relevant."
 ---
+
+Follow this imported repository guidance from `.github/instructions/repo-validation.instructions.md` when the task overlaps with its original scope.
+
+## Instructions
+- Treat the guidance below as repository-specific instructions for this project.
+- Apply it together with higher-priority system, developer, and repo instructions already in effect.
+- Preserve the intent of the source guidance while adapting it to the current task.
+
+## Imported guidance
 
 # Repo Validation
 

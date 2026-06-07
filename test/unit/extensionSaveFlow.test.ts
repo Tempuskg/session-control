@@ -11,6 +11,7 @@ import { isChatSession } from '../../src/types';
 
 function createCopilotSession(): CopilotSession {
 	return {
+		provider: 'copilot',
 		id: 'session-roundtrip',
 		title: 'Initial Session Title',
 		lastMessageDate: '2026-04-12T12:05:00.000Z',
@@ -75,6 +76,7 @@ suite('extension save flow', () => {
 			const restored = await store.readSession(storageDirectory, fileName as string);
 			assert.equal(isChatSession(restored), true);
 			assert.equal(restored.title, 'Auth Bug Investigation');
+			assert.equal(restored.provider, 'copilot');
 			assert.equal(restored.git?.branch, 'main');
 			assert.equal(restored.git?.commit, 'abcdef1234567890');
 			assert.equal(restored.totalTurns, 2);

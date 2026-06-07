@@ -1,13 +1,16 @@
 # Session Control
 
-[![VS Code Marketplace](https://img.shields.io/badge/VS%20Marketplace-v1.1.2-blue)](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Marketplace-v1.2.0-blue)](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
 [![Open VSX](https://img.shields.io/open-vsx/v/darrenjmcleod/session-control)](https://open-vsx.org/extension/darrenjmcleod/session-control)
 [![CI](https://github.com/tempuskg/session-control/actions/workflows/ci.yml/badge.svg)](https://github.com/tempuskg/session-control/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON files in your repository, linked to git commits and branches. Resume saved conversations via the `@session-control` chat participant.
+A VS Code extension that saves GitHub Copilot, Cursor, and local Codex chat sessions as structured JSON files in your repository, linked to git commits and branches. Resume saved conversations via the `@session-control` chat participant.
 
 ## Features
+
+- **Provider choice** - Keep Copilot as the default save source, switch to Codex for local transcript import, and let Session Control auto-detect Cursor when running inside Cursor.
+- **Import Codex skills** - Convert repository Copilot guidance into repo-scoped Codex skills under `.agents/skills/`.
 
 - **Save sessions** — Capture the active Copilot Chat session as a JSON file in `.chat/`, enriched with branch and commit metadata.
 - **Resume sessions** — Use `@session-control /resume <name>` to reload a saved conversation as LLM context in a new chat.
@@ -15,14 +18,16 @@ A VS Code extension that saves GitHub Copilot Chat sessions as structured JSON f
 - **Implement recommendations** — Use `@session-control /implement` to open a generated implementation prompt in chat or an agent session.
 - **Browse, preview, delete** — Manage saved sessions via the Session Explorer and command palette.
 - **Resume from viewer** — When viewing a saved session, click the ▶ icon in the editor title bar to resume it directly in chat.
-- **Auto-save on chat response** — Optionally save the active session automatically after every Copilot chat response.
+- **Auto-save on chat response** — Optionally auto-save Copilot chat responses or Cursor Agent transcript updates after every response.
 - **Lives in source control** — Sessions are plain JSON files tracked alongside your code, reviewable in diffs and PRs.
 - **Bloat controls** — Configurable file size limits, session splitting, tool output stripping, and automatic pruning of old sessions.
 
 ## Requirements
 
 - VS Code `^1.93.0`
-- GitHub Copilot extension installed and signed in
+- GitHub Copilot extension installed and signed in if you want to save Copilot sessions
+- Cursor installed locally if you want to import or auto-save Cursor Agent transcript sessions
+- Codex installed locally if you want to import Codex sessions or create repo-scoped Codex skills
 
 ## Installation
 
@@ -38,7 +43,29 @@ Open the Command Palette (`Ctrl+Shift+P`) and run:
 Session Control: Save Current Chat Session
 ```
 
-Select the session you want to save. The JSON file is written to `.chat/` in your workspace root.
+By default this uses the provider configured in `session-control.save.provider` when you set one explicitly. If the setting is unset, Session Control auto-detects Cursor and saves the current Cursor Agent transcript there; otherwise it defaults to Copilot. The JSON file is written to `.chat/` in your workspace root.
+
+For a one-off provider choice, run:
+
+```
+Session Control: Save Session From Provider...
+```
+
+Choose **Copilot** to read VS Code chat storage or **Codex** to import local transcripts from `CODEX_HOME` or `~/.codex`. Cursor support is automatic when the extension is running inside Cursor. In that case, Session Control reads Agent transcript JSONL files from `~/.cursor/projects/<project-slug>/agent-transcripts` and falls back to legacy Cursor workspace `chatSessions` JSONL files when possible.
+
+### Auto-save on chat response
+
+Enable:
+
+```json
+"session-control.autoSaveOnChatResponse": true
+```
+
+Auto-save follows the effective save provider:
+
+- `copilot` watches VS Code chat storage and saves the latest Copilot session after each response.
+- `cursor` is selected automatically when the extension is running in Cursor and no explicit provider override is set. It watches Cursor Agent transcript JSONL files under `~/.cursor/projects/<project-slug>/agent-transcripts` and auto-saves the latest Agent chat.
+- `codex` does not currently support auto-save; Codex sessions remain a manual import flow.
 
 ### Resume a session
 
@@ -90,6 +117,17 @@ Session Control: Implement Latest Analysis
 
 This command looks across the open workspace folders, finds the newest saved analysis report that still exists on disk, and opens the same lightweight implementation flow used by `@session-control /implement`. If an agent-session opener is available, you can send the generated prompt there; otherwise it opens a new chat with the prompt prefilled. Internally this command is registered as `session-control.implementLatestAnalysis`.
 
+### Import Copilot guidance as Cursor or Codex skills
+
+Run:
+
+```
+Session Control: Import Copilot Guidance as Cursor Skills
+Session Control: Import Copilot Guidance as Codex Skills
+```
+
+This scans repository guidance such as `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`, `.github/prompts/*.prompt.md`, and other repo-local `*.instructions.md`, `*.prompt.md`, `*.agent.md`, or `SKILL.md` files. Use the Cursor command to import each source into `.cursor/skills/<slug>/SKILL.md`, or the Codex command to import into `.agents/skills/<slug>/SKILL.md`, without overwriting existing skills.
+
 ### View a saved session in the web viewer
 
 You can open the HTML session viewer in two ways:
@@ -123,7 +161,11 @@ This command opens the web viewer for the active JSON file when it matches Sessi
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `session-control.storagePath` | `.chat` | Folder (relative to workspace root) where sessions are saved |
-| `session-control.autoSaveOnChatResponse` | `false` | Auto-save active session after every Copilot chat response |
+| `session-control.save.provider` | `copilot` | Explicit provider override for `Session Control: Save Current Chat Session`; when unset, Session Control auto-detects Cursor and otherwise defaults to Copilot |
+| `session-control.codex.homePath` | `""` | Optional Codex home directory override; when empty, Session Control uses `CODEX_HOME` or `~/.codex` |
+| `session-control.cursor.userDataPath` | `""` | Optional Cursor user data directory for legacy workspace `chatSessions` JSONL fallback; when empty, Session Control uses the default Cursor user data location for this OS |
+| `session-control.cursor.projectsPath` | `""` | Optional Cursor projects directory for Agent transcript import; when empty, Session Control uses `~/.cursor/projects` |
+| `session-control.autoSaveOnChatResponse` | `false` | Auto-save after each response when the selected provider supports it (`copilot` and `cursor`; not `codex`) |
 | `session-control.includeInGitignore` | `false` | Add storage folder to `.gitignore` |
 | `session-control.resume.maxTurns` | `50` | Max turns injected when resuming |
 | `session-control.resume.overflowStrategy` | `summarize` | `summarize`, `truncate`, or `recent-only` |

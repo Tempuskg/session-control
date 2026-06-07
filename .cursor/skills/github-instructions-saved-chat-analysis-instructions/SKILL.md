@@ -1,7 +1,16 @@
 ---
-name: "Saved Chat Analysis"
-description: "Use when implementing or updating saved chat analysis flows, analysis reports, implementation handoffs, or report status and provenance handling in Session Control."
+name: github-instructions-saved-chat-analysis-instructions
+description: "Imported repository guidance from .github/instructions/saved-chat-analysis.instructions.md. Use when working in this repository and the original guidance is relevant."
 ---
+
+Follow this imported repository guidance from `.github/instructions/saved-chat-analysis.instructions.md` when the task overlaps with its original scope.
+
+## Instructions
+- Treat the guidance below as repository-specific instructions for this project.
+- Apply it together with higher-priority system, developer, and repo instructions already in effect.
+- Preserve the intent of the source guidance while adapting it to the current task.
+
+## Imported guidance
 
 # Saved Chat Analysis
 

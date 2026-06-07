@@ -293,7 +293,7 @@ async function promptDateRangeAnalysisMode(): Promise<boolean | undefined> {
 	return pick?.onlyUnanalyzed;
 }
 
-async function resolveAnalysisSelection(prompt: string): Promise<import('./types').AnalysisSelection | undefined> {
+export async function resolveAnalysisSelection(prompt: string): Promise<import('./types').AnalysisSelection | undefined> {
 	const parsed = parseAnalysisSelectionAlias(prompt);
 	if (parsed) {
 		return parsed;
@@ -418,13 +418,13 @@ async function loadAnalyzedFingerprintSet(candidates: AnalysisCandidateSession[]
 	return analyzed;
 }
 
-async function collectModelText(
-	request: vscode.ChatRequest,
-	stream: vscode.ChatResponseStream | undefined,
+async function collectModelTextFromModel(
+	model: vscode.LanguageModelChat,
+	streamText: ((markdown: string) => void) | undefined,
 	token: vscode.CancellationToken,
 	prompt: string,
 ): Promise<string> {
-	const modelResponse = await request.model.sendRequest(
+	const modelResponse = await model.sendRequest(
 		[vscode.LanguageModelChatMessage.User(prompt)],
 		{},
 		token,
@@ -434,13 +434,27 @@ async function collectModelText(
 	for await (const part of modelResponse.stream) {
 		if (part instanceof vscode.LanguageModelTextPart) {
 			text += part.value;
-			if (stream) {
-				stream.markdown(part.value);
+			if (streamText) {
+				streamText(part.value);
 			}
 		}
 	}
 
 	return text.trim();
+}
+
+async function collectModelText(
+	request: vscode.ChatRequest,
+	stream: vscode.ChatResponseStream | undefined,
+	token: vscode.CancellationToken,
+	prompt: string,
+): Promise<string> {
+	return collectModelTextFromModel(
+		request.model,
+		stream ? (markdown) => stream.markdown(markdown) : undefined,
+		token,
+		prompt,
+	);
 }
 
 function findLatestAnalysisReportMeta(history: readonly (vscode.ChatRequestTurn | vscode.ChatResponseTurn)[]): {
@@ -471,32 +485,58 @@ function findLatestAnalysisReportMeta(history: readonly (vscode.ChatRequestTurn 
 	return null;
 }
 
+export interface AnalyzeSessionsFlowDepsOverrides {
+	resolveSelection?: AnalyzeSessionsFlowDeps['resolveSelection'];
+	createCandidates?: AnalyzeSessionsFlowDeps['createCandidates'];
+	loadAnalyzedFingerprints?: AnalyzeSessionsFlowDeps['loadAnalyzedFingerprints'];
+	loadRecommendationBaseline?: AnalyzeSessionsFlowDeps['loadRecommendationBaseline'];
+	splitIntoBatches?: AnalyzeSessionsFlowDeps['splitIntoBatches'];
+	buildPrompt?: AnalyzeSessionsFlowDeps['buildPrompt'];
+	buildSynthesisPrompt?: AnalyzeSessionsFlowDeps['buildSynthesisPrompt'];
+	runModelPrompt: AnalyzeSessionsFlowDeps['runModelPrompt'];
+	streamMarkdown: AnalyzeSessionsFlowDeps['streamMarkdown'];
+	pickOwnerWorkspace?: AnalyzeSessionsFlowDeps['pickOwnerWorkspace'];
+	getStoragePath?: AnalyzeSessionsFlowDeps['getStoragePath'];
+	writeReport?: AnalyzeSessionsFlowDeps['writeReport'];
+	recordAnalysis?: AnalyzeSessionsFlowDeps['recordAnalysis'];
+	batchCharBudget?: number;
+}
+
+export function createAnalyzeSessionsFlowDeps(overrides: AnalyzeSessionsFlowDepsOverrides): AnalyzeSessionsFlowDeps {
+	return {
+		resolveSelection: overrides.resolveSelection ?? (async (prompt: string) => resolveAnalysisSelection(prompt)),
+		createCandidates: overrides.createCandidates ?? (async (workspaceSessions: WorkspaceSessionMeta[]) => createAnalysisCandidates(workspaceSessions)),
+		loadAnalyzedFingerprints: overrides.loadAnalyzedFingerprints
+			?? (async (candidates: AnalysisCandidateSession[]) => loadAnalyzedFingerprintSet(candidates)),
+		loadRecommendationBaseline: overrides.loadRecommendationBaseline ?? (async (
+			workspaceFolders: readonly vscode.WorkspaceFolder[],
+			candidates: AnalysisCandidateSession[],
+		) => loadRecommendationBaseline(workspaceFolders, candidates)),
+		splitIntoBatches: overrides.splitIntoBatches
+			?? ((candidates: AnalysisCandidateSession[], maxChars?: number) => splitCandidatesIntoAnalysisBatches(candidates, maxChars)),
+		buildPrompt: overrides.buildPrompt ?? ((selection, candidates, recommendationBaseline, detailLevel) =>
+			buildAnalysisPrompt(selection, candidates, recommendationBaseline, detailLevel)),
+		buildSynthesisPrompt: overrides.buildSynthesisPrompt ?? ((selection, batchSummaries, recommendationBaseline) =>
+			buildAnalysisSynthesisPrompt(selection, batchSummaries, recommendationBaseline)),
+		runModelPrompt: overrides.runModelPrompt,
+		streamMarkdown: overrides.streamMarkdown,
+		pickOwnerWorkspace: overrides.pickOwnerWorkspace ?? ((workspaceFolders: readonly vscode.WorkspaceFolder[]) => pickWorkspaceFolder() ?? workspaceFolders[0]),
+		getStoragePath: overrides.getStoragePath ?? ((workspaceFolder: vscode.WorkspaceFolder) => getStoragePath(workspaceFolder)),
+		writeReport: overrides.writeReport ?? (async (storageDirectory, input) => analysisStore.writeReport(storageDirectory, input)),
+		recordAnalysis: overrides.recordAnalysis ?? (async (storageDirectory, report, sessions) => analysisStore.recordAnalysis(storageDirectory, report, sessions)),
+		batchCharBudget: overrides.batchCharBudget ?? DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET,
+	};
+}
+
 function createDefaultAnalyzeSessionsFlowDeps(
 	request: vscode.ChatRequest,
 	stream: vscode.ChatResponseStream,
 	token: vscode.CancellationToken,
 ): AnalyzeSessionsFlowDeps {
-	return {
-		resolveSelection: async (prompt: string) => resolveAnalysisSelection(prompt),
-		createCandidates: async (workspaceSessions: WorkspaceSessionMeta[]) => createAnalysisCandidates(workspaceSessions),
-		loadAnalyzedFingerprints: async (candidates: AnalysisCandidateSession[]) => loadAnalyzedFingerprintSet(candidates),
-		loadRecommendationBaseline: async (
-			workspaceFolders: readonly vscode.WorkspaceFolder[],
-			candidates: AnalysisCandidateSession[],
-		) => loadRecommendationBaseline(workspaceFolders, candidates),
-		splitIntoBatches: (candidates, maxChars) => splitCandidatesIntoAnalysisBatches(candidates, maxChars),
-		buildPrompt: (selection, candidates, recommendationBaseline, detailLevel) =>
-			buildAnalysisPrompt(selection, candidates, recommendationBaseline, detailLevel),
-		buildSynthesisPrompt: (selection, batchSummaries, recommendationBaseline) =>
-			buildAnalysisSynthesisPrompt(selection, batchSummaries, recommendationBaseline),
+	return createAnalyzeSessionsFlowDeps({
 		runModelPrompt: async (prompt: string, streamOutput: boolean) => collectModelText(request, streamOutput ? stream : undefined, token, prompt),
 		streamMarkdown: (markdown: string) => stream.markdown(markdown),
-		pickOwnerWorkspace: (workspaceFolders: readonly vscode.WorkspaceFolder[]) => pickWorkspaceFolder() ?? workspaceFolders[0],
-		getStoragePath: (workspaceFolder: vscode.WorkspaceFolder) => getStoragePath(workspaceFolder),
-		writeReport: async (storageDirectory, input) => analysisStore.writeReport(storageDirectory, input),
-		recordAnalysis: async (storageDirectory, report, sessions) => analysisStore.recordAnalysis(storageDirectory, report, sessions),
-		batchCharBudget: DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET,
-	};
+	});
 }
 
 function findAgentSessionCommandId(commands: readonly string[]): string | undefined {
@@ -730,13 +770,29 @@ function applyResumeOverflowStrategy(
 }
 
 function turnsToContextBlock(turns: SavedTurn[]): string {
+	const formatAssistantLabel = (participant: string): string => {
+		if (/^copilot$/i.test(participant)) {
+			return 'Copilot';
+		}
+
+		if (/^codex$/i.test(participant)) {
+			return 'Codex';
+		}
+
+		if (/^cursor$/i.test(participant)) {
+			return 'Cursor';
+		}
+
+		return participant.trim() || 'Assistant';
+	};
+
 	return turns
 		.map((turn) => {
 			if (turn.type === 'request') {
 				return `User: ${turn.prompt}`;
 			}
 
-			return `Copilot: ${turn.content}`;
+			return `${formatAssistantLabel(turn.participant)}: ${turn.content}`;
 		})
 		.join('\n\n');
 }

@@ -59,6 +59,7 @@ function toSessionMeta(fileName: string, session: ChatSession): SessionMeta {
 		title: session.title,
 		savedAt: session.savedAt,
 		fileName,
+		...(session.provider ? { provider: session.provider } : {}),
 		turnCount: session.totalTurns,
 		git: session.git,
 	};

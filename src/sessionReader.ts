@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { SavedTurn, ToolCall } from './types';
+import { SavedTurn, SessionProviderId, SourceChatSession, ToolCall } from './types';
 
 interface StorageUriLike {
 	fsPath: string;
@@ -20,22 +20,18 @@ interface SessionReaderDeps {
 	vscodeVersion: string;
 }
 
-export interface CopilotSession {
-	id: string;
-	title: string;
-	lastMessageDate: string;
-	turns: SavedTurn[];
-	sourceFile: string;
+export interface CopilotSession extends SourceChatSession {
+	provider: 'copilot';
 }
 
-class UnknownFormatError extends Error {
+export class UnknownFormatError extends Error {
 	constructor(fileName: string) {
 		super(`Unknown session format: ${fileName}`);
 		this.name = 'UnknownFormatError';
 	}
 }
 
-class EmptySessionError extends Error {
+export class EmptySessionError extends Error {
 	constructor(fileName: string) {
 		super(`Empty session (no completed turns): ${fileName}`);
 		this.name = 'EmptySessionError';
@@ -360,6 +356,7 @@ function normalizeObjectPayload(payload: Record<string, unknown>, sourceFile: st
 		const lastMessageDate = toIsoTimestamp(payload.lastMessageDate ?? payload.updatedAt ?? turns[turns.length - 1]?.timestamp);
 
 		return {
+			provider: 'copilot',
 			id,
 			title,
 			lastMessageDate,
@@ -384,6 +381,7 @@ function normalizeObjectPayload(payload: Record<string, unknown>, sourceFile: st
 		const lastMessageDate = toIsoTimestamp(session.lastMessageDate ?? session.updatedAt ?? turns[turns.length - 1]?.timestamp);
 
 		return {
+			provider: 'copilot',
 			id,
 			title,
 			lastMessageDate,
@@ -575,6 +573,7 @@ function normalizeSnapshotPatchPayload(records: unknown[], sourceFile: string): 
 			: new Date().toISOString());
 
 	return {
+		provider: 'copilot',
 		id,
 		title,
 		lastMessageDate,
@@ -601,12 +600,31 @@ function normalizeJsonlPayload(records: unknown[], sourceFile: string): CopilotS
 	const lastMessageDate = toIsoTimestamp(metaRecord?.lastMessageDate ?? turns[turns.length - 1]?.timestamp);
 
 	return {
+		provider: 'copilot',
 		id,
 		title,
 		lastMessageDate,
 		turns,
 		sourceFile,
 	};
+}
+
+export function parseWorkspaceSessionJson(
+	content: string,
+	sourceFile: string,
+	provider: SessionProviderId,
+): SourceChatSession {
+	const session = parseJson(content, sourceFile);
+	return { ...session, provider };
+}
+
+export function parseWorkspaceSessionJsonl(
+	content: string,
+	sourceFile: string,
+	provider: SessionProviderId,
+): SourceChatSession {
+	const session = parseJsonl(content, sourceFile);
+	return { ...session, provider };
 }
 
 function parseJson(content: string, sourceFile: string): CopilotSession {

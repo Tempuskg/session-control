@@ -4,10 +4,18 @@ import {
 	isGitContext,
 	isRequestTurn,
 	isResponseTurn,
+	isSessionProviderId,
 	isToolCall,
 } from '../../src/types';
 
 suite('types guards', () => {
+	test('isSessionProviderId accepts known providers', () => {
+		assert.equal(isSessionProviderId('copilot'), true);
+		assert.equal(isSessionProviderId('codex'), true);
+		assert.equal(isSessionProviderId('cursor'), true);
+		assert.equal(isSessionProviderId('unknown'), false);
+	});
+
 	test('isGitContext accepts valid git data', () => {
 		assert.equal(
 			isGitContext({ branch: 'main', commit: 'abc123', dirty: false }),
@@ -96,5 +104,7 @@ suite('types guards', () => {
 		assert.equal(isChatSession(valid), true);
 		assert.equal(isChatSession({ ...valid, savedAt: 'not-a-date' }), false);
 		assert.equal(isChatSession({ ...valid, turns: [{ type: 'bad' }] }), false);
+		assert.equal(isChatSession({ ...valid, provider: 'cursor' }), true);
+		assert.equal(isChatSession({ ...valid, provider: 'invalid-provider' }), false);
 	});
 });

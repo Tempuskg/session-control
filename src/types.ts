@@ -4,6 +4,8 @@ export interface GitContext {
 	dirty: boolean;
 }
 
+export type SessionProviderId = 'copilot' | 'codex' | 'cursor';
+
 export interface ToolCall {
 	name: string;
 	summary?: string;
@@ -29,11 +31,21 @@ export interface ResponseTurn {
 
 export type SavedTurn = RequestTurn | ResponseTurn;
 
+export interface SourceChatSession {
+	provider: SessionProviderId;
+	id: string;
+	title: string;
+	lastMessageDate: string;
+	turns: SavedTurn[];
+	sourceFile: string;
+}
+
 export interface ChatSession {
 	version: number;
 	id: string;
 	title: string;
 	savedAt: string;
+	provider?: SessionProviderId;
 	git: GitContext | null;
 	vscodeVersion: string;
 	totalTurns: number;
@@ -50,6 +62,7 @@ export interface SessionMeta {
 	title: string;
 	savedAt: string;
 	fileName: string;
+	provider?: SessionProviderId;
 	turnCount: number;
 	git: GitContext | null;
 }
@@ -140,6 +153,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isIsoTimestamp(value: unknown): value is string {
 	return typeof value === 'string' && Number.isFinite(Date.parse(value));
+}
+
+export function isSessionProviderId(value: unknown): value is SessionProviderId {
+	return value === 'copilot' || value === 'codex' || value === 'cursor';
 }
 
 export function isGitContext(value: unknown): value is GitContext {
@@ -342,6 +359,7 @@ export function isChatSession(value: unknown): value is ChatSession {
 		|| typeof value.id !== 'string'
 		|| typeof value.title !== 'string'
 		|| !isIsoTimestamp(value.savedAt)
+		|| (value.provider !== undefined && !isSessionProviderId(value.provider))
 		|| typeof value.vscodeVersion !== 'string'
 		|| typeof value.totalTurns !== 'number'
 		|| !Array.isArray(value.turns)

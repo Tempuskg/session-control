@@ -119,3 +119,19 @@ Pages touched: CHAT_ANALYSIS_PLAN.md, README.md, CHANGELOG.md, chat-participant.
 ## [2026-06-06] query | Codex Session Saving Feasibility
 Answered whether Session Control can save Codex sessions like Copilot sessions. Reviewed the save-system, resume-system, chat-participant, architecture pages, README, current source reader/writer behavior, and official Codex manual notes about local transcripts, resume, and app-server thread APIs.
 Pages touched: log.md
+
+## [2026-06-06] update | Codex Provider Support
+Implemented opt-in Codex provider support alongside the existing Copilot save flow. Added provider metadata to saved sessions, a provider picker and default provider setting, local Codex transcript import, and a command that imports repository Copilot guidance into repo-scoped Codex skills under `.agents/skills/`.
+Pages touched: log.md
+
+## [2026-06-06] update | Cursor JSONL Provider Support
+Implemented opt-in Cursor provider support for workspace `chatSessions` JSONL import. Added a separate `cursor` provider, Cursor user data path resolution via `workspace.json`, shared snapshot-patch parsing with the existing Copilot reader, and focused unit coverage for workspace matching and import behavior.
+Pages touched: log.md
+
+## [2026-06-07] update | Cursor Auto-save Documentation
+Updated the user-facing docs to describe Cursor Agent transcript import, legacy `chatSessions` fallback, and provider-aware auto-save behavior. Synced the marketplace-facing extension description with the current Copilot, Cursor, and Codex support surface.
+Pages touched: README.md, CHANGELOG.md, package.json, log.md
+
+## [2026-06-07] update | Cursor Provider Autodetection
+Removed the explicit Cursor provider option from the visible provider picker and settings surface. Session Control now auto-detects Cursor at runtime and uses the Cursor provider there unless the user explicitly overrides the save provider to Copilot or Codex.
+Pages touched: README.md, CHANGELOG.md, package.json, log.md

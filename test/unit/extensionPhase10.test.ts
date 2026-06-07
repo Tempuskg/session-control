@@ -7,6 +7,9 @@ import {
 	createStorageGitignoreEntry,
 	ensureStoragePathInGitignore,
 	listSessionsAcrossWorkspaceFolders,
+	resolveImplicitSaveProviderForHost,
+	resolveSaveProviderForHost,
+	runAnalyzeSavedChatsCommand,
 	runImplementLatestAnalysisCommand,
 	runOpenSavedSessionCommand,
 	runResumeSessionFromViewerCommand,
@@ -30,6 +33,7 @@ function createWorkspaceFolder(rootPath: string, name: string, index: number): v
 
 function createCopilotSession(title: string): CopilotSession {
 	return {
+		provider: 'copilot',
 		id: `${title}-id`,
 		title,
 		lastMessageDate: '2026-04-12T12:05:00.000Z',
@@ -75,7 +79,41 @@ function createAnalysisReportReference(overrides: Partial<AnalysisReportReferenc
 	};
 }
 
+function createWorkspaceSessionMeta(
+	workspaceFolder: vscode.WorkspaceFolder,
+	title: string,
+	storageDirectory = path.join(workspaceFolder.uri.fsPath, '.chat'),
+): Awaited<ReturnType<typeof listSessionsAcrossWorkspaceFolders>>[number] {
+	return {
+		id: `${title}-id`,
+		title,
+		savedAt: '2026-05-17T18:00:00.000Z',
+		fileName: 'saved.json',
+		turnCount: 2,
+		git: null,
+		label: `[${workspaceFolder.name}] ${title}`,
+		description: '2 turns',
+		detail: '2026-05-17T18:00:00.000Z | saved.json',
+		displayTitle: `[${workspaceFolder.name}] ${title}`,
+		storageDirectory,
+		workspaceFolder,
+	};
+}
+
 suite('extension phase 10', () => {
+	test('resolveImplicitSaveProviderForHost defaults to Cursor only inside Cursor', () => {
+		assert.equal(resolveImplicitSaveProviderForHost('Cursor'), 'cursor');
+		assert.equal(resolveImplicitSaveProviderForHost('Cursor Nightly'), 'cursor');
+		assert.equal(resolveImplicitSaveProviderForHost('Visual Studio Code'), 'copilot');
+	});
+
+	test('resolveSaveProviderForHost prefers explicit provider overrides', () => {
+		assert.equal(resolveSaveProviderForHost('copilot', 'Cursor'), 'copilot');
+		assert.equal(resolveSaveProviderForHost('codex', 'Cursor'), 'codex');
+		assert.equal(resolveSaveProviderForHost(undefined, 'Cursor'), 'cursor');
+		assert.equal(resolveSaveProviderForHost(undefined, 'Visual Studio Code'), 'copilot');
+	});
+
 	test('validateStoragePath accepts in-workspace relative paths and rejects invalid ones', () => {
 		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
 
@@ -186,16 +224,7 @@ suite('extension phase 10', () => {
 			undefined,
 			{
 				getWorkspaceFolders: () => [workspaceFolder],
-				listSessionsAcrossWorkspaceFolders: async () => [
-					{
-						label: '[repo] Session 1',
-						description: '2 turns',
-						detail: '2026-04-13T00:00:00.000Z | saved.json',
-						fileName: 'saved.json',
-						storageDirectory: 'C:/repo/.chat',
-						workspaceFolder,
-					},
-				],
+				listSessionsAcrossWorkspaceFolders: async () => [createWorkspaceSessionMeta(workspaceFolder, 'Session 1', 'C:/repo/.chat')],
 				pickSession: async (sessions) => sessions[0],
 				readSession: async () => ({ id: 's1' } as ReturnType<typeof createChatSession>),
 				showSession: (_session, extensionUri, storageDirectory, fileName) => {
@@ -379,7 +408,7 @@ suite('runImplementLatestAnalysisCommand', () => {
 			showWarningMessage: async () => undefined,
 		});
 
-		assert.deepEqual(infoMessages, ['No saved analysis reports found. Run @session-control /analyze first.']);
+		assert.deepEqual(infoMessages, ['No saved analysis reports found. Run Session Control: Analyze Saved Chats or @session-control /analyze first.']);
 	});
 
 	test('opens chat with the latest usable saved analysis report', async () => {
@@ -493,5 +522,177 @@ suite('runImplementLatestAnalysisCommand', () => {
 		assert.deepEqual(infoMessages, [
 			'Opened an agent session for the latest saved analysis from repo. The generated implementation prompt is on the clipboard.',
 		]);
+	});
+});
+
+suite('runAnalyzeSavedChatsCommand', () => {
+	test('shows guidance when no workspace is open', async () => {
+		const infoMessages: string[] = [];
+
+		await runAnalyzeSavedChatsCommand('', {
+			getWorkspaceFolders: () => undefined,
+			showInformationMessage: async (message: string) => {
+				infoMessages.push(message);
+				return undefined;
+			},
+			showWarningMessage: async () => undefined,
+		});
+
+		assert.deepEqual(infoMessages, ['Open a workspace folder before analyzing saved chats.']);
+	});
+
+	test('warns when no host chat model is available outside Cursor', async () => {
+		const warningMessages: string[] = [];
+		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
+
+		await runAnalyzeSavedChatsCommand('', {
+			getWorkspaceFolders: () => [workspaceFolder],
+			listSessionsAcrossWorkspaceFolders: async () => [createWorkspaceSessionMeta(workspaceFolder, 'Session 1')],
+			resolveSelection: async () => ({
+				mode: 'needsAnalysis',
+				label: 'Needs Analysis',
+				range: null,
+			}),
+			selectChatModels: async () => [],
+			getAppName: () => 'Visual Studio Code',
+			runAnalyzeFlow: async () => {
+				throw new Error('runAnalyzeFlow should not be called without a model.');
+			},
+			withProgress: async (_options, task) => task({ report: () => undefined }, new vscode.CancellationTokenSource().token),
+			openTextDocument: async (uri: vscode.Uri) => ({ uri } as vscode.TextDocument),
+			showTextDocument: async (_document: vscode.TextDocument) => ({}) as vscode.TextEditor,
+			showInformationMessage: async () => undefined,
+			showWarningMessage: async (message: string) => {
+				warningMessages.push(message);
+				return undefined;
+			},
+		});
+
+		assert.deepEqual(warningMessages, [
+			'No host chat model is available for analysis. Sign in or enable a chat model, then try again.',
+		]);
+	});
+
+	test('opens chat with a handoff prompt when Cursor has no extension-callable model', async () => {
+		const infoMessages: string[] = [];
+		const warningMessages: string[] = [];
+		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
+		let openedPrompt: string | undefined;
+
+		await runAnalyzeSavedChatsCommand('', {
+			getWorkspaceFolders: () => [workspaceFolder],
+			listSessionsAcrossWorkspaceFolders: async () => [createWorkspaceSessionMeta(workspaceFolder, 'Session 1')],
+			resolveSelection: async () => ({
+				mode: 'needsAnalysis',
+				label: 'Needs Analysis',
+				range: null,
+			}),
+			selectChatModels: async () => [],
+			getAppName: () => 'Cursor',
+			buildCursorHandoffPrompt: async () => ({ prompt: 'ANALYZE HANDOFF' }),
+			openChat: async (prompt: string) => {
+				openedPrompt = prompt;
+			},
+			runAnalyzeFlow: async () => {
+				throw new Error('runAnalyzeFlow should not be called without a model.');
+			},
+			withProgress: async (_options, task) => task({ report: () => undefined }, new vscode.CancellationTokenSource().token),
+			openTextDocument: async (uri: vscode.Uri) => ({ uri } as vscode.TextDocument),
+			showTextDocument: async (_document: vscode.TextDocument) => ({}) as vscode.TextEditor,
+			showInformationMessage: async (message: string) => {
+				infoMessages.push(message);
+				return undefined;
+			},
+			showWarningMessage: async (message: string) => {
+				warningMessages.push(message);
+				return undefined;
+			},
+		});
+
+		assert.equal(openedPrompt, 'ANALYZE HANDOFF');
+		assert.deepEqual(infoMessages, [
+			'Cursor does not currently expose extension-callable chat models, so Session Control opened chat with an analysis handoff prompt. Send it in chat to continue.',
+		]);
+		assert.deepEqual(warningMessages, []);
+	});
+
+	test('opens the saved analysis report after a successful run', async () => {
+		const infoMessages: string[] = [];
+		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
+		let openedDocumentPath: string | undefined;
+		let shownDocumentPath: string | undefined;
+
+		await runAnalyzeSavedChatsCommand('', {
+			getWorkspaceFolders: () => [workspaceFolder],
+			listSessionsAcrossWorkspaceFolders: async () => [createWorkspaceSessionMeta(workspaceFolder, 'Session 1')],
+			resolveSelection: async () => ({
+				mode: 'needsAnalysis',
+				label: 'Needs Analysis',
+				range: null,
+			}),
+			selectChatModels: async () => [{} as vscode.LanguageModelChat],
+			runAnalyzeFlow: async (_workspaceFolders, _workspaceSessions, _selection, _model, _token, onStatus) => {
+				onStatus('Saved analysis report.');
+				return {
+					metadata: {
+						resultType: 'analysis-report',
+						analysisStatus: 'complete',
+						analysisReportPath: 'analysis/reports/report-1.md',
+						analysisStorageDirectory: 'C:/repo/.chat',
+					},
+				};
+			},
+			withProgress: async (_options, task) => task({ report: () => undefined }, new vscode.CancellationTokenSource().token),
+			openTextDocument: async (uri: vscode.Uri) => {
+				openedDocumentPath = uri.fsPath;
+				return { uri } as vscode.TextDocument;
+			},
+			showTextDocument: async (document: vscode.TextDocument) => {
+				shownDocumentPath = document.uri.fsPath;
+				return {} as vscode.TextEditor;
+			},
+			showInformationMessage: async (message: string) => {
+				infoMessages.push(message);
+				return undefined;
+			},
+			showWarningMessage: async () => undefined,
+		});
+
+		const expectedPath = path.join('C:/repo/.chat', 'analysis/reports/report-1.md');
+		assert.equal(openedDocumentPath?.toLowerCase(), expectedPath.toLowerCase());
+		assert.equal(shownDocumentPath?.toLowerCase(), expectedPath.toLowerCase());
+		assert.deepEqual(infoMessages, [
+			'Saved analysis report to analysis/reports/report-1.md. Run Session Control: Implement Latest Analysis to continue.',
+		]);
+	});
+
+	test('surfaces the last status message when analysis stops without saving a report', async () => {
+		const infoMessages: string[] = [];
+		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
+
+		await runAnalyzeSavedChatsCommand('', {
+			getWorkspaceFolders: () => [workspaceFolder],
+			listSessionsAcrossWorkspaceFolders: async () => [createWorkspaceSessionMeta(workspaceFolder, 'Session 1')],
+			resolveSelection: async () => ({
+				mode: 'needsAnalysis',
+				label: 'Needs Analysis',
+				range: null,
+			}),
+			selectChatModels: async () => [{} as vscode.LanguageModelChat],
+			runAnalyzeFlow: async (_workspaceFolders, _workspaceSessions, _selection, _model, _token, onStatus) => {
+				onStatus('No saved sessions currently need analysis.');
+				return undefined;
+			},
+			withProgress: async (_options, task) => task({ report: () => undefined }, new vscode.CancellationTokenSource().token),
+			openTextDocument: async (uri: vscode.Uri) => ({ uri } as vscode.TextDocument),
+			showTextDocument: async (_document: vscode.TextDocument) => ({}) as vscode.TextEditor,
+			showInformationMessage: async (message: string) => {
+				infoMessages.push(message);
+				return undefined;
+			},
+			showWarningMessage: async () => undefined,
+		});
+
+		assert.deepEqual(infoMessages, ['No saved sessions currently need analysis.']);
 	});
 });

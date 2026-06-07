@@ -1,6 +1,5 @@
 import * as crypto from 'node:crypto';
-import { CopilotSession } from './sessionReader';
-import { ChatSession, GitContext, SavedTurn, ToolCall } from './types';
+import { ChatSession, GitContext, SavedTurn, SourceChatSession, ToolCall } from './types';
 import { formatTimestamp, slugify } from './utils';
 
 const DEFAULT_SUMMARY_MAX_TURNS = 50;
@@ -38,6 +37,30 @@ function toIsoTimestamp(value: string | undefined): string {
 
 function sanitizeTitle(value: string): string {
 	return value.replace(/\s+/g, ' ').trim();
+}
+
+function formatAssistantLabel(participant: string): string {
+	const normalized = participant.trim();
+	if (!normalized) {
+		return 'Assistant';
+	}
+
+	if (/^copilot$/i.test(normalized)) {
+		return 'Copilot';
+	}
+
+	if (/^codex$/i.test(normalized)) {
+		return 'Codex';
+	}
+
+	if (/^cursor$/i.test(normalized)) {
+		return 'Cursor';
+	}
+
+	return normalized
+		.split(/\s+/)
+		.map((segment) => segment ? `${segment.charAt(0).toUpperCase()}${segment.slice(1)}` : segment)
+		.join(' ');
 }
 
 function estimateSessionSizeBytes(session: ChatSession): number {
@@ -230,7 +253,7 @@ function renderTurn(index: number, turn: SavedTurn): string {
 	}
 
 	const toolCalls = renderToolCalls(turn.toolCalls);
-	return `### Turn ${turnNumber} - Copilot\n${turn.content}${toolCalls ? `\n\n${toolCalls}` : ''}`;
+	return `### Turn ${turnNumber} - ${formatAssistantLabel(turn.participant)}\n${turn.content}${toolCalls ? `\n\n${toolCalls}` : ''}`;
 }
 
 function capTurnsForSummary(turns: SavedTurn[], maxTurns: number): { turns: SavedTurn[]; omittedCount: number } {
@@ -299,7 +322,7 @@ export function createMarkdownSummary(session: ChatSession, options: SessionWrit
 }
 
 export function createChatSession(
-	source: CopilotSession,
+	source: SourceChatSession,
 	options: SessionWriterOptions = {},
 ): ChatSession {
 	const savedAt = toIsoTimestamp(options.savedAt);
@@ -310,6 +333,7 @@ export function createChatSession(
 		id: source.id || crypto.randomUUID(),
 		title,
 		savedAt,
+		provider: source.provider,
 		git: options.git ?? null,
 		vscodeVersion: options.vscodeVersion ?? 'unknown',
 		totalTurns: source.turns.length,

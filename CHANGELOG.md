@@ -7,12 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-06-07
+
 ### Added
 - Added `@session-control /analyze` to review saved chat sessions from a selected timeframe or only chats that have not been analyzed yet, with markdown reports persisted under `.chat/analysis/`.
 - Added `@session-control /implement` to open a generated implementation prompt in chat or an agent session using the latest saved analysis report.
 - Added the `Session Control: Implement Latest Analysis` command so the newest saved analysis report can be opened from the command palette without relying on chat-thread metadata.
+- Added opt-in Codex session import support alongside the existing Copilot save flow, including the `session-control.save.provider` setting and the `Session Control: Save Session From Provider...` command.
+- Added opt-in Cursor session import support for Cursor Agent transcript JSONL files under `~/.cursor/projects`, including the `cursor` provider option plus optional `session-control.cursor.projectsPath` and legacy `chatSessions` fallback settings.
+- Added provider-aware auto-save support for Cursor Agent transcript sessions when `session-control.save.provider = cursor`.
+- Added `Session Control: Import Copilot Guidance as Cursor Skills` and `Session Control: Import Copilot Guidance as Codex Skills` to convert repository Copilot guidance into repo-scoped skills under `.cursor/skills/` or `.agents/skills/`.
 
 ### Changed
+- Saved session files can now record their source provider, and resume/save summaries label assistant turns from the underlying provider (for example Copilot, Codex, or Cursor).
+- Cursor is now auto-detected when Session Control is running inside Cursor, so Cursor session saving and auto-save no longer require selecting a visible `cursor` provider option.
 - When choosing an interactive date range for `@session-control /analyze`, the participant now asks whether to analyze only unanalyzed chats in that range or re-analyze every chat in that range.
 - Analysis results now offer an **Implement Recommendations** follow-up that opens the generated coding-agent implementation prompt.
 - Analysis prompts and implementation prompts now restrict recommendations and implementation follow-up to AI-specific control files such as `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and similar repository-local instruction files.

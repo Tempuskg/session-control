@@ -1,3 +1,17 @@
+---
+name: github-copilot-instructions
+description: "Imported repository guidance from .github/copilot-instructions.md. Use when working in this repository and the original guidance is relevant."
+---
+
+Follow this imported repository guidance from `.github/copilot-instructions.md` when the task overlaps with its original scope.
+
+## Instructions
+- Treat the guidance below as repository-specific instructions for this project.
+- Apply it together with higher-priority system, developer, and repo instructions already in effect.
+- Preserve the intent of the source guidance while adapting it to the current task.
+
+## Imported guidance
+
 # Copilot Instructions for Session Control
 
 ## Project Overview
