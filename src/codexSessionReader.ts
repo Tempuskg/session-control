@@ -134,6 +134,7 @@ function normalizeCodexRecords(records: unknown[], sourceFile: string): CodexSes
 	const pendingToolCalls: PendingToolCall[] = [];
 	let sessionId = sourceFile;
 	let sessionTimestamp: string | undefined;
+	let sessionWorkingDirectory: string | undefined;
 
 	for (const record of records) {
 		if (!isRecord(record)) {
@@ -143,6 +144,10 @@ function normalizeCodexRecords(records: unknown[], sourceFile: string): CodexSes
 		if (record.type === 'session_meta' && isRecord(record.payload)) {
 			sessionId = typeof record.payload.id === 'string' ? record.payload.id : sessionId;
 			sessionTimestamp = typeof record.payload.timestamp === 'string' ? record.payload.timestamp : sessionTimestamp;
+			const cwd = typeof record.payload.cwd === 'string' ? record.payload.cwd.trim() : undefined;
+			if (cwd) {
+				sessionWorkingDirectory = cwd;
+			}
 			continue;
 		}
 
@@ -228,6 +233,21 @@ function normalizeCodexRecords(records: unknown[], sourceFile: string): CodexSes
 				timestamp,
 			});
 		}
+
+		if (payload.type === 'message' && payload.role === 'user') {
+			const text = extractContentText(payload.content);
+			if (!text) {
+				continue;
+			}
+
+			appendTurn(turns, {
+				type: 'request',
+				participant: 'user',
+				prompt: text,
+				references: [],
+				timestamp,
+			});
+		}
 	}
 
 	if (!turns.length) {
@@ -244,6 +264,7 @@ function normalizeCodexRecords(records: unknown[], sourceFile: string): CodexSes
 		lastMessageDate: lastTurn ? lastTurn.timestamp : toIsoTimestamp(sessionTimestamp),
 		turns,
 		sourceFile,
+		...(sessionWorkingDirectory ? { cwd: sessionWorkingDirectory } : {}),
 	};
 }
 

@@ -54,7 +54,7 @@ export interface PersistedAnalysisReport {
 	reportFilePath: string;
 }
 
-const ANALYSIS_INDEX_VERSION = 1;
+export const ANALYSIS_INDEX_VERSION = 1;
 
 function createDefaultDeps(): AnalysisStoreDeps {
 	return {
@@ -202,6 +202,167 @@ function renderReportMarkdown(report: AnalysisReportReference, content: string):
 	lines.push('');
 
 	return lines.join('\n');
+}
+
+function createExampleFingerprintSession(): ChatSession {
+	return {
+		version: 1,
+		id: 'session-example',
+		title: 'Example saved chat',
+		savedAt: '2026-06-08T13:55:52.509Z',
+		provider: 'cursor',
+		git: {
+			branch: 'main',
+			commit: '3c0879b6690aec25d6a89dc821296647794f30ab',
+			dirty: false,
+		},
+		vscodeVersion: '1.105.1',
+		totalTurns: 2,
+		part: null,
+		totalParts: null,
+		previousPartFile: null,
+		nextPartFile: null,
+		turns: [
+			{
+				type: 'request',
+				participant: 'user',
+				prompt: 'Analyze these saved chats for recurring AI workflow issues.',
+				references: [],
+				timestamp: '2026-06-08T13:55:47.415Z',
+			},
+			{
+				type: 'response',
+				participant: 'cursor',
+				content: 'I will review the saved sessions and summarize the recurring issues.',
+				toolCalls: [
+					{
+						name: 'ReadFile',
+						summary: 'Read one saved session',
+						arguments: '{"path":"E:/repo/.chat/example.json"}',
+					},
+				],
+				timestamp: '2026-06-08T13:55:48.415Z',
+			},
+		],
+		markdownSummary: '# Chat: Example saved chat',
+	};
+}
+
+function createExampleAnalysisReport(promptVersion: string): AnalysisReportReference {
+	const exampleSession = createExampleFingerprintSession();
+	const fingerprint = createSessionAnalysisFingerprint(exampleSession);
+	return {
+		id: 'report-example',
+		createdAt: '2026-06-08T13:55:52.509Z',
+		selection: {
+			mode: 'last7Days',
+			label: 'Last 7 Days',
+			range: {
+				start: '2026-06-01T13:55:52.509Z',
+				end: '2026-06-08T13:55:52.509Z',
+			},
+			onlyUnanalyzed: true,
+		},
+		promptVersion,
+		reportPath: 'analysis/reports/2026-06-08T13-55-last-7-days-example.md',
+		contributingWorkspaces: ['repo'],
+		analyzedFingerprints: [fingerprint],
+		sessionCount: 1,
+		ownerWorkspaceName: 'repo',
+		repositories: [{
+			workspaceName: 'repo',
+			branch: 'main',
+			commit: '3c0879b6690aec25d6a89dc821296647794f30ab',
+			dirty: false,
+			sessionCount: 1,
+		}],
+		sourceSessions: [{
+			workspaceName: 'repo',
+			sessionId: exampleSession.id,
+			title: exampleSession.title,
+			savedAt: exampleSession.savedAt,
+			rootFileName: 'example.json',
+			fingerprint,
+			git: exampleSession.git,
+		}],
+		status: 'complete',
+		warnings: ['Only include this section when a warning is actually present.'],
+	};
+}
+
+function renderAnalysisReportTemplate(promptVersion: string): string {
+	return renderReportMarkdown(
+		createExampleAnalysisReport(promptVersion),
+		[
+			'## Repository-Specific Findings',
+			'',
+			'- Example finding',
+		].join('\n'),
+	);
+}
+
+function renderAnalysisIndexTemplate(promptVersion: string): string {
+	const report = createExampleAnalysisReport(promptVersion);
+	const analyzedSession = report.sourceSessions?.[0];
+	if (!analyzedSession) {
+		throw new Error('Example analysis report must include a source session.');
+	}
+
+	const index: AnalysisIndex = {
+		version: ANALYSIS_INDEX_VERSION,
+		updatedAt: '2026-06-08T13:55:52.509Z',
+		reports: [report],
+		analyzedSessions: [{
+			fingerprint: analyzedSession.fingerprint,
+			sessionId: analyzedSession.sessionId,
+			title: analyzedSession.title,
+			savedAt: analyzedSession.savedAt,
+			analyzedAt: report.createdAt,
+			reportPath: report.reportPath,
+			reportId: report.id,
+			rootFileName: analyzedSession.rootFileName,
+			git: analyzedSession.git,
+		}],
+	};
+
+	return JSON.stringify(index, null, 2);
+}
+
+function renderNormalizedFingerprintTemplate(): string {
+	return JSON.stringify(
+		normalizeSessionForFingerprint(createExampleFingerprintSession()),
+		null,
+		2,
+	);
+}
+
+export function buildAnalysisPersistenceContract(promptVersion: string): string {
+	return [
+		'Session Control persistence contract for this handoff:',
+		'',
+		`- Use report prompt version \`${promptVersion}\` and analysis index version \`${ANALYSIS_INDEX_VERSION}\`.`,
+		'- Save the report markdown at the requested report path using this top-level shape:',
+		'',
+		'```md',
+		renderAnalysisReportTemplate(promptVersion),
+		'```',
+		'',
+		'- Keep `analysis/index.json` in this shape. Merge by `report.id` and session `fingerprint` instead of replacing unrelated entries:',
+		'',
+		'```json',
+		renderAnalysisIndexTemplate(promptVersion),
+		'```',
+		'',
+		'- Compute each root-session fingerprint as SHA-256 over the UTF-8 bytes of `JSON.stringify(normalizedSession)` and write the lowercase hex digest.',
+		'- Use this exact normalized fingerprint payload shape:',
+		'',
+		'```json',
+		renderNormalizedFingerprintTemplate(),
+		'```',
+		'',
+		'- Ignore `savedAt`, `provider`, `git`, `vscodeVersion`, `markdownSummary`, `part`, `totalParts`, `previousPartFile`, and `nextPartFile` when computing the fingerprint.',
+		'- A `savedAt` change by itself must not change the fingerprint.',
+	].join('\n');
 }
 
 async function writeAtomic(

@@ -38,6 +38,7 @@ export interface SourceChatSession {
 	lastMessageDate: string;
 	turns: SavedTurn[];
 	sourceFile: string;
+	cwd?: string;
 }
 
 export interface ChatSession {

@@ -16,7 +16,13 @@ async function setupCodexHome(): Promise<{
 	return { root, codexHomePath, sessionsDirectory };
 }
 
-function createCodexSessionJsonl(id: string, prompt: string, response: string, timestampPrefix: string): string {
+function createCodexSessionJsonl(
+	id: string,
+	prompt: string,
+	response: string,
+	timestampPrefix: string,
+	cwd = 'E:/workspace/repo',
+): string {
 	return [
 		JSON.stringify({
 			timestamp: `${timestampPrefix}:00.000Z`,
@@ -24,6 +30,7 @@ function createCodexSessionJsonl(id: string, prompt: string, response: string, t
 			payload: {
 				id,
 				timestamp: `${timestampPrefix}:00.000Z`,
+				cwd,
 			},
 		}),
 		JSON.stringify({
@@ -133,6 +140,7 @@ suite('codexSessionReader', () => {
 			assert.equal(sessions[0]?.provider, 'codex');
 			assert.equal(sessions[0]?.id, 'codex-session-newer');
 			assert.equal(sessions[0]?.title, 'Help me refactor auth middleware');
+			assert.equal(sessions[0]?.cwd, 'E:/workspace/repo');
 			assert.equal(sessions[0]?.turns.length, 2);
 			assert.equal(sessions[0]?.turns[0]?.type, 'request');
 			const responseTurn = sessions[0]?.turns[1];
@@ -167,6 +175,75 @@ suite('codexSessionReader', () => {
 			const sessions = await reader.readCodexSessions(setup.codexHomePath);
 			assert.equal(sessions.length, 0);
 			assert.equal(infoMessages[0], `No Codex sessions found in ${setup.sessionsDirectory}.`);
+		} finally {
+			await fs.rm(setup.root, { recursive: true, force: true });
+		}
+	});
+
+	test('reads user request turns from Codex response item messages', async () => {
+		const setup = await setupCodexHome();
+
+		try {
+			const sessionDirectory = path.join(setup.sessionsDirectory, '2026', '06', '14');
+			await fs.mkdir(sessionDirectory, { recursive: true });
+			await fs.writeFile(
+				path.join(sessionDirectory, 'response-item-user.jsonl'),
+				[
+					JSON.stringify({
+						timestamp: '2026-06-14T10:00:00.000Z',
+						type: 'session_meta',
+						payload: {
+							id: 'response-item-user',
+							timestamp: '2026-06-14T10:00:00.000Z',
+							cwd: 'E:/chat-commit',
+						},
+					}),
+					JSON.stringify({
+						timestamp: '2026-06-14T10:00:01.000Z',
+						type: 'response_item',
+						payload: {
+							type: 'message',
+							role: 'user',
+							content: [
+								{
+									type: 'input_text',
+									text: 'Fix Codex auto-save',
+								},
+							],
+						},
+					}),
+					JSON.stringify({
+						timestamp: '2026-06-14T10:00:02.000Z',
+						type: 'response_item',
+						payload: {
+							type: 'message',
+							role: 'assistant',
+							content: [
+								{
+									type: 'output_text',
+									text: 'I found the auto-save path.',
+								},
+							],
+						},
+					}),
+				].join('\n'),
+				'utf8',
+			);
+
+			const sessions = await createCodexSessionReader({
+				showInformationMessage: async () => undefined,
+				logWarning: () => undefined,
+			}).readCodexSessions(setup.codexHomePath);
+
+			assert.equal(sessions.length, 1);
+			assert.equal(sessions[0]?.title, 'Fix Codex auto-save');
+			assert.equal(sessions[0]?.turns.length, 2);
+			const requestTurn = sessions[0]?.turns[0];
+			assert.equal(requestTurn?.type, 'request');
+			if (requestTurn?.type === 'request') {
+				assert.equal(requestTurn.participant, 'user');
+				assert.equal(requestTurn.prompt, 'Fix Codex auto-save');
+			}
 		} finally {
 			await fs.rm(setup.root, { recursive: true, force: true });
 		}

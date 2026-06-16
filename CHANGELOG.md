@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-06-14
+
+### Added
+- Added provider-aware Codex auto-save support by watching local Codex session transcripts under `CODEX_HOME/sessions` or `~/.codex/sessions` and saving the latest session that matches the current workspace.
+
+### Changed
+- Session Control now auto-detects Codex when running inside the Codex host app, matching the existing host-based Cursor detection and keeping Copilot as the fallback elsewhere.
+- Auto-save now follows the effective provider for Copilot, Cursor, and Codex instead of treating Codex as a manual-import-only path.
+
 ## [1.2.0] - 2026-06-07
 
 ### Added

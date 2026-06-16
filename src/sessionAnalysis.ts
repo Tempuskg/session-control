@@ -16,7 +16,7 @@ export interface AnalysisCandidateSession {
 
 export type AnalysisEvidenceDetailLevel = 'full' | 'compact' | 'summaryOnly';
 
-export const ANALYSIS_PROMPT_VERSION = '4';
+export const ANALYSIS_PROMPT_VERSION = '5';
 export const DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET = 48000;
 const SESSION_CONTROL_ANALYZE_PROMPT_PATTERN = /^(?:@?session-control\s+)?\/anal(?:y)?ze\b/i;
 const ANALYSIS_COMPACT_SUMMARY_MAX_CHARS = 4000;

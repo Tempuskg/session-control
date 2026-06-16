@@ -3,10 +3,11 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
+	buildAnalysisPersistenceContract,
 	createAnalysisStore,
 	createSessionAnalysisFingerprint,
 } from '../../src/analysisStore';
-import { createNeedsAnalysisSelection } from '../../src/sessionAnalysis';
+import { ANALYSIS_PROMPT_VERSION, createNeedsAnalysisSelection } from '../../src/sessionAnalysis';
 import { ChatSession } from '../../src/types';
 
 function createSession(id: string, savedAt: string, title: string, response: string): ChatSession {
@@ -131,16 +132,38 @@ suite('analysisStore', () => {
 		}
 	});
 
-	test('createSessionAnalysisFingerprint ignores savedAt but changes when content changes', () => {
+	test('createSessionAnalysisFingerprint ignores non-content metadata but changes when content changes', () => {
 		const first = createSession('session-a', '2026-05-17T10:00:00.000Z', 'Title', 'Initial response');
 		const sameContentDifferentSave = createSession('session-a', '2026-05-18T10:00:00.000Z', 'Title', 'Initial response');
+		const sameContentDifferentMetadata: ChatSession = {
+			...sameContentDifferentSave,
+			provider: 'cursor',
+			git: { branch: 'feature/test', commit: '1234567890abcdef', dirty: true },
+			vscodeVersion: '1.116.0',
+			markdownSummary: '# Different summary',
+		};
 		const changed = createSession('session-a', '2026-05-18T10:00:00.000Z', 'Title', 'Changed response');
 
 		const firstFingerprint = createSessionAnalysisFingerprint(first);
 		const sameFingerprint = createSessionAnalysisFingerprint(sameContentDifferentSave);
+		const sameMetadataFingerprint = createSessionAnalysisFingerprint(sameContentDifferentMetadata);
 		const changedFingerprint = createSessionAnalysisFingerprint(changed);
 
 		assert.equal(firstFingerprint, sameFingerprint);
+		assert.equal(firstFingerprint, sameMetadataFingerprint);
 		assert.notEqual(firstFingerprint, changedFingerprint);
+	});
+
+	test('buildAnalysisPersistenceContract documents the report, index, and fingerprint contract', () => {
+		const contract = buildAnalysisPersistenceContract(ANALYSIS_PROMPT_VERSION);
+
+		assert.equal(contract.includes(`# Chat Analysis Report`), true);
+		assert.equal(contract.includes(`Use report prompt version \`${ANALYSIS_PROMPT_VERSION}\``), true);
+		assert.equal(contract.includes('"reports": ['), true);
+		assert.equal(contract.includes('"analyzedSessions": ['), true);
+		assert.equal(contract.includes('"id": "session-example"'), true);
+		assert.equal(contract.includes('SHA-256 over the UTF-8 bytes of `JSON.stringify(normalizedSession)`'), true);
+		assert.equal(contract.includes('Ignore `savedAt`, `provider`, `git`, `vscodeVersion`, `markdownSummary`, `part`, `totalParts`, `previousPartFile`, and `nextPartFile`'), true);
+		assert.equal(contract.includes('A `savedAt` change by itself must not change the fingerprint.'), true);
 	});
 });

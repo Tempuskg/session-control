@@ -7,6 +7,7 @@ import {
 	createStorageGitignoreEntry,
 	ensureStoragePathInGitignore,
 	listSessionsAcrossWorkspaceFolders,
+	resolveAutoSaveProvidersForHost,
 	resolveImplicitSaveProviderForHost,
 	resolveSaveProviderForHost,
 	runAnalyzeSavedChatsCommand,
@@ -17,6 +18,7 @@ import {
 	resolveManualWorkspaceFolder,
 	validateStoragePath,
 } from '../../src/extension';
+import { ANALYSIS_PROMPT_VERSION } from '../../src/sessionAnalysis';
 import { SessionViewerPanel } from '../../src/sessionViewer';
 import { createSessionStore } from '../../src/sessionStore';
 import { createChatSession } from '../../src/sessionWriter';
@@ -101,9 +103,11 @@ function createWorkspaceSessionMeta(
 }
 
 suite('extension phase 10', () => {
-	test('resolveImplicitSaveProviderForHost defaults to Cursor only inside Cursor', () => {
+	test('resolveImplicitSaveProviderForHost defaults to Cursor or Codex only inside those hosts', () => {
 		assert.equal(resolveImplicitSaveProviderForHost('Cursor'), 'cursor');
 		assert.equal(resolveImplicitSaveProviderForHost('Cursor Nightly'), 'cursor');
+		assert.equal(resolveImplicitSaveProviderForHost('Codex'), 'codex');
+		assert.equal(resolveImplicitSaveProviderForHost('OpenAI Codex'), 'codex');
 		assert.equal(resolveImplicitSaveProviderForHost('Visual Studio Code'), 'copilot');
 	});
 
@@ -111,7 +115,16 @@ suite('extension phase 10', () => {
 		assert.equal(resolveSaveProviderForHost('copilot', 'Cursor'), 'copilot');
 		assert.equal(resolveSaveProviderForHost('codex', 'Cursor'), 'codex');
 		assert.equal(resolveSaveProviderForHost(undefined, 'Cursor'), 'cursor');
+		assert.equal(resolveSaveProviderForHost(undefined, 'Codex'), 'codex');
 		assert.equal(resolveSaveProviderForHost(undefined, 'Visual Studio Code'), 'copilot');
+	});
+
+	test('resolveAutoSaveProvidersForHost watches Copilot and Codex unless explicitly overridden', () => {
+		assert.deepEqual(resolveAutoSaveProvidersForHost('copilot', 'Visual Studio Code'), ['copilot']);
+		assert.deepEqual(resolveAutoSaveProvidersForHost('codex', 'Visual Studio Code'), ['codex']);
+		assert.deepEqual(resolveAutoSaveProvidersForHost(undefined, 'Visual Studio Code'), ['copilot', 'codex']);
+		assert.deepEqual(resolveAutoSaveProvidersForHost(undefined, 'OpenAI Codex'), ['copilot', 'codex']);
+		assert.deepEqual(resolveAutoSaveProvidersForHost(undefined, 'Cursor'), ['cursor']);
 	});
 
 	test('validateStoragePath accepts in-workspace relative paths and rejects invalid ones', () => {
@@ -573,43 +586,76 @@ suite('runAnalyzeSavedChatsCommand', () => {
 		]);
 	});
 
-	test('opens chat with a handoff prompt when Cursor has no extension-callable model', async () => {
+	test('opens chat with a self-contained analysis handoff prompt when Cursor has no extension-callable model', async () => {
 		const infoMessages: string[] = [];
 		const warningMessages: string[] = [];
-		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
 		let openedPrompt: string | undefined;
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-cursor-handoff-'));
+		const store = createSessionStore();
 
-		await runAnalyzeSavedChatsCommand('', {
-			getWorkspaceFolders: () => [workspaceFolder],
-			listSessionsAcrossWorkspaceFolders: async () => [createWorkspaceSessionMeta(workspaceFolder, 'Session 1')],
-			resolveSelection: async () => ({
-				mode: 'needsAnalysis',
-				label: 'Needs Analysis',
-				range: null,
-			}),
-			selectChatModels: async () => [],
-			getAppName: () => 'Cursor',
-			buildCursorHandoffPrompt: async () => ({ prompt: 'ANALYZE HANDOFF' }),
-			openChat: async (prompt: string) => {
-				openedPrompt = prompt;
-			},
-			runAnalyzeFlow: async () => {
-				throw new Error('runAnalyzeFlow should not be called without a model.');
-			},
-			withProgress: async (_options, task) => task({ report: () => undefined }, new vscode.CancellationTokenSource().token),
-			openTextDocument: async (uri: vscode.Uri) => ({ uri } as vscode.TextDocument),
-			showTextDocument: async (_document: vscode.TextDocument) => ({}) as vscode.TextEditor,
-			showInformationMessage: async (message: string) => {
-				infoMessages.push(message);
-				return undefined;
-			},
-			showWarningMessage: async (message: string) => {
-				warningMessages.push(message);
-				return undefined;
-			},
-		});
+		try {
+			const workspaceFolder = createWorkspaceFolder(tempRoot, 'repo', 0);
+			await store.writeSession(
+				path.join(tempRoot, '.chat'),
+				createChatSession(createCopilotSession('Session 1'), {
+					title: 'Session 1',
+					savedAt: '2026-05-17T18:00:00.000Z',
+					vscodeVersion: '1.115.0',
+				}),
+			);
+			const workspaceSessions = await listSessionsAcrossWorkspaceFolders([workspaceFolder]);
+			const savedSession = workspaceSessions[0];
+			assert.ok(savedSession);
 
-		assert.equal(openedPrompt, 'ANALYZE HANDOFF');
+			await runAnalyzeSavedChatsCommand('', {
+				getWorkspaceFolders: () => [workspaceFolder],
+				listSessionsAcrossWorkspaceFolders: async () => workspaceSessions,
+				resolveSelection: async () => ({
+					mode: 'needsAnalysis',
+					label: 'Needs Analysis',
+					range: null,
+					onlyUnanalyzed: true,
+				}),
+				selectChatModels: async () => [],
+				getAppName: () => 'Cursor',
+				openChat: async (prompt: string) => {
+					openedPrompt = prompt;
+				},
+				runAnalyzeFlow: async () => {
+					throw new Error('runAnalyzeFlow should not be called without a model.');
+				},
+				withProgress: async (_options, task) => task({ report: () => undefined }, new vscode.CancellationTokenSource().token),
+				openTextDocument: async (uri: vscode.Uri) => ({ uri } as vscode.TextDocument),
+				showTextDocument: async (_document: vscode.TextDocument) => ({}) as vscode.TextEditor,
+				showInformationMessage: async (message: string) => {
+					infoMessages.push(message);
+					return undefined;
+				},
+				showWarningMessage: async (message: string) => {
+					warningMessages.push(message);
+					return undefined;
+				},
+			});
+
+			assert.equal(typeof openedPrompt, 'string');
+			const prompt = openedPrompt ?? '';
+			assert.equal(prompt.includes('This handoff runs inside the target repository workspace, not inside the Session Control source repository.'), true);
+			assert.equal(prompt.includes('Do not search the target repository for Session Control implementation files'), true);
+			assert.equal(prompt.includes(`Owner workspace for persisted output: ${workspaceFolder.name}`), true);
+			assert.equal(prompt.includes('".chat/analysis/reports"'), true);
+			assert.equal(prompt.includes('".chat/analysis/index.json"'), true);
+			assert.equal(prompt.includes(`.chat/${savedSession.fileName}`), true);
+			assert.equal(prompt.includes(savedSession.title), true);
+			assert.equal(prompt.includes(`Use report prompt version \`${ANALYSIS_PROMPT_VERSION}\``), true);
+			assert.equal(prompt.includes('"analyzedSessions": ['), true);
+			assert.equal(prompt.includes('A `savedAt` change by itself must not change the fingerprint.'), true);
+			assert.equal(prompt.includes('src/sessionAnalysis.ts'), false);
+			assert.equal(prompt.includes('src/analysisStore.ts'), false);
+			assert.equal(prompt.includes('.github/instructions/saved-chat-analysis.instructions.md'), false);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+
 		assert.deepEqual(infoMessages, [
 			'Cursor does not currently expose extension-callable chat models, so Session Control opened chat with an analysis handoff prompt. Send it in chat to continue.',
 		]);

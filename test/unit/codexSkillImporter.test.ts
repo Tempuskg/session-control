@@ -101,4 +101,41 @@ suite('codexSkillImporter', () => {
 			await fs.rm(workspaceRoot, { recursive: true, force: true });
 		}
 	});
+
+	test('skips unreadable workspace directories during guidance discovery', async () => {
+		const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-codex-skill-importer-'));
+		const blockedDirectory = path.join(workspaceRoot, '.tmp_pytest', 'pytest-adjacent');
+		const importer = createCodexSkillImporter({
+			readDir: async (directoryPath) => {
+				if (directoryPath === blockedDirectory) {
+					throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
+				}
+
+				const entries = await fs.readdir(directoryPath, { withFileTypes: true });
+				return entries.map((entry) => ({
+					name: entry.name,
+					isDirectory: entry.isDirectory(),
+					isFile: entry.isFile(),
+				}));
+			},
+		});
+
+		try {
+			await fs.mkdir(path.join(workspaceRoot, '.github'), { recursive: true });
+			await fs.mkdir(blockedDirectory, { recursive: true });
+			await fs.writeFile(
+				path.join(workspaceRoot, '.github', 'copilot-instructions.md'),
+				'# Copilot\nUse the local test workflow.\n',
+				'utf8',
+			);
+
+			const discovered = await importer.discoverSourceFiles(workspaceRoot);
+
+			assert.deepEqual(discovered.map((filePath) => path.relative(workspaceRoot, filePath).replace(/\\/g, '/')), [
+				'.github/copilot-instructions.md',
+			]);
+		} finally {
+			await fs.rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
 });

@@ -20,6 +20,10 @@ suite('cursorAgentTranscriptReader', () => {
 	test('deriveCursorProjectSlug maps Windows workspace paths to Cursor project slugs', () => {
 		assert.equal(deriveCursorProjectSlug('E:\\chat-commit'), 'e-chat-commit');
 		assert.equal(deriveCursorProjectSlug('e:/chat-commit'), 'e-chat-commit');
+		assert.equal(
+			deriveCursorProjectSlug('E:\\Source\\Workspaces\\DogsDen\\Online\\DogsDen.Online'),
+			'e-Source-Workspaces-DogsDen-Online-DogsDen-Online',
+		);
 	});
 
 	test('getDefaultCursorProjectsPath points at ~/.cursor/projects', () => {

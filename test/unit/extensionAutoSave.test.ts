@@ -53,6 +53,7 @@ suite('extension auto-save on chat response', () => {
 					index: 0,
 				}),
 				getSaveProvider: () => 'copilot',
+				getAutoSaveProviders: () => ['copilot'],
 			},
 		);
 
@@ -79,6 +80,7 @@ suite('extension auto-save on chat response', () => {
 					index: 0,
 				}),
 				getSaveProvider: () => 'copilot',
+				getAutoSaveProviders: () => ['copilot'],
 				getCursorProjectsPath: () => 'C:/Users/test/.cursor/projects',
 				readCopilotSessions: async () => [{
 					provider: 'copilot',
@@ -138,6 +140,7 @@ suite('extension auto-save on chat response', () => {
 					index: 0,
 				}),
 				getSaveProvider: () => 'copilot',
+				getAutoSaveProviders: () => ['copilot'],
 				getCursorProjectsPath: () => 'C:/Users/test/.cursor/projects',
 				readCopilotSessions: async () => [{
 					provider: 'copilot',
@@ -195,6 +198,7 @@ suite('extension auto-save on chat response', () => {
 					index: 0,
 				}),
 				getSaveProvider: () => 'copilot',
+				getAutoSaveProviders: () => ['copilot'],
 				getCursorProjectsPath: () => 'C:/Users/test/.cursor/projects',
 				readCopilotSessions: async () => [{
 					provider: 'copilot',
@@ -265,6 +269,7 @@ suite('extension auto-save on chat response', () => {
 					index: 0,
 				}),
 				getSaveProvider: () => 'copilot',
+				getAutoSaveProviders: () => ['copilot'],
 				getCursorProjectsPath: () => 'C:/Users/test/.cursor/projects',
 				readCopilotSessions: async () => {
 					throw new Error('read failed');
@@ -319,6 +324,7 @@ suite('extension auto-save on chat response', () => {
 					index: 0,
 				}),
 				getSaveProvider: () => 'cursor',
+				getAutoSaveProviders: () => ['cursor'],
 				getCursorProjectsPath: () => 'C:/Users/test/.cursor/projects',
 				readCopilotSessions: async () => [],
 				readCursorSessions: async () => [{
@@ -358,5 +364,155 @@ suite('extension auto-save on chat response', () => {
 		assert.equal(saveCalls.length, 1);
 		assert.equal(saveCalls[0]?.workspaceFolder.name, 'chat-commit');
 		assert.equal(outputLines.some((line) => line.includes('Implement Cursor auto-save')), true);
+	});
+
+	test('triggers save when Codex session transcript changes', async () => {
+		const watcher = createFakeWatcher();
+		const scheduledCallbacks: Array<() => void> = [];
+		const saveCalls: Array<{ workspaceFolder: vscode.WorkspaceFolder; storageDirectory: string }> = [];
+		const watchedTargets: Array<{ directory: string; glob: string }> = [];
+		const outputLines: string[] = [];
+		const subscriptions: vscode.Disposable[] = [];
+
+		registerAutoSaveOnChatResponseListener(
+			{ subscriptions } as unknown as vscode.ExtensionContext,
+			{ appendLine: (value: string) => outputLines.push(value) } as unknown as vscode.OutputChannel,
+			{
+				getStorageUri: () => ({ fsPath: 'e:/storage/workspace-id' }),
+				createWatcher: (directory: string, glob: string) => {
+					watchedTargets.push({ directory, glob });
+					return watcher;
+				},
+				getImplicitWorkspaceFolder: () => ({
+					uri: vscode.Uri.file('e:/chat-commit'),
+					name: 'chat-commit',
+					index: 0,
+				}),
+				getSaveProvider: () => 'codex',
+				getAutoSaveProviders: () => ['codex'],
+				getCodexHomePath: () => 'C:/Users/test/.codex',
+				getCursorProjectsPath: () => 'C:/Users/test/.cursor/projects',
+				readCopilotSessions: async () => [],
+				readCodexSessions: async () => [{
+					provider: 'codex',
+					id: 'codex-session-1',
+					title: 'Implement Codex auto-save',
+					lastMessageDate: new Date().toISOString(),
+					turns: [
+						{ type: 'request', participant: 'user', prompt: 'implement codex autosave', references: [], timestamp: new Date().toISOString() },
+						{ type: 'response', participant: 'codex', content: 'working on it', toolCalls: [], timestamp: new Date().toISOString() },
+					],
+					sourceFile: 'codex-session-1',
+					cwd: 'E:/chat-commit',
+				}],
+				readCursorSessions: async () => [],
+				saveSessionSilently: async (workspaceFolder, storageDirectory) => {
+					saveCalls.push({ workspaceFolder, storageDirectory });
+					return 'codex-auto-save.json';
+				},
+				deleteOldAutoSave: async () => undefined,
+				showWarningMessage: async () => undefined,
+				schedule: (callback: () => void) => {
+					scheduledCallbacks.push(callback);
+					return callback as unknown as ReturnType<typeof setTimeout>;
+				},
+				clearSchedule: () => undefined,
+			},
+		);
+
+		assert.equal(watchedTargets.length, 1);
+		assert.equal(watchedTargets[0]?.directory.replace(/\\/g, '/'), 'C:/Users/test/.codex');
+		assert.equal(watchedTargets[0]?.glob, 'sessions/**/*.{json,jsonl}');
+
+		watcher.emitChange();
+		assert.equal(scheduledCallbacks.length, 1);
+
+		scheduledCallbacks[0]?.();
+		await drainAsyncWork();
+		assert.equal(saveCalls.length, 1);
+		assert.equal(saveCalls[0]?.workspaceFolder.name, 'chat-commit');
+		assert.equal(outputLines.some((line) => line.includes('Implement Codex auto-save')), true);
+	});
+
+	test('watches Copilot and Codex when no provider override is set', async () => {
+		const copilotWatcher = createFakeWatcher();
+		const codexWatcher = createFakeWatcher();
+		const scheduledCallbacks: Array<() => void> = [];
+		const saveCalls: Array<{ provider: string; title: string }> = [];
+		const watchedTargets: Array<{ directory: string; glob: string }> = [];
+		const subscriptions: vscode.Disposable[] = [];
+
+		registerAutoSaveOnChatResponseListener(
+			{ subscriptions } as unknown as vscode.ExtensionContext,
+			{ appendLine: () => undefined } as unknown as vscode.OutputChannel,
+			{
+				getStorageUri: () => ({ fsPath: 'e:/storage/workspace-id' }),
+				createWatcher: (directory: string, glob: string) => {
+					watchedTargets.push({ directory, glob });
+					return glob === '*.{json,jsonl}' ? copilotWatcher : codexWatcher;
+				},
+				getImplicitWorkspaceFolder: () => ({
+					uri: vscode.Uri.file('e:/chat-commit'),
+					name: 'chat-commit',
+					index: 0,
+				}),
+				getSaveProvider: () => 'copilot',
+				getAutoSaveProviders: () => ['copilot', 'codex'],
+				getCodexHomePath: () => 'C:/Users/test/.codex',
+				getCursorProjectsPath: () => 'C:/Users/test/.cursor/projects',
+				readCopilotSessions: async () => [{
+					provider: 'copilot',
+					id: 'copilot-session-1',
+					title: 'Copilot session',
+					lastMessageDate: new Date().toISOString(),
+					turns: [
+						{ type: 'request', participant: 'user', prompt: 'copilot prompt', references: [], timestamp: new Date().toISOString() },
+						{ type: 'response', participant: 'copilot', content: 'copilot response', toolCalls: [], timestamp: new Date().toISOString() },
+					],
+					sourceFile: 'copilot-session-1.jsonl',
+				}],
+				readCodexSessions: async () => [{
+					provider: 'codex',
+					id: 'codex-session-1',
+					title: 'Codex session',
+					lastMessageDate: new Date().toISOString(),
+					turns: [
+						{ type: 'request', participant: 'user', prompt: 'codex prompt', references: [], timestamp: new Date().toISOString() },
+						{ type: 'response', participant: 'codex', content: 'codex response', toolCalls: [], timestamp: new Date().toISOString() },
+					],
+					sourceFile: 'codex-session-1',
+					cwd: 'E:/chat-commit',
+				}],
+				readCursorSessions: async () => [],
+				saveSessionSilently: async (_workspaceFolder, _storageDirectory, provider, sessions) => {
+					saveCalls.push({ provider, title: sessions[0]?.title ?? '' });
+					return `${provider}-auto-save.json`;
+				},
+				deleteOldAutoSave: async () => undefined,
+				showWarningMessage: async () => undefined,
+				schedule: (callback: () => void) => {
+					scheduledCallbacks.push(callback);
+					return callback as unknown as ReturnType<typeof setTimeout>;
+				},
+				clearSchedule: () => undefined,
+			},
+		);
+
+		assert.equal(watchedTargets.length, 2);
+		assert.equal(watchedTargets[0]?.glob, '*.{json,jsonl}');
+		assert.equal(watchedTargets[1]?.glob, 'sessions/**/*.{json,jsonl}');
+
+		copilotWatcher.emitChange();
+		codexWatcher.emitChange();
+		assert.equal(scheduledCallbacks.length, 2);
+
+		scheduledCallbacks[0]?.();
+		scheduledCallbacks[1]?.();
+		await drainAsyncWork();
+
+		assert.deepEqual(saveCalls, [
+			{ provider: 'copilot', title: 'Copilot session' },
+			{ provider: 'codex', title: 'Codex session' },
+		]);
 	});
 });

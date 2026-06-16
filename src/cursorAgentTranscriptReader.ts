@@ -19,7 +19,7 @@ export function deriveCursorProjectSlug(workspaceFolderPath: string): string {
 	if (windowsMatch?.[1]) {
 		const drive = windowsMatch[1].toLowerCase();
 		const rest = (windowsMatch[2] ?? '')
-			.replace(/[/\\]+/g, '-')
+			.replace(/[./\\]+/g, '-')
 			.replace(/-+/g, '-')
 			.replace(/^-|-$/g, '');
 		return rest ? `${drive}-${rest}` : drive;

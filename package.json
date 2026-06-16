@@ -2,7 +2,7 @@
   "name": "session-control",
   "displayName": "Session Control",
   "description": "Save and resume GitHub Copilot, Cursor, and Codex chat sessions linked to git commits",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "publisher": "darrenjmcleod",
   "icon": "media/session-control.png",
   "license": "MIT",
@@ -129,11 +129,11 @@
             "codex"
           ],
           "enumDescriptions": [
-            "Save from VS Code Copilot chat storage. This remains the default and keeps existing workflows unchanged.",
-            "Import from local Codex session transcripts under CODEX_HOME or the configured Codex home path."
+            "Override host detection and save from VS Code Copilot chat storage.",
+            "Override host detection and import from local Codex session transcripts under CODEX_HOME or the configured Codex home path."
           ],
           "default": "copilot",
-          "description": "Explicit provider override used by Session Control: Save Current Chat Session. When unset, Session Control auto-detects Cursor and uses Cursor there; otherwise it defaults to Copilot.",
+          "description": "Explicit provider override used by Session Control: Save Current Chat Session. When unset, Session Control auto-detects Cursor or Codex based on the host app, and otherwise defaults to Copilot.",
           "scope": "resource"
         },
         "session-control.codex.homePath": {
@@ -157,7 +157,7 @@
         "session-control.autoSaveOnChatResponse": {
           "type": "boolean",
           "default": false,
-          "description": "Automatically save the active chat session after every Copilot chat response.",
+          "description": "Automatically save after each detected response or transcript update. When no provider override is set, Session Control watches both Copilot and Codex sources outside Cursor.",
           "scope": "resource"
         },
         "session-control.includeInGitignore": {

@@ -35,6 +35,13 @@ const EXCLUDED_DIRECTORIES = new Set([
 	'node_modules',
 ]);
 
+const SKIPPABLE_READ_DIRECTORY_ERROR_CODES = new Set([
+	'EACCES',
+	'ENOENT',
+	'ENOTDIR',
+	'EPERM',
+]);
+
 function createDefaultDeps(): CodexSkillImporterDeps {
 	return {
 		readDir: async (directoryPath: string) => {
@@ -84,6 +91,29 @@ function stripLeadingFrontmatter(content: string): string {
 
 function isGuidanceFileName(fileName: string): boolean {
 	return /(?:\.instructions|\.prompt|\.agent)\.md$/i.test(fileName) || /^SKILL\.md$/i.test(fileName);
+}
+
+function isSkippableReadDirectoryError(error: unknown): boolean {
+	return typeof error === 'object'
+		&& error !== null
+		&& 'code' in error
+		&& typeof error.code === 'string'
+		&& SKIPPABLE_READ_DIRECTORY_ERROR_CODES.has(error.code);
+}
+
+async function readDirectoryEntries(
+	directoryPath: string,
+	deps: CodexSkillImporterDeps,
+): Promise<DirectoryEntry[]> {
+	try {
+		return await deps.readDir(directoryPath);
+	} catch (error: unknown) {
+		if (isSkippableReadDirectoryError(error)) {
+			return [];
+		}
+
+		throw error;
+	}
 }
 
 function isInstructionsFileName(fileName: string): boolean {
@@ -142,7 +172,7 @@ async function collectMatchingFiles(
 		return;
 	}
 
-	const entries = await deps.readDir(directoryPath);
+	const entries = await readDirectoryEntries(directoryPath, deps);
 	for (const entry of entries) {
 		const absolutePath = path.join(directoryPath, entry.name);
 		if (entry.isDirectory) {
@@ -161,7 +191,7 @@ async function collectWorkspaceGuidanceFiles(
 	deps: CodexSkillImporterDeps,
 	results: Set<string>,
 ): Promise<void> {
-	const entries = await deps.readDir(directoryPath);
+	const entries = await readDirectoryEntries(directoryPath, deps);
 	for (const entry of entries) {
 		if (EXCLUDED_DIRECTORIES.has(entry.name)) {
 			continue;
