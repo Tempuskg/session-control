@@ -58,7 +58,7 @@ suite('extension auto-save on chat response', () => {
 		);
 
 		assert.equal(result, undefined);
-		assert.equal(outputLines.some((line) => line.includes('No workspace storage')), true);
+		assert.equal(outputLines.some((line) => line.includes('No watch targets available for providers copilot.')), true);
 	});
 
 	test('triggers save when chatSessions file changes and turn count increases', async () => {
