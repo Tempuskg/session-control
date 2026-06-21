@@ -80,12 +80,38 @@ jobs:
       - name: Publish to VS Code Marketplace
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx @vscode/vsce publish --packagePath "${{ steps.package.outputs.vsix_path }}"
+        shell: bash
+        run: |
+          set +e
+          publish_output="$(npx @vscode/vsce publish --packagePath "${{ steps.package.outputs.vsix_path }}" 2>&1)"
+          publish_status=$?
+          set -e
+          printf '%s\n' "$publish_output"
+          if [ "$publish_status" -ne 0 ]; then
+            if printf '%s' "$publish_output" | grep -qi 'already exists'; then
+              echo 'VS Code Marketplace already has this version; continuing.'
+            else
+              exit "$publish_status"
+            fi
+          fi
 
       - name: Publish to Open VSX
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
-        run: npx ovsx publish "${{ steps.package.outputs.vsix_path }}" -p "$OVSX_PAT"
+        shell: bash
+        run: |
+          set +e
+          publish_output="$(npx ovsx publish "${{ steps.package.outputs.vsix_path }}" -p "$OVSX_PAT" 2>&1)"
+          publish_status=$?
+          set -e
+          printf '%s\n' "$publish_output"
+          if [ "$publish_status" -ne 0 ]; then
+            if printf '%s' "$publish_output" | grep -qi 'already exists'; then
+              echo 'Open VSX already has this version; continuing.'
+            else
+              exit "$publish_status"
+            fi
+          fi
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
