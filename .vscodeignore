@@ -1,11 +1,17 @@
 **/.git/**
 **/.github/**
 **/.vscode/**
+**/.vscode-test/**
+**/.agents/**
+**/.cursor/**
+**/.claude/**
 **/src/**
 **/test/**
 **/dist-test/**
 **/*.map
+*.vsix
 .vscodeignore
+.gitignore
 webpack.config.js
 eslint.config.mjs
 tsconfig.json
@@ -14,6 +20,8 @@ tsconfig.test.json
 # Project documentation / planning not required at runtime
 AGENTS.md
 PLAN.md
+CHAT_ANALYSIS_PLAN.md
+Monetization*.md
 raw/**
 wiki/**
 

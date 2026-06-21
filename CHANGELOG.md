@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-20
+
+### Added
+- Added Claude Code session import support from local JSONL transcripts under `CLAUDE_CONFIG_DIR/projects/<project-slug>` or `~/.claude/projects/<project-slug>`, including manual provider saves, workspace-filtered auto-save, and the `claude-code` provider setting.
+- Added `Session Control: Import Copilot Guidance as Claude Code Skills` to convert repository guidance into `.claude/skills/`.
+
 ## [1.2.1] - 2026-06-14
 
 ### Added

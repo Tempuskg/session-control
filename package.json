@@ -1,8 +1,8 @@
 {
   "name": "session-control",
   "displayName": "Session Control",
-  "description": "Save and resume GitHub Copilot, Cursor, and Codex chat sessions linked to git commits",
-  "version": "1.2.1",
+  "description": "Save and resume GitHub Copilot, Cursor, Codex, and Claude Code chat sessions linked to git commits",
+  "version": "1.3.0",
   "publisher": "darrenjmcleod",
   "icon": "media/session-control.png",
   "license": "MIT",
@@ -25,6 +25,8 @@
     "copilot",
     "cursor",
     "codex",
+    "claude-code",
+    "claude",
     "chat",
     "git",
     "session",
@@ -102,6 +104,11 @@
         "category": "Session Control"
       },
       {
+        "command": "session-control.importCopilotSkillsToClaudeCode",
+        "title": "Session Control: Import Copilot Guidance as Claude Code Skills",
+        "category": "Session Control"
+      },
+      {
         "command": "session-control.deleteSessionFromExplorer",
         "title": "Delete Saved Session",
         "category": "Session Control",
@@ -126,20 +133,30 @@
           "type": "string",
           "enum": [
             "copilot",
-            "codex"
+            "codex",
+            "cursor",
+            "claude-code"
           ],
           "enumDescriptions": [
             "Override host detection and save from VS Code Copilot chat storage.",
-            "Override host detection and import from local Codex session transcripts under CODEX_HOME or the configured Codex home path."
+            "Override host detection and import from local Codex session transcripts under CODEX_HOME or the configured Codex home path.",
+            "Override host detection and import from Cursor Agent transcript JSONL files.",
+            "Override host detection and import from local Claude Code JSONL transcripts under CLAUDE_CONFIG_DIR or the configured Claude Code home path."
           ],
           "default": "copilot",
-          "description": "Explicit provider override used by Session Control: Save Current Chat Session. When unset, Session Control auto-detects Cursor or Codex based on the host app, and otherwise defaults to Copilot.",
+          "description": "Explicit provider override used by Session Control: Save Current Chat Session. When unset, Session Control auto-detects Cursor, Codex, or Claude Code based on the host app, and otherwise defaults to Copilot.",
           "scope": "resource"
         },
         "session-control.codex.homePath": {
           "type": "string",
           "default": "",
           "description": "Optional Codex home directory for importing local Codex sessions. When empty, Session Control uses CODEX_HOME or ~/.codex.",
+          "scope": "resource"
+        },
+        "session-control.claudeCode.homePath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional Claude Code home directory for importing local Claude Code sessions. When empty, Session Control uses CLAUDE_CONFIG_DIR or ~/.claude.",
           "scope": "resource"
         },
         "session-control.cursor.userDataPath": {
@@ -157,7 +174,7 @@
         "session-control.autoSaveOnChatResponse": {
           "type": "boolean",
           "default": false,
-          "description": "Automatically save after each detected response or transcript update. When no provider override is set, Session Control watches both Copilot and Codex sources outside Cursor.",
+          "description": "Automatically save after each detected response or transcript update. When no provider override is set, Session Control watches Copilot, Codex, and Claude Code sources outside Cursor.",
           "scope": "resource"
         },
         "session-control.includeInGitignore": {
@@ -321,6 +338,9 @@
         },
         {
           "command": "session-control.importCopilotSkillsToCodex"
+        },
+        {
+          "command": "session-control.importCopilotSkillsToClaudeCode"
         },
         {
           "command": "session-control.toggleAutoSave"

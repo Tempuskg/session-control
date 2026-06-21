@@ -29,7 +29,12 @@ export interface CodexSkillImportOptions {
 const EXCLUDED_DIRECTORIES = new Set([
 	'.agents',
 	'.chat',
+	'.claude',
+	'.codex',
+	'.cursor',
 	'.git',
+	'.vscode',
+	'.vscode-test',
 	'dist',
 	'dist-test',
 	'node_modules',

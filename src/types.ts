@@ -4,7 +4,7 @@ export interface GitContext {
 	dirty: boolean;
 }
 
-export type SessionProviderId = 'copilot' | 'codex' | 'cursor';
+export type SessionProviderId = 'copilot' | 'codex' | 'cursor' | 'claude-code';
 
 export interface ToolCall {
 	name: string;
@@ -157,7 +157,7 @@ function isIsoTimestamp(value: unknown): value is string {
 }
 
 export function isSessionProviderId(value: unknown): value is SessionProviderId {
-	return value === 'copilot' || value === 'codex' || value === 'cursor';
+	return value === 'copilot' || value === 'codex' || value === 'cursor' || value === 'claude-code';
 }
 
 export function isGitContext(value: unknown): value is GitContext {

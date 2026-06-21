@@ -434,9 +434,80 @@ suite('extension auto-save on chat response', () => {
 		assert.equal(outputLines.some((line) => line.includes('Implement Codex auto-save')), true);
 	});
 
-	test('watches Copilot and Codex when no provider override is set', async () => {
+	test('triggers save when Claude Code session transcript changes', async () => {
+		const watcher = createFakeWatcher();
+		const scheduledCallbacks: Array<() => void> = [];
+		const saveCalls: Array<{ workspaceFolder: vscode.WorkspaceFolder; storageDirectory: string }> = [];
+		const watchedTargets: Array<{ directory: string; glob: string }> = [];
+		const outputLines: string[] = [];
+		const subscriptions: vscode.Disposable[] = [];
+
+		registerAutoSaveOnChatResponseListener(
+			{ subscriptions } as unknown as vscode.ExtensionContext,
+			{ appendLine: (value: string) => outputLines.push(value) } as unknown as vscode.OutputChannel,
+			{
+				getStorageUri: () => ({ fsPath: 'e:/storage/workspace-id' }),
+				createWatcher: (directory: string, glob: string) => {
+					watchedTargets.push({ directory, glob });
+					return watcher;
+				},
+				getImplicitWorkspaceFolder: () => ({
+					uri: vscode.Uri.file('e:/chat-commit'),
+					name: 'chat-commit',
+					index: 0,
+				}),
+				getSaveProvider: () => 'claude-code',
+				getAutoSaveProviders: () => ['claude-code'],
+				getCodexHomePath: () => 'C:/Users/test/.codex',
+				getClaudeCodeHomePath: () => 'C:/Users/test/.claude',
+				getCursorProjectsPath: () => 'C:/Users/test/.cursor/projects',
+				readCopilotSessions: async () => [],
+				readCodexSessions: async () => [],
+				readClaudeCodeSessions: async () => [{
+					provider: 'claude-code',
+					id: 'claude-session-1',
+					title: 'Implement Claude Code auto-save',
+					lastMessageDate: new Date().toISOString(),
+					turns: [
+						{ type: 'request', participant: 'user', prompt: 'implement claude autosave', references: [], timestamp: new Date().toISOString() },
+						{ type: 'response', participant: 'claude-code', content: 'working on it', toolCalls: [], timestamp: new Date().toISOString() },
+					],
+					sourceFile: 'claude-session-1',
+					cwd: 'E:/chat-commit',
+				}],
+				readCursorSessions: async () => [],
+				saveSessionSilently: async (workspaceFolder, storageDirectory) => {
+					saveCalls.push({ workspaceFolder, storageDirectory });
+					return 'claude-auto-save.json';
+				},
+				deleteOldAutoSave: async () => undefined,
+				showWarningMessage: async () => undefined,
+				schedule: (callback: () => void) => {
+					scheduledCallbacks.push(callback);
+					return callback as unknown as ReturnType<typeof setTimeout>;
+				},
+				clearSchedule: () => undefined,
+			},
+		);
+
+		assert.equal(watchedTargets.length, 1);
+		assert.equal(watchedTargets[0]?.directory.replace(/\\/g, '/'), 'C:/Users/test/.claude/projects/e-chat-commit');
+		assert.equal(watchedTargets[0]?.glob, '*.jsonl');
+
+		watcher.emitChange();
+		assert.equal(scheduledCallbacks.length, 1);
+
+		scheduledCallbacks[0]?.();
+		await drainAsyncWork();
+		assert.equal(saveCalls.length, 1);
+		assert.equal(saveCalls[0]?.workspaceFolder.name, 'chat-commit');
+		assert.equal(outputLines.some((line) => line.includes('Implement Claude Code auto-save')), true);
+	});
+
+	test('watches Copilot, Codex, and Claude Code when no provider override is set', async () => {
 		const copilotWatcher = createFakeWatcher();
 		const codexWatcher = createFakeWatcher();
+		const claudeWatcher = createFakeWatcher();
 		const scheduledCallbacks: Array<() => void> = [];
 		const saveCalls: Array<{ provider: string; title: string }> = [];
 		const watchedTargets: Array<{ directory: string; glob: string }> = [];
@@ -449,7 +520,10 @@ suite('extension auto-save on chat response', () => {
 				getStorageUri: () => ({ fsPath: 'e:/storage/workspace-id' }),
 				createWatcher: (directory: string, glob: string) => {
 					watchedTargets.push({ directory, glob });
-					return glob === '*.{json,jsonl}' ? copilotWatcher : codexWatcher;
+					if (glob === '*.{json,jsonl}') {
+						return copilotWatcher;
+					}
+					return glob === '*.jsonl' ? claudeWatcher : codexWatcher;
 				},
 				getImplicitWorkspaceFolder: () => ({
 					uri: vscode.Uri.file('e:/chat-commit'),
@@ -457,8 +531,9 @@ suite('extension auto-save on chat response', () => {
 					index: 0,
 				}),
 				getSaveProvider: () => 'copilot',
-				getAutoSaveProviders: () => ['copilot', 'codex'],
+				getAutoSaveProviders: () => ['copilot', 'codex', 'claude-code'],
 				getCodexHomePath: () => 'C:/Users/test/.codex',
+				getClaudeCodeHomePath: () => 'C:/Users/test/.claude',
 				getCursorProjectsPath: () => 'C:/Users/test/.cursor/projects',
 				readCopilotSessions: async () => [{
 					provider: 'copilot',
@@ -483,6 +558,18 @@ suite('extension auto-save on chat response', () => {
 					sourceFile: 'codex-session-1',
 					cwd: 'E:/chat-commit',
 				}],
+				readClaudeCodeSessions: async () => [{
+					provider: 'claude-code',
+					id: 'claude-session-1',
+					title: 'Claude Code session',
+					lastMessageDate: new Date().toISOString(),
+					turns: [
+						{ type: 'request', participant: 'user', prompt: 'claude prompt', references: [], timestamp: new Date().toISOString() },
+						{ type: 'response', participant: 'claude-code', content: 'claude response', toolCalls: [], timestamp: new Date().toISOString() },
+					],
+					sourceFile: 'claude-session-1',
+					cwd: 'E:/chat-commit',
+				}],
 				readCursorSessions: async () => [],
 				saveSessionSilently: async (_workspaceFolder, _storageDirectory, provider, sessions) => {
 					saveCalls.push({ provider, title: sessions[0]?.title ?? '' });
@@ -498,21 +585,25 @@ suite('extension auto-save on chat response', () => {
 			},
 		);
 
-		assert.equal(watchedTargets.length, 2);
+		assert.equal(watchedTargets.length, 3);
 		assert.equal(watchedTargets[0]?.glob, '*.{json,jsonl}');
 		assert.equal(watchedTargets[1]?.glob, 'sessions/**/*.{json,jsonl}');
+		assert.equal(watchedTargets[2]?.glob, '*.jsonl');
 
 		copilotWatcher.emitChange();
 		codexWatcher.emitChange();
-		assert.equal(scheduledCallbacks.length, 2);
+		claudeWatcher.emitChange();
+		assert.equal(scheduledCallbacks.length, 3);
 
 		scheduledCallbacks[0]?.();
 		scheduledCallbacks[1]?.();
+		scheduledCallbacks[2]?.();
 		await drainAsyncWork();
 
 		assert.deepEqual(saveCalls, [
 			{ provider: 'copilot', title: 'Copilot session' },
 			{ provider: 'codex', title: 'Codex session' },
+			{ provider: 'claude-code', title: 'Claude Code session' },
 		]);
 	});
 });

@@ -783,6 +783,10 @@ function turnsToContextBlock(turns: SavedTurn[]): string {
 			return 'Cursor';
 		}
 
+		if (/^claude-code$/i.test(participant)) {
+			return 'Claude Code';
+		}
+
 		return participant.trim() || 'Assistant';
 	};
 

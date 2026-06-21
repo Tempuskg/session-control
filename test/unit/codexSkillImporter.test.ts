@@ -102,6 +102,60 @@ suite('codexSkillImporter', () => {
 		}
 	});
 
+	test('imports guidance into project-scoped Claude Code skills when requested', async () => {
+		const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-claude-skill-importer-'));
+		const importer = createCodexSkillImporter();
+
+		try {
+			await fs.mkdir(path.join(workspaceRoot, '.github'), { recursive: true });
+			await fs.mkdir(path.join(workspaceRoot, '.claude', 'skills', 'existing'), { recursive: true });
+			await fs.mkdir(path.join(workspaceRoot, '.cursor', 'skills', 'existing'), { recursive: true });
+			await fs.mkdir(path.join(workspaceRoot, '.vscode-test', 'download-cache'), { recursive: true });
+			await fs.writeFile(
+				path.join(workspaceRoot, '.github', 'copilot-instructions.md'),
+				'# Copilot\nPreserve repository-specific guidance.\n',
+				'utf8',
+			);
+			await fs.writeFile(
+				path.join(workspaceRoot, '.claude', 'skills', 'existing', 'SKILL.md'),
+				'Generated Claude skill should not be rediscovered.\n',
+				'utf8',
+			);
+			await fs.writeFile(
+				path.join(workspaceRoot, '.cursor', 'skills', 'existing', 'SKILL.md'),
+				'Generated Cursor skill should not be rediscovered.\n',
+				'utf8',
+			);
+			await fs.writeFile(
+				path.join(workspaceRoot, '.vscode-test', 'download-cache', 'SKILL.md'),
+				'Downloaded test cache should not be rediscovered.\n',
+				'utf8',
+			);
+
+			const discovered = await importer.discoverSourceFiles(workspaceRoot);
+			assert.deepEqual(discovered.map((filePath) => path.relative(workspaceRoot, filePath).replace(/\\/g, '/')), [
+				'.github/copilot-instructions.md',
+			]);
+
+			const result = await importer.importSkills(workspaceRoot, {
+				skillDirectorySegments: ['.claude', 'skills'],
+			});
+			assert.deepEqual(result.created, [
+				'.claude/skills/github-copilot-instructions/SKILL.md',
+			]);
+			assert.deepEqual(result.skipped, []);
+
+			const createdSkill = await fs.readFile(
+				path.join(workspaceRoot, '.claude', 'skills', 'github-copilot-instructions', 'SKILL.md'),
+				'utf8',
+			);
+			assert.equal(createdSkill.includes('name: github-copilot-instructions'), true);
+			assert.equal(createdSkill.includes('Preserve repository-specific guidance.'), true);
+		} finally {
+			await fs.rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
 	test('skips unreadable workspace directories during guidance discovery', async () => {
 		const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-codex-skill-importer-'));
 		const blockedDirectory = path.join(workspaceRoot, '.tmp_pytest', 'pytest-adjacent');

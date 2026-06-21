@@ -13,6 +13,7 @@ suite('types guards', () => {
 		assert.equal(isSessionProviderId('copilot'), true);
 		assert.equal(isSessionProviderId('codex'), true);
 		assert.equal(isSessionProviderId('cursor'), true);
+		assert.equal(isSessionProviderId('claude-code'), true);
 		assert.equal(isSessionProviderId('unknown'), false);
 	});
 

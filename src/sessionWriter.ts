@@ -57,6 +57,10 @@ function formatAssistantLabel(participant: string): string {
 		return 'Cursor';
 	}
 
+	if (/^claude-code$/i.test(normalized)) {
+		return 'Claude Code';
+	}
+
 	return normalized
 		.split(/\s+/)
 		.map((segment) => segment ? `${segment.charAt(0).toUpperCase()}${segment.slice(1)}` : segment)

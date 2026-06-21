@@ -108,22 +108,27 @@ suite('extension phase 10', () => {
 		assert.equal(resolveImplicitSaveProviderForHost('Cursor Nightly'), 'cursor');
 		assert.equal(resolveImplicitSaveProviderForHost('Codex'), 'codex');
 		assert.equal(resolveImplicitSaveProviderForHost('OpenAI Codex'), 'codex');
+		assert.equal(resolveImplicitSaveProviderForHost('Claude Code'), 'claude-code');
 		assert.equal(resolveImplicitSaveProviderForHost('Visual Studio Code'), 'copilot');
 	});
 
 	test('resolveSaveProviderForHost prefers explicit provider overrides', () => {
 		assert.equal(resolveSaveProviderForHost('copilot', 'Cursor'), 'copilot');
 		assert.equal(resolveSaveProviderForHost('codex', 'Cursor'), 'codex');
+		assert.equal(resolveSaveProviderForHost('claude-code', 'Cursor'), 'claude-code');
 		assert.equal(resolveSaveProviderForHost(undefined, 'Cursor'), 'cursor');
 		assert.equal(resolveSaveProviderForHost(undefined, 'Codex'), 'codex');
+		assert.equal(resolveSaveProviderForHost(undefined, 'Claude Code'), 'claude-code');
 		assert.equal(resolveSaveProviderForHost(undefined, 'Visual Studio Code'), 'copilot');
 	});
 
-	test('resolveAutoSaveProvidersForHost watches Copilot and Codex unless explicitly overridden', () => {
+	test('resolveAutoSaveProvidersForHost watches Copilot, Codex, and Claude Code unless explicitly overridden', () => {
 		assert.deepEqual(resolveAutoSaveProvidersForHost('copilot', 'Visual Studio Code'), ['copilot']);
 		assert.deepEqual(resolveAutoSaveProvidersForHost('codex', 'Visual Studio Code'), ['codex']);
-		assert.deepEqual(resolveAutoSaveProvidersForHost(undefined, 'Visual Studio Code'), ['copilot', 'codex']);
-		assert.deepEqual(resolveAutoSaveProvidersForHost(undefined, 'OpenAI Codex'), ['copilot', 'codex']);
+		assert.deepEqual(resolveAutoSaveProvidersForHost('claude-code', 'Visual Studio Code'), ['claude-code']);
+		assert.deepEqual(resolveAutoSaveProvidersForHost(undefined, 'Visual Studio Code'), ['copilot', 'codex', 'claude-code']);
+		assert.deepEqual(resolveAutoSaveProvidersForHost(undefined, 'OpenAI Codex'), ['copilot', 'codex', 'claude-code']);
+		assert.deepEqual(resolveAutoSaveProvidersForHost(undefined, 'Claude Code'), ['copilot', 'codex', 'claude-code']);
 		assert.deepEqual(resolveAutoSaveProvidersForHost(undefined, 'Cursor'), ['cursor']);
 	});
 

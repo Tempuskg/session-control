@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { buildAnalysisPersistenceContract, createAnalysisStore } from './analysisStore';
 import { createAnalysisCandidates, createAnalyzeSessionsFlowDeps, registerChatParticipant, resolveAnalysisSelection, runAnalyzeSessionsFlow } from './chatParticipant';
+import { createClaudeCodeSessionReader, deriveClaudeCodeProjectSlug, deriveClaudeCodeProjectsPath, readClaudeCodeSessions } from './claudeCodeSessionReader';
 import { deriveCursorProjectSlug } from './cursorAgentTranscriptReader';
 import { createCursorSessionReader, getDefaultCursorProjectsPath, getDefaultCursorUserDataPath, readCursorSessions } from './cursorSessionReader';
 import { createCodexSkillImporter } from './codexSkillImporter';
@@ -41,12 +42,13 @@ function pathsOverlap(leftPath: string, rightPath: string): boolean {
 	return isSameOrDescendantPath(left, right) || isSameOrDescendantPath(right, left);
 }
 
-function filterCodexSessionsForWorkspace(
+function filterSessionsForWorkspace(
 	sessions: SourceChatSession[],
 	workspaceFolder: vscode.WorkspaceFolder,
+	provider: SessionProviderId,
 ): SourceChatSession[] {
 	const matches = sessions.filter(
-		(session) => session.provider === 'codex'
+		(session) => session.provider === provider
 			&& typeof session.cwd === 'string'
 			&& session.cwd.length > 0
 			&& pathsOverlap(session.cwd, workspaceFolder.uri.fsPath),
@@ -89,7 +91,7 @@ interface LatestAnalysisReportTarget {
 }
 
 interface ImportCopilotGuidanceCommandOptions {
-	skillLabel: 'Codex' | 'Cursor';
+	skillLabel: 'Codex' | 'Cursor' | 'Claude Code';
 	targetDirectory: string;
 	skillDirectorySegments?: readonly string[];
 }
@@ -148,9 +150,11 @@ interface AutoSaveOnChatResponseDeps {
 	getSaveProvider: (workspaceFolder: vscode.WorkspaceFolder) => SessionProviderId;
 	getAutoSaveProviders: (workspaceFolder: vscode.WorkspaceFolder) => SessionProviderId[];
 	getCodexHomePath: (workspaceFolder: vscode.WorkspaceFolder) => string;
+	getClaudeCodeHomePath: (workspaceFolder: vscode.WorkspaceFolder) => string;
 	getCursorProjectsPath: (workspaceFolder: vscode.WorkspaceFolder) => string;
 	readCopilotSessions: () => Promise<CopilotSession[]>;
 	readCodexSessions: (workspaceFolder: vscode.WorkspaceFolder) => Promise<SourceChatSession[]>;
+	readClaudeCodeSessions: (workspaceFolder: vscode.WorkspaceFolder) => Promise<SourceChatSession[]>;
 	readCursorSessions: (workspaceFolder: vscode.WorkspaceFolder) => Promise<SourceChatSession[]>;
 	saveSessionSilently: (
 		workspaceFolder: vscode.WorkspaceFolder,
@@ -345,6 +349,8 @@ function getProviderLabel(provider: SessionProviderId): string {
 			return 'Codex';
 		case 'cursor':
 			return 'Cursor';
+		case 'claude-code':
+			return 'Claude Code';
 		default:
 			return 'Copilot';
 	}
@@ -357,6 +363,10 @@ export function resolveImplicitSaveProviderForHost(appName: string): SessionProv
 
 	if (/codex/i.test(appName)) {
 		return 'codex';
+	}
+
+	if (/claude/i.test(appName)) {
+		return 'claude-code';
 	}
 
 	return 'copilot';
@@ -386,7 +396,7 @@ export function resolveAutoSaveProvidersForHost(
 		return ['cursor'];
 	}
 
-	return ['copilot', 'codex'];
+	return ['copilot', 'codex', 'claude-code'];
 }
 
 function getConfiguredSaveProvider(workspaceFolder: vscode.WorkspaceFolder): SessionProviderId | undefined {
@@ -434,6 +444,24 @@ function getCodexHomePath(workspaceFolder: vscode.WorkspaceFolder): string {
 	}
 
 	return path.join(os.homedir(), '.codex');
+}
+
+function getClaudeCodeHomePath(workspaceFolder: vscode.WorkspaceFolder): string {
+	const configured = vscode.workspace
+		.getConfiguration('session-control', workspaceFolder.uri)
+		.get<string>('claudeCode.homePath', '')
+		.trim();
+
+	if (configured) {
+		return configured;
+	}
+
+	const fromEnvironment = process.env.CLAUDE_CONFIG_DIR?.trim();
+	if (fromEnvironment) {
+		return fromEnvironment;
+	}
+
+	return path.join(os.homedir(), '.claude');
 }
 
 function getCursorUserDataPath(workspaceFolder: vscode.WorkspaceFolder): string {
@@ -1013,6 +1041,11 @@ async function pickSessionProvider(): Promise<SessionProviderId | undefined> {
 			description: 'Import from local Codex session transcripts',
 			provider: 'codex',
 		},
+		{
+			label: 'Claude Code',
+			description: 'Import from local Claude Code JSONL transcripts',
+			provider: 'claude-code',
+		},
 	], {
 		title: 'Choose a session provider',
 	});
@@ -1026,9 +1059,18 @@ async function loadSessionsForProvider(
 	provider: SessionProviderId,
 ): Promise<SourceChatSession[]> {
 	if (provider === 'codex') {
-		return filterCodexSessionsForWorkspace(
+		return filterSessionsForWorkspace(
 			await readCodexSessions(getCodexHomePath(workspaceFolder)),
 			workspaceFolder,
+			'codex',
+		);
+	}
+
+	if (provider === 'claude-code') {
+		return filterSessionsForWorkspace(
+			await readClaudeCodeSessions(getClaudeCodeHomePath(workspaceFolder), workspaceFolder.uri.fsPath),
+			workspaceFolder,
+			'claude-code',
 		);
 	}
 
@@ -1097,6 +1139,14 @@ async function runImportCopilotSkillsToCursorCommand(): Promise<void> {
 		skillLabel: 'Cursor',
 		targetDirectory: '.cursor/skills',
 		skillDirectorySegments: ['.cursor', 'skills'],
+	});
+}
+
+async function runImportCopilotSkillsToClaudeCodeCommand(): Promise<void> {
+	await runImportCopilotGuidanceCommand({
+		skillLabel: 'Claude Code',
+		targetDirectory: '.claude/skills',
+		skillDirectorySegments: ['.claude', 'skills'],
 	});
 }
 
@@ -1451,6 +1501,9 @@ function createDefaultAutoSaveOnChatResponseDeps(context: vscode.ExtensionContex
 	const autoSaveCodexSessionReader = createCodexSessionReader({
 		showInformationMessage: async () => undefined,
 	});
+	const autoSaveClaudeCodeSessionReader = createClaudeCodeSessionReader({
+		showInformationMessage: async () => undefined,
+	});
 
 	return {
 		getStorageUri: () => context.storageUri,
@@ -1470,11 +1523,21 @@ function createDefaultAutoSaveOnChatResponseDeps(context: vscode.ExtensionContex
 		getSaveProvider,
 		getAutoSaveProviders,
 		getCodexHomePath,
+		getClaudeCodeHomePath,
 		getCursorProjectsPath,
 		readCopilotSessions: () => readCopilotSessions(context),
-		readCodexSessions: async (workspaceFolder) => filterCodexSessionsForWorkspace(
+		readCodexSessions: async (workspaceFolder) => filterSessionsForWorkspace(
 			await autoSaveCodexSessionReader.readCodexSessions(getCodexHomePath(workspaceFolder)),
 			workspaceFolder,
+			'codex',
+		),
+		readClaudeCodeSessions: async (workspaceFolder) => filterSessionsForWorkspace(
+			await autoSaveClaudeCodeSessionReader.readClaudeCodeSessions(
+				getClaudeCodeHomePath(workspaceFolder),
+				workspaceFolder.uri.fsPath,
+			),
+			workspaceFolder,
+			'claude-code',
 		),
 		readCursorSessions: (workspaceFolder) => autoSaveCursorSessionReader.readCursorSessions(
 			workspaceFolder,
@@ -1503,7 +1566,7 @@ function resolveAutoSaveWatchTargets(
 	workspaceFolder: vscode.WorkspaceFolder,
 	provider: SessionProviderId,
 	storageUri: { fsPath: string } | undefined,
-	deps: Pick<AutoSaveOnChatResponseDeps, 'getCodexHomePath' | 'getCursorProjectsPath'>,
+	deps: Pick<AutoSaveOnChatResponseDeps, 'getCodexHomePath' | 'getClaudeCodeHomePath' | 'getCursorProjectsPath'>,
 ): AutoSaveWatchTarget[] {
 	if (provider === 'copilot') {
 		if (!storageUri) {
@@ -1538,13 +1601,24 @@ function resolveAutoSaveWatchTargets(
 		}];
 	}
 
+	if (provider === 'claude-code') {
+		const projectSlug = deriveClaudeCodeProjectSlug(workspaceFolder.uri.fsPath);
+		const projectDirectory = path.join(deriveClaudeCodeProjectsPath(deps.getClaudeCodeHomePath(workspaceFolder)), projectSlug);
+		return [{
+			provider,
+			directory: projectDirectory,
+			glob: '*.jsonl',
+			label: 'Claude Code transcripts',
+		}];
+	}
+
 	return [];
 }
 
 async function readAutoSaveSessionsForProvider(
 	provider: SessionProviderId,
 	workspaceFolder: vscode.WorkspaceFolder,
-	deps: Pick<AutoSaveOnChatResponseDeps, 'readCopilotSessions' | 'readCodexSessions' | 'readCursorSessions'>,
+	deps: Pick<AutoSaveOnChatResponseDeps, 'readCopilotSessions' | 'readCodexSessions' | 'readClaudeCodeSessions' | 'readCursorSessions'>,
 ): Promise<SourceChatSession[]> {
 	if (provider === 'cursor') {
 		return deps.readCursorSessions(workspaceFolder);
@@ -1552,6 +1626,10 @@ async function readAutoSaveSessionsForProvider(
 
 	if (provider === 'codex') {
 		return deps.readCodexSessions(workspaceFolder);
+	}
+
+	if (provider === 'claude-code') {
+		return deps.readClaudeCodeSessions(workspaceFolder);
 	}
 
 	return deps.readCopilotSessions();
@@ -1835,6 +1913,9 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand('session-control.importCopilotSkillsToCodex', async () => {
 			await runImportCopilotSkillsToCodexCommand();
 		}),
+		vscode.commands.registerCommand('session-control.importCopilotSkillsToClaudeCode', async () => {
+			await runImportCopilotSkillsToClaudeCodeCommand();
+		}),
 		vscode.commands.registerCommand('session-control.deleteSessionFromExplorer', async (item: SessionExplorerSessionItem) => {
 			const confirmation = await vscode.window.showWarningMessage(
 				`Delete session '${item.label}'?`,
@@ -1886,6 +1967,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			event.affectsConfiguration('session-control.autoSaveOnChatResponse')
 			|| event.affectsConfiguration('session-control.save.provider')
 			|| event.affectsConfiguration('session-control.codex.homePath')
+			|| event.affectsConfiguration('session-control.claudeCode.homePath')
 			|| event.affectsConfiguration('session-control.cursor.projectsPath')
 			|| event.affectsConfiguration('session-control.cursor.userDataPath')
 		) {
