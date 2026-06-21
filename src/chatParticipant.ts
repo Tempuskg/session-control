@@ -50,7 +50,14 @@ const AI_RECOMMENDATION_FILE_PATTERNS = [
 const AI_RECOMMENDATION_EXCLUDE_GLOB = '**/{.git,node_modules,dist,dist-test,.vscode-test}/**';
 const MAX_AI_RECOMMENDATION_BASELINE_CHARS = 16000;
 const MAX_AI_RECOMMENDATION_FILE_CHARS = 4000;
+const CLAUDE_CODE_FOCUS_MOUNT_DELAY_MS = 250;
+const CLAUDE_CODE_NEW_CONVERSATION_SETTLE_MS = 250;
 const CLAUDE_CODE_PASTE_SETTLE_MS = 75;
+const CLAUDE_CODE_PASTE_RETRY_DELAY_MS = 150;
+const CLAUDE_CODE_PASTE_MAX_ATTEMPTS = 6;
+const CODEX_PASTE_SETTLE_MS = 250;
+const CODEX_PASTE_RETRY_DELAY_MS = 150;
+const CODEX_PASTE_MAX_ATTEMPTS = 6;
 
 export type ResumeOverflowStrategy = 'summarize' | 'truncate' | 'recent-only';
 export type ResumeTargetMode = 'origin-agent' | 'vscode-chat';
@@ -82,7 +89,74 @@ export interface ResumeIntoOriginAgentDeps {
 	getCommands: () => Promise<readonly string[]>;
 	executeCommand: (commandId: string, args?: unknown) => Promise<void>;
 	writeClipboard: (text: string) => Promise<void>;
+	sleep?: (ms: number) => Promise<void>;
 	streamMarkdown: (markdown: string) => void;
+}
+
+async function sleepFor(ms: number): Promise<void> {
+	await new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+async function pasteClipboardIntoFocusedChat(
+	provider: SessionProviderId,
+	focusCommand: string,
+	deps: ResumeIntoOriginAgentDeps,
+): Promise<void> {
+	const sleep = deps.sleep ?? sleepFor;
+	let settleMs = 0;
+	let retryDelayMs = 0;
+	let attemptCount = 1;
+	if (provider === 'claude-code' && focusCommand === 'claude-vscode.focus') {
+		// Claude's focus command dispatches through the webview bridge. On a cold
+		// sidebar open the first focus event can fire before the webview is ready
+		// to receive it, so wait for mount, refocus, then give the input a beat
+		// to claim focus before we paste.
+		await sleep(CLAUDE_CODE_FOCUS_MOUNT_DELAY_MS);
+		await deps.executeCommand(focusCommand);
+		settleMs = CLAUDE_CODE_PASTE_SETTLE_MS;
+		retryDelayMs = CLAUDE_CODE_PASTE_RETRY_DELAY_MS;
+		attemptCount = CLAUDE_CODE_PASTE_MAX_ATTEMPTS;
+	}
+	if (provider === 'codex') {
+		// Codex can take a moment to mount the composer on a cold sidebar open,
+		// even after the view itself is focused.
+		settleMs = CODEX_PASTE_SETTLE_MS;
+		retryDelayMs = CODEX_PASTE_RETRY_DELAY_MS;
+		attemptCount = CODEX_PASTE_MAX_ATTEMPTS;
+	}
+	if (settleMs > 0) {
+		await sleep(settleMs);
+	}
+	let lastError: unknown;
+	for (let attempt = 1; attempt <= attemptCount; attempt += 1) {
+		try {
+			await deps.executeCommand('editor.action.clipboardPasteAction');
+			return;
+		} catch (error) {
+			lastError = error;
+			if (attempt >= attemptCount) {
+				throw error;
+			}
+			await sleep(retryDelayMs);
+		}
+	}
+
+	throw lastError instanceof Error
+		? lastError
+		: new Error(lastError ? String(lastError) : 'Automatic paste failed.');
+}
+
+async function prepareClaudeCodeConversationForResume(
+	availableCommands: readonly string[],
+	deps: ResumeIntoOriginAgentDeps,
+): Promise<void> {
+	if (!availableCommands.includes('claude-vscode.newConversation')) {
+		return;
+	}
+	const sleep = deps.sleep ?? sleepFor;
+	await sleep(CLAUDE_CODE_FOCUS_MOUNT_DELAY_MS);
+	await deps.executeCommand('claude-vscode.newConversation');
+	await sleep(CLAUDE_CODE_NEW_CONVERSATION_SETTLE_MS);
 }
 
 type ImplementationHandoffTarget = 'chat' | 'agentSession';
@@ -644,7 +718,8 @@ export async function runResumeIntoOriginAgent(
 	let target: ResumeTarget | undefined;
 
 	try {
-		target = resolveResumeTarget(provider, await deps.getCommands(), config.providerCommands);
+		const availableCommands = await deps.getCommands();
+		target = resolveResumeTarget(provider, availableCommands, config.providerCommands);
 		if (!target) {
 			deps.streamMarkdown(`Could not find an installed ${providerLabel} chat command. Falling back to VS Code chat resume.\n\n`);
 			return false;
@@ -666,20 +741,18 @@ export async function runResumeIntoOriginAgent(
 
 		await deps.executeCommand(target.commandId);
 		await deps.writeClipboard(resumePrompt);
+		if (provider === 'claude-code') {
+			await prepareClaudeCodeConversationForResume(availableCommands, deps);
+		}
 
-		const focusCommand = resolveProviderFocusCommand(provider, await deps.getCommands());
+		const focusCommand = resolveProviderFocusCommand(provider, availableCommands);
 		if (focusCommand) {
 			try {
 				await deps.executeCommand(focusCommand);
 				if (provider === 'codex' || provider === 'claude-code') {
 					const tabLabel = provider === 'codex' ? 'Codex' : 'Claude Code';
-					if (provider === 'claude-code' && focusCommand === 'claude-vscode.focus') {
-						// Claude's focus command dispatches through the webview bridge, so
-						// give the input a beat to claim focus before we paste.
-						await new Promise((resolve) => setTimeout(resolve, CLAUDE_CODE_PASTE_SETTLE_MS));
-					}
 					try {
-						await deps.executeCommand('editor.action.clipboardPasteAction');
+						await pasteClipboardIntoFocusedChat(provider, focusCommand, deps);
 						deps.streamMarkdown(`Opened the ${tabLabel} chat tab and pasted the conversation context.`);
 						return true;
 					} catch (pasteError) {

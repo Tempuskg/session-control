@@ -1,0 +1,87 @@
+---
+name: github-copilot-instructions
+description: "Imported repository guidance from .github/copilot-instructions.md. Use when working in this repository and the original guidance is relevant."
+---
+
+Follow this imported repository guidance from `.github/copilot-instructions.md` when the task overlaps with its original scope.
+
+## Instructions
+- Treat the guidance below as repository-specific instructions for this project.
+- Apply it together with higher-priority system, developer, and repo instructions already in effect.
+- Preserve the intent of the source guidance while adapting it to the current task.
+
+## Imported guidance
+
+# Copilot Instructions for Session Control
+
+## Project Overview
+
+Session Control is a VS Code extension that saves and resumes GitHub Copilot Chat sessions linked to git commits. It is written in TypeScript, bundled with webpack, and published under the `darrenjmcleod` publisher.
+
+## AI Execution Rules
+
+- Before designing or implementing repo-aware chat commands or implementation flows, verify whether the current surface has tool and workspace access. Plain chat-participant LM surfaces are prompt-only unless tool access is explicitly wired, and repo-aware implementation requests on non-tool surfaces should default to handoff-first. If a generated handoff prompt is later executed with full access, restate the operative user request before editing.
+- In Cursor, do not assume third-party chatParticipants or extension-callable `vscode.lm` models are available. Verify both capabilities before implementing chat-driven UX; if either is missing, prefer a command-palette or handoff-prompt fallback.
+- Analysis recommendations may target only repository-local AI control files: `AGENTS.md`, `.github/copilot-instructions.md`, and when present `CLAUDE.md`, `*.instructions.md`, `*.prompt.md`, `*.agent.md`, `SKILL.md`, and similar local AI instruction files. For gap-only AI-control-file analysis, compare against the current contents of the relevant local AI instruction and skill files, not just their paths or file types. If relevant file contents are missing from context, mark the comparison partial and do not claim complete gap-only output. If evidence is insufficient, say so instead of recommending source, test, build, or general documentation changes.
+- Every implementation reply must end with: `Status: completed|partial|blocked`, `Changed files`, `Commands run`, `Results`, `Blockers`, `Unverified`, and `Next step`. Use `Status: completed` only when the full in-scope request is done. If any explicitly requested in-scope item remains undone, use `Status: partial` and list the remainder. A no-edit implementation turn must be marked `partial` or `blocked`.
+- In `Changed files`, `Commands run`, and `Results`, use literal repo-relative paths and exact commands in backticks. Do not leave empty bullets or rely on editor links.
+- Assume strict optional-property typing. Omit absent optional keys instead of passing `undefined`.
+- Use plain relative file paths in summaries and handoffs; do not rely on rendered anchor text.
+- When public documentation already shows that a supported API or command is unavailable, stop command-id hunting and choose the documented fallback.
+- When the user asks about publishing, answer with the repo's exact VS Marketplace and Open VSX flow first instead of generic marketplace guidance. On Windows, default to PowerShell syntax unless the user explicitly asks for `cmd` or bash.
+- Do not read unrelated prompt or policy files unless the active task explicitly depends on them.
+- When multiple repositories are in scope, return per-repo closeouts first and keep state, persistence assumptions, and conclusions isolated per workspace unless the user explicitly asks to merge them.
+
+## Language & Build
+
+- TypeScript with **strict mode** (`strict`, `noImplicitAny`, `noImplicitReturns`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`).
+- Target: ES2022, module system: Node16.
+- Bundled via webpack (`dist/extension.js`). Tests compiled to `dist-test/`.
+- Node.js 20+, VS Code engine `^1.93.0`.
+
+## Code Style
+
+- Use ES module syntax (`import`/`export`). Prefer Node.js prefixed imports: `import * as fs from 'node:fs/promises'`.
+- Import the vscode API as: `import * as vscode from 'vscode'`.
+- No `any` types without justification. Use `void` operator for intentionally-ignored promise returns.
+- Follow ESLint rules: `curly`, `eqeqeq`, `no-throw-literal`; `@typescript-eslint/strict` config.
+- Import naming: camelCase or PascalCase only.
+
+## Architecture Patterns
+
+- **Factory functions** for module initialization: `createSessionStore()`, `createChatParticipant()`, etc.
+- **Dependency injection** via `Deps` interfaces (e.g., `SessionStoreDeps`, `SaveSessionFlowDeps`). Factories accept `overrides: Partial<Deps>` for testing.
+- **Discriminated unions** for variant types (e.g., `SavedTurn = RequestTurn | ResponseTurn`).
+- **Type guards** for runtime validation (e.g., `isChatSession()`).
+- Types centralized in `src/types.ts`; pure utilities in `src/utils.ts`.
+- Configuration via `vscode.workspace.getConfiguration('session-control')`.
+
+## File Organization
+
+- `src/` — extension source (one module per domain: `sessionStore`, `sessionReader`, `chatParticipant`, `gitIntegration`, etc.)
+- `test/unit/` — unit tests (Node.js built-in test runner: `suite()`, `test()`)
+- `test/suite/` — integration tests (VS Code extension host)
+- `test/fixtures/` — test fixture files
+- `wiki/` — LLM-maintained project wiki (see `AGENTS.md`)
+- `raw/` — immutable source documents
+
+## Testing
+
+- Unit tests use the **Node.js built-in test runner** (`node:test`), not Mocha/Jest.
+- Test helpers use factory functions (e.g., `createSession()`) to build test data.
+- File system tests use `fs.mkdtemp()` with cleanup.
+- Run: `npm run compile-tests && npm test`.
+
+## Commands
+
+- `npm run compile` — build the extension
+- `npm run compile-tests` — compile tests to `dist-test/`
+- `npm test` — run unit tests
+- `npm run lint` — ESLint check
+- `npm run package` — production bundle
+
+## Commit & PR Conventions
+
+- Commit messages use conventional commit prefixes: `chore:`, `feat:`, `fix:`, `docs:`, `test:`.
+- Update `CHANGELOG.md` under the `[Unreleased]` section for user-facing changes.
+- Both `npm run lint` and `npm test` must pass before committing.

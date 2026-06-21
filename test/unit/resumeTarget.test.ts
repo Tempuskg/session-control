@@ -42,12 +42,11 @@ suite('resumeTarget', () => {
 
 	test('resolves the first available Codex focus command', () => {
 		const focusCommand = resolveProviderFocusCommand('codex', [
-			'chatgpt.openSidebar',
-			'workbench.view.extension.codexViewContainer',
+			'chatgpt.sidebarSecondaryView.focus',
 			'chatgpt.sidebarView.focus',
 		]);
 
-		assert.equal(focusCommand, 'chatgpt.openSidebar');
+		assert.equal(focusCommand, 'chatgpt.sidebarSecondaryView.focus');
 	});
 
 	test('falls back to the view container focus command when the view focus is unavailable', () => {

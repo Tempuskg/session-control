@@ -361,7 +361,12 @@ suite('chatParticipant integration', () => {
 			maxContextChars: 30000,
 			overflowStrategy: 'recent-only',
 		}, {
-			getCommands: async () => ['claude-vscode.sidebar.open', 'claude-vscode.focus', 'claudeVSCodeSidebar.focus'],
+			getCommands: async () => [
+				'claude-vscode.sidebar.open',
+				'claude-vscode.newConversation',
+				'claude-vscode.focus',
+				'claudeVSCodeSidebar.focus',
+			],
 			executeCommand: async (commandId: string) => {
 				executedCommand = commandId;
 				executedCommands.push(commandId);
@@ -376,11 +381,68 @@ suite('chatParticipant integration', () => {
 		assert.equal(executedCommand, 'editor.action.clipboardPasteAction');
 		assert.deepEqual(executedCommands, [
 			'claude-vscode.sidebar.open',
+			'claude-vscode.newConversation',
+			'claude-vscode.focus',
 			'claude-vscode.focus',
 			'editor.action.clipboardPasteAction',
 		]);
 		assert.equal(clipboardText?.includes('User follow-up: Continue'), true);
 		assert.equal(clipboardText?.includes('Earlier turns omitted ('), true);
+	});
+
+	test('runResumeIntoOriginAgent waits and retries paste for a cold Claude Code sidebar', async () => {
+		const saved = {
+			...createChatSession(createCopilotSession(), {
+				title: 'Claude cold start',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'claude-code' as const,
+		};
+		const executedCommands: string[] = [];
+		const waits: number[] = [];
+		const messages: string[] = [];
+		let pasteAttempts = 0;
+
+		const opened = await runResumeIntoOriginAgent(saved, 'Continue', {
+			maxTurns: 2,
+			maxContextChars: 30000,
+			overflowStrategy: 'recent-only',
+		}, {
+			getCommands: async () => [
+				'claude-vscode.sidebar.open',
+				'claude-vscode.newConversation',
+				'claude-vscode.focus',
+				'claudeVSCodeSidebar.focus',
+			],
+			executeCommand: async (commandId: string) => {
+				executedCommands.push(commandId);
+				if (commandId === 'editor.action.clipboardPasteAction' && pasteAttempts < 2) {
+					pasteAttempts += 1;
+					throw new Error('Claude composer not ready');
+				}
+			},
+			writeClipboard: async () => undefined,
+			sleep: async (ms: number) => {
+				waits.push(ms);
+			},
+			streamMarkdown: (markdown: string) => {
+				messages.push(markdown);
+			},
+		});
+
+		assert.equal(opened, true);
+		assert.deepEqual(executedCommands, [
+			'claude-vscode.sidebar.open',
+			'claude-vscode.newConversation',
+			'claude-vscode.focus',
+			'claude-vscode.focus',
+			'editor.action.clipboardPasteAction',
+			'editor.action.clipboardPasteAction',
+			'editor.action.clipboardPasteAction',
+		]);
+		assert.deepEqual(waits, [250, 250, 250, 75, 150, 150]);
+		assert.equal(messages[0], 'Opened the Claude Code chat tab and pasted the conversation context.');
 	});
 
 	test('runResumeIntoOriginAgent opens the Codex sidebar tab and pastes context', async () => {
@@ -401,7 +463,7 @@ suite('chatParticipant integration', () => {
 			maxContextChars: 30000,
 			overflowStrategy: 'truncate',
 		}, {
-			getCommands: async () => ['chatgpt.openSidebar', 'chatgpt.sidebarView.focus'],
+			getCommands: async () => ['chatgpt.openSidebar', 'chatgpt.sidebarSecondaryView.focus', 'chatgpt.sidebarView.focus'],
 			executeCommand: async (commandId: string) => {
 				executedCommands.push(commandId);
 			},
@@ -416,10 +478,58 @@ suite('chatParticipant integration', () => {
 		assert.equal(opened, true);
 		assert.deepEqual(executedCommands, [
 			'chatgpt.openSidebar',
-			'chatgpt.openSidebar',
+			'chatgpt.sidebarSecondaryView.focus',
 			'editor.action.clipboardPasteAction',
 		]);
 		assert.equal(clipboardText?.includes('User follow-up: Continue in Codex'), true);
+		assert.equal(messages[0], 'Opened the Codex chat tab and pasted the conversation context.');
+	});
+
+	test('runResumeIntoOriginAgent waits and retries paste for a cold Codex sidebar', async () => {
+		const saved = {
+			...createChatSession(createCopilotSession(), {
+				title: 'Codex cold start',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'codex' as const,
+		};
+		const executedCommands: string[] = [];
+		const waits: number[] = [];
+		const messages: string[] = [];
+		let pasteAttempts = 0;
+
+		const opened = await runResumeIntoOriginAgent(saved, 'Continue in Codex', {
+			maxTurns: 50,
+			maxContextChars: 30000,
+			overflowStrategy: 'truncate',
+		}, {
+			getCommands: async () => ['chatgpt.openSidebar', 'chatgpt.sidebarSecondaryView.focus'],
+			executeCommand: async (commandId: string) => {
+				executedCommands.push(commandId);
+				if (commandId === 'editor.action.clipboardPasteAction' && pasteAttempts < 2) {
+					pasteAttempts += 1;
+					throw new Error('Codex composer not ready');
+				}
+			},
+			writeClipboard: async () => undefined,
+			sleep: async (ms: number) => {
+				waits.push(ms);
+			},
+			streamMarkdown: (markdown: string) => {
+				messages.push(markdown);
+			},
+		});
+
+		assert.equal(opened, true);
+		assert.deepEqual(executedCommands, [
+			'chatgpt.openSidebar',
+			'chatgpt.sidebarSecondaryView.focus',
+			'editor.action.clipboardPasteAction',
+			'editor.action.clipboardPasteAction',
+			'editor.action.clipboardPasteAction',
+		]);
+		assert.deepEqual(waits, [250, 150, 150]);
 		assert.equal(messages[0], 'Opened the Codex chat tab and pasted the conversation context.');
 	});
 

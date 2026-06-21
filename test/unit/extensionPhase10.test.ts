@@ -417,7 +417,7 @@ suite('runResumeSessionFromViewerCommand', () => {
 				getSession: () => session,
 				getFilePath: () => 'C:/repo/.chat/viewer-codex-session.json',
 			};
-			(vscode.commands as any).getCommands = async () => ['chatgpt.openSidebar', 'chatgpt.sidebarView.focus', 'workbench.action.chat.open'];
+			(vscode.commands as any).getCommands = async () => ['chatgpt.openSidebar', 'chatgpt.sidebarSecondaryView.focus', 'chatgpt.sidebarView.focus', 'workbench.action.chat.open'];
 			(vscode.commands as any).executeCommand = async (commandId: string) => {
 				executedCommands.push(commandId);
 				return undefined;
@@ -431,7 +431,7 @@ suite('runResumeSessionFromViewerCommand', () => {
 
 			assert.deepEqual(executedCommands, [
 				'chatgpt.openSidebar',
-				'chatgpt.openSidebar',
+				'chatgpt.sidebarSecondaryView.focus',
 				'editor.action.clipboardPasteAction',
 			]);
 			assert.equal(clipboardText?.includes('Viewer Codex Session'), false);
@@ -469,7 +469,7 @@ suite('runResumeSessionFromViewerCommand', () => {
 				getSession: () => session,
 				getFilePath: () => 'C:/repo/.chat/viewer-claude-session.json',
 			};
-			(vscode.commands as any).getCommands = async () => ['claude-vscode.sidebar.open', 'claude-vscode.focus', 'claudeVSCodeSidebar.focus', 'workbench.action.chat.open'];
+			(vscode.commands as any).getCommands = async () => ['claude-vscode.sidebar.open', 'claude-vscode.newConversation', 'claude-vscode.focus', 'claudeVSCodeSidebar.focus', 'workbench.action.chat.open'];
 			(vscode.commands as any).executeCommand = async (commandId: string) => {
 				executedCommands.push(commandId);
 				return undefined;
@@ -483,6 +483,8 @@ suite('runResumeSessionFromViewerCommand', () => {
 
 			assert.deepEqual(executedCommands, [
 				'claude-vscode.sidebar.open',
+				'claude-vscode.newConversation',
+				'claude-vscode.focus',
 				'claude-vscode.focus',
 				'editor.action.clipboardPasteAction',
 			]);

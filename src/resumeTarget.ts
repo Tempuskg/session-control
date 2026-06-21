@@ -47,16 +47,21 @@ const RESUME_TARGET_CANDIDATES: Record<SessionProviderId, readonly string[]> = {
 // appear in getCommands(true) when the provider extension is installed.
 // Verified locally from openai.chatgpt package.json: views chatgpt.sidebarView /
 // chatgpt.sidebarSecondaryView in containers codexViewContainer /
-// codexSecondaryViewContainer. Verified locally from anthropic.claude-code
-// package.json/extension.js: claude-vscode.focus is the dedicated command that
-// pushes focus into Claude's chat experience after the sidebar is revealed.
+// codexSecondaryViewContainer. The Codex manifest also uses the
+// chatgpt.sidebarView.visible context key for enablement, but VS Code does not
+// expose a stable public API for reading that runtime state from another
+// extension, so resume uses the most specific focus command available and lets
+// paste wait/retry briefly on cold starts. Verified locally from
+// anthropic.claude-code package.json/extension.js: claude-vscode.focus is the
+// dedicated command that pushes focus into Claude's chat experience after the
+// sidebar is revealed.
 const FOCUS_COMMAND_CANDIDATES: Partial<Record<SessionProviderId, readonly string[]>> = {
 	codex: [
-		'chatgpt.openSidebar',
-		'chatgpt.sidebarView.focus',
 		'chatgpt.sidebarSecondaryView.focus',
-		'workbench.view.extension.codexViewContainer',
+		'chatgpt.sidebarView.focus',
 		'workbench.view.extension.codexSecondaryViewContainer',
+		'workbench.view.extension.codexViewContainer',
+		'chatgpt.openSidebar',
 	],
 	'claude-code': [
 		'claude-vscode.focus',

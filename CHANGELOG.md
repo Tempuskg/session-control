@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-06-21
+
+### Fixed
+- Improved Codex origin-agent resume on cold starts by preferring the dedicated Codex sidebar focus command and retrying clipboard paste until the composer is ready.
+- Improved Claude Code origin-agent resume on cold starts by starting a fresh conversation when supported and retrying clipboard paste after the sidebar webview finishes mounting.
+
 ## [1.3.0] - 2026-06-20
 
 ### Added
