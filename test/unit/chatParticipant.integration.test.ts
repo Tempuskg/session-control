@@ -8,6 +8,7 @@ import {
 	createAnalysisCandidates,
 	loadReassembledSession,
 	renderSessionListMarkdown,
+	runResumeIntoOriginAgent,
 	selectSessionForResume,
 } from '../../src/chatParticipant';
 import { createSessionStore } from '../../src/sessionStore';
@@ -306,5 +307,174 @@ suite('chatParticipant integration', () => {
 
 		const selection = selectSessionForResume('backend fix auth', sessions);
 		assert.equal(selection.session?.fileName, 'fix-auth-bug-backend.json');
+	});
+
+	test('runResumeIntoOriginAgent opens query-capable targets with resumed context', async () => {
+		const saved = {
+			...createChatSession(createCopilotSession(), {
+				title: 'Codex resume',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'codex' as const,
+		};
+		let executedCommand: string | undefined;
+		let executedArgs: unknown;
+
+		const opened = await runResumeIntoOriginAgent(saved, 'What next?', {
+			maxTurns: 50,
+			maxContextChars: 30000,
+			overflowStrategy: 'truncate',
+			providerCommands: {
+				codex: 'workbench.action.chat.open',
+			},
+		}, {
+			getCommands: async () => ['workbench.action.chat.open'],
+			executeCommand: async (commandId: string, args?: unknown) => {
+				executedCommand = commandId;
+				executedArgs = args;
+			},
+			writeClipboard: async () => undefined,
+			streamMarkdown: () => undefined,
+		});
+
+		assert.equal(opened, true);
+		assert.equal(executedCommand, 'workbench.action.chat.open');
+		assert.equal((executedArgs as { query?: string } | undefined)?.query?.includes('User follow-up: What next?'), true);
+	});
+
+	test('runResumeIntoOriginAgent opens non-query targets and copies context', async () => {
+		const saved = {
+			...createChatSession(createCopilotSession(), {
+				title: 'Claude resume',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'claude-code' as const,
+		};
+		let executedCommand: string | undefined;
+		let clipboardText: string | undefined;
+
+		const opened = await runResumeIntoOriginAgent(saved, 'Continue', {
+			maxTurns: 2,
+			maxContextChars: 30000,
+			overflowStrategy: 'recent-only',
+		}, {
+			getCommands: async () => ['claude-vscode.newConversation'],
+			executeCommand: async (commandId: string) => {
+				executedCommand = commandId;
+			},
+			writeClipboard: async (text: string) => {
+				clipboardText = text;
+			},
+			streamMarkdown: () => undefined,
+		});
+
+		assert.equal(opened, true);
+		assert.equal(executedCommand, 'claude-vscode.newConversation');
+		assert.equal(clipboardText?.includes('User follow-up: Continue'), true);
+		assert.equal(clipboardText?.includes('Earlier turns omitted ('), true);
+	});
+
+	test('runResumeIntoOriginAgent opens the Codex sidebar tab and pastes context', async () => {
+		const saved = {
+			...createChatSession(createCopilotSession(), {
+				title: 'Codex resume',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'codex' as const,
+		};
+		const executedCommands: string[] = [];
+		let clipboardText: string | undefined;
+		const messages: string[] = [];
+
+		const opened = await runResumeIntoOriginAgent(saved, 'Continue in Codex', {
+			maxTurns: 50,
+			maxContextChars: 30000,
+			overflowStrategy: 'truncate',
+		}, {
+			getCommands: async () => ['chatgpt.openSidebar', 'chatgpt.sidebarView.focus'],
+			executeCommand: async (commandId: string) => {
+				executedCommands.push(commandId);
+			},
+			writeClipboard: async (text: string) => {
+				clipboardText = text;
+			},
+			streamMarkdown: (markdown: string) => {
+				messages.push(markdown);
+			},
+		});
+
+		assert.equal(opened, true);
+		assert.deepEqual(executedCommands, [
+			'chatgpt.openSidebar',
+			'chatgpt.openSidebar',
+			'editor.action.clipboardPasteAction',
+		]);
+		assert.equal(clipboardText?.includes('User follow-up: Continue in Codex'), true);
+		assert.equal(messages[0], 'Opened the Codex chat tab and pasted the conversation context.');
+	});
+
+	test('runResumeIntoOriginAgent falls back to a paste instruction when no Codex focus command exists', async () => {
+		const saved = {
+			...createChatSession(createCopilotSession(), {
+				title: 'Codex resume',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'codex' as const,
+		};
+		const executedCommands: string[] = [];
+		const messages: string[] = [];
+
+		const opened = await runResumeIntoOriginAgent(saved, 'Continue in Codex', {
+			maxTurns: 50,
+			maxContextChars: 30000,
+			overflowStrategy: 'truncate',
+		}, {
+			getCommands: async () => ['chatgpt.newCodexPanel'],
+			executeCommand: async (commandId: string) => {
+				executedCommands.push(commandId);
+			},
+			writeClipboard: async () => undefined,
+			streamMarkdown: (markdown: string) => {
+				messages.push(markdown);
+			},
+		});
+
+		assert.equal(opened, true);
+		assert.deepEqual(executedCommands, ['chatgpt.newCodexPanel']);
+		assert.equal(messages[0], 'Opened Codex chat and copied the conversation context - paste to continue.');
+	});
+
+	test('runResumeIntoOriginAgent returns false when provider command is unavailable', async () => {
+		const saved = {
+			...createChatSession(createCopilotSession(), {
+				title: 'Cursor resume',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'cursor' as const,
+		};
+		const messages: string[] = [];
+
+		const opened = await runResumeIntoOriginAgent(saved, 'Continue', {
+			maxTurns: 50,
+			maxContextChars: 30000,
+			overflowStrategy: 'truncate',
+		}, {
+			getCommands: async () => ['workbench.action.chat.open'],
+			executeCommand: async () => {
+				throw new Error('should not execute');
+			},
+			writeClipboard: async () => undefined,
+			streamMarkdown: (markdown: string) => {
+				messages.push(markdown);
+			},
+		});
+
+		assert.equal(opened, false);
+		assert.equal(messages[0]?.includes('Falling back to VS Code chat resume'), true);
 	});
 });

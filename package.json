@@ -2,7 +2,7 @@
   "name": "session-control",
   "displayName": "Session Control",
   "description": "Save and resume GitHub Copilot, Cursor, Codex, and Claude Code chat sessions linked to git commits",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "publisher": "darrenjmcleod",
   "icon": "media/session-control.png",
   "license": "MIT",
@@ -211,6 +211,47 @@
           "default": 80000,
           "minimum": 1000,
           "description": "Hard cap on total characters injected as context when resuming. Overflow is handled by resume.overflowStrategy.",
+          "scope": "resource"
+        },
+        "session-control.resume.target": {
+          "type": "string",
+          "enum": [
+            "origin-agent",
+            "vscode-chat"
+          ],
+          "enumDescriptions": [
+            "Open the saved session's origin agent chat window when possible.",
+            "Always use the VS Code chat participant resume flow."
+          ],
+          "default": "origin-agent",
+          "description": "Where saved sessions should resume. Origin-agent opens Codex, Claude Code, Cursor, or Copilot based on the saved provider when available.",
+          "scope": "resource"
+        },
+        "session-control.resume.providerCommands": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          },
+          "properties": {
+            "copilot": {
+              "type": "string",
+              "description": "Command ID used to open Copilot chat for resume."
+            },
+            "codex": {
+              "type": "string",
+              "description": "Command ID used to open Codex chat for resume."
+            },
+            "cursor": {
+              "type": "string",
+              "description": "Command ID used to open Cursor agent chat for resume."
+            },
+            "claude-code": {
+              "type": "string",
+              "description": "Command ID used to open Claude Code chat for resume."
+            }
+          },
+          "description": "Provider-specific chat command IDs that override Session Control's built-in resume command discovery.",
           "scope": "resource"
         },
         "session-control.save.maxFileSize": {

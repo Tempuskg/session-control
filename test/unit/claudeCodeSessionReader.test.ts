@@ -103,9 +103,9 @@ function createClaudeCodeSessionJsonl(
 suite('claudeCodeSessionReader', () => {
 	test('derives Claude Code project paths from workspace paths', () => {
 		assert.equal(deriveClaudeCodeProjectsPath(path.join('tmp', '.claude')).endsWith(path.join('.claude', 'projects')), true);
-		assert.equal(deriveClaudeCodeProjectSlug('e:\\chat-commit'), 'e-chat-commit');
-		assert.equal(deriveClaudeCodeProjectSlug('e:/chat-commit'), 'e-chat-commit');
-		assert.equal(deriveClaudeCodeProjectSlug('/home/user/chat-commit'), 'home-user-chat-commit');
+		assert.equal(deriveClaudeCodeProjectSlug('e:\\chat-commit'), 'e--chat-commit');
+		assert.equal(deriveClaudeCodeProjectSlug('e:/chat-commit'), 'e--chat-commit');
+		assert.equal(deriveClaudeCodeProjectSlug('/home/user/chat-commit'), '-home-user-chat-commit');
 	});
 
 	test('reads Claude Code JSONL sessions, pairs tool results, applies ai-title, and sorts by recency', async () => {

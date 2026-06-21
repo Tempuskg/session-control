@@ -320,23 +320,12 @@ export function deriveClaudeCodeProjectsPath(claudeCodeHomePath: string): string
 }
 
 export function deriveClaudeCodeProjectSlug(workspacePath: string): string {
-	const normalized = path.normalize(workspacePath);
-	const windowsMatch = /^([A-Za-z]):\\?(.*)$/.exec(normalized);
-	if (windowsMatch?.[1]) {
-		const drive = windowsMatch[1].toLowerCase();
-		const rest = (windowsMatch[2] ?? '')
-			.replace(/[./\\]+/g, '-')
-			.replace(/-+/g, '-')
-			.replace(/^-|-$/g, '');
-		return rest ? `${drive}-${rest}` : drive;
-	}
-
-	return normalized
-		.replace(/^[/\\]+/, '')
-		.replace(/[/\\:]/g, '-')
-		.replace(/-+/g, '-')
-		.replace(/^-|-$/g, '')
-		.toLowerCase();
+	// Claude Code names its per-project transcript directory by replacing every
+	// non-alphanumeric character in the workspace path with a single dash, without
+	// collapsing consecutive dashes or trimming. For example, "e:\chat-commit"
+	// becomes "e--chat-commit" (one dash for ":" and one for "\"). VS Code already
+	// lowercases the drive letter in uri.fsPath, so no extra casing is needed.
+	return workspacePath.replace(/[^a-zA-Z0-9]/g, '-');
 }
 
 export function createClaudeCodeSessionReader(overrides: Partial<ClaudeCodeSessionReaderDeps> = {}): {

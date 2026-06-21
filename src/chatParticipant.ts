@@ -25,7 +25,9 @@ import {
 	ChatSession,
 	SavedTurn,
 	SessionMeta,
+	SessionProviderId,
 } from './types';
+import { resolveProviderFocusCommand, resolveResumeTarget, ResumeProviderCommands, ResumeTarget } from './resumeTarget';
 import { fuzzyMatchSessions } from './utils';
 
 export { runAnalyzeSessionsFlow } from './analysisOrchestrator';
@@ -50,6 +52,7 @@ const MAX_AI_RECOMMENDATION_BASELINE_CHARS = 16000;
 const MAX_AI_RECOMMENDATION_FILE_CHARS = 4000;
 
 export type ResumeOverflowStrategy = 'summarize' | 'truncate' | 'recent-only';
+export type ResumeTargetMode = 'origin-agent' | 'vscode-chat';
 const SUMMARIZE_FALLBACK_NOTE = 'Summary generation failed - showing most recent turns only.';
 
 export interface ResumeSelection {
@@ -65,6 +68,20 @@ export interface ReassembledSessionResult {
 	session: ChatSession;
 	rootFileName: string;
 	partFiles: string[];
+}
+
+export interface ResumeIntoOriginAgentConfig {
+	maxTurns: number;
+	maxContextChars: number;
+	overflowStrategy: ResumeOverflowStrategy;
+	providerCommands?: ResumeProviderCommands;
+}
+
+export interface ResumeIntoOriginAgentDeps {
+	getCommands: () => Promise<readonly string[]>;
+	executeCommand: (commandId: string, args?: unknown) => Promise<void>;
+	writeClipboard: (text: string) => Promise<void>;
+	streamMarkdown: (markdown: string) => void;
 }
 
 type ImplementationHandoffTarget = 'chat' | 'agentSession';
@@ -566,6 +583,123 @@ function findAgentSessionCommandId(commands: readonly string[]): string | undefi
 	});
 }
 
+function formatProviderLabel(provider: SessionProviderId | string): string {
+	if (/^copilot$/i.test(provider)) {
+		return 'Copilot';
+	}
+
+	if (/^codex$/i.test(provider)) {
+		return 'Codex';
+	}
+
+	if (/^cursor$/i.test(provider)) {
+		return 'Cursor';
+	}
+
+	if (/^claude-code$/i.test(provider)) {
+		return 'Claude Code';
+	}
+
+	return provider.trim() || 'Assistant';
+}
+
+function createDefaultResumeIntoOriginAgentDeps(
+	stream: vscode.ChatResponseStream,
+): ResumeIntoOriginAgentDeps {
+	return {
+		getCommands: async () => vscode.commands.getCommands(true),
+		executeCommand: async (commandId: string, args?: unknown) => {
+			if (args === undefined) {
+				await vscode.commands.executeCommand(commandId);
+				return;
+			}
+
+			await vscode.commands.executeCommand(commandId, args);
+		},
+		writeClipboard: async (text: string) => vscode.env.clipboard.writeText(text),
+		streamMarkdown: (markdown: string) => stream.markdown(markdown),
+	};
+}
+
+export async function runResumeIntoOriginAgent(
+	session: ChatSession,
+	userPrompt: string,
+	config: ResumeIntoOriginAgentConfig,
+	depsOverrides: Partial<ResumeIntoOriginAgentDeps> = {},
+): Promise<boolean> {
+	const provider = session.provider;
+	if (!provider || provider === 'copilot') {
+		return false;
+	}
+
+	const deps: ResumeIntoOriginAgentDeps = {
+		getCommands: async () => [],
+		executeCommand: async () => undefined,
+		writeClipboard: async () => undefined,
+		streamMarkdown: () => undefined,
+		...depsOverrides,
+	};
+	const providerLabel = formatProviderLabel(provider);
+	let target: ResumeTarget | undefined;
+
+	try {
+		target = resolveResumeTarget(provider, await deps.getCommands(), config.providerCommands);
+		if (!target) {
+			deps.streamMarkdown(`Could not find an installed ${providerLabel} chat command. Falling back to VS Code chat resume.\n\n`);
+			return false;
+		}
+
+		const constrained = applyResumeOverflowStrategy(
+			session.turns,
+			config.maxTurns,
+			config.maxContextChars,
+			config.overflowStrategy,
+		);
+		const resumePrompt = composeResumePrompt(constrained.turns, userPrompt, constrained.note);
+
+		if (target.supportsQuery) {
+			await deps.executeCommand(target.commandId, { query: resumePrompt });
+			deps.streamMarkdown(`Opened ${providerLabel} chat with the resumed conversation context.`);
+			return true;
+		}
+
+		await deps.executeCommand(target.commandId);
+		await deps.writeClipboard(resumePrompt);
+
+		const focusCommand = resolveProviderFocusCommand(provider, await deps.getCommands());
+		if (focusCommand) {
+			try {
+				await deps.executeCommand(focusCommand);
+				if (provider === 'codex') {
+					try {
+						await deps.executeCommand('editor.action.clipboardPasteAction');
+						deps.streamMarkdown('Opened the Codex chat tab and pasted the conversation context.');
+						return true;
+					} catch (pasteError) {
+						const pasteMessage = pasteError instanceof Error ? pasteError.message : String(pasteError);
+						deps.streamMarkdown(`Opened the Codex chat tab and copied the conversation context, but automatic paste failed (${pasteMessage}) - paste (Ctrl+V) to continue.`);
+						return true;
+					}
+				}
+
+				deps.streamMarkdown(`Opened ${providerLabel} chat, focused the panel, and copied the conversation context - paste (Ctrl+V) to continue.`);
+				return true;
+			} catch (focusError) {
+				const focusMessage = focusError instanceof Error ? focusError.message : String(focusError);
+				deps.streamMarkdown(`Opened ${providerLabel} chat and copied the conversation context, but focusing the panel failed (${focusMessage}) - switch to the ${providerLabel} panel and paste to continue.`);
+				return true;
+			}
+		}
+
+		deps.streamMarkdown(`Opened ${providerLabel} chat and copied the conversation context - paste to continue.`);
+		return true;
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		deps.streamMarkdown(`Could not open ${providerLabel} chat (${message}). Falling back to VS Code chat resume.\n\n`);
+		return false;
+	}
+}
+
 function createDefaultImplementationHandoffFlowDeps(
 	stream: vscode.ChatResponseStream,
 ): ImplementationHandoffFlowDeps {
@@ -770,33 +904,13 @@ function applyResumeOverflowStrategy(
 }
 
 function turnsToContextBlock(turns: SavedTurn[]): string {
-	const formatAssistantLabel = (participant: string): string => {
-		if (/^copilot$/i.test(participant)) {
-			return 'Copilot';
-		}
-
-		if (/^codex$/i.test(participant)) {
-			return 'Codex';
-		}
-
-		if (/^cursor$/i.test(participant)) {
-			return 'Cursor';
-		}
-
-		if (/^claude-code$/i.test(participant)) {
-			return 'Claude Code';
-		}
-
-		return participant.trim() || 'Assistant';
-	};
-
 	return turns
 		.map((turn) => {
 			if (turn.type === 'request') {
 				return `User: ${turn.prompt}`;
 			}
 
-			return `${formatAssistantLabel(turn.participant)}: ${turn.content}`;
+			return `${formatProviderLabel(turn.participant)}: ${turn.content}`;
 		})
 		.join('\n\n');
 }
@@ -1129,6 +1243,33 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 				const overflowStrategy = vscode.workspace
 					.getConfiguration('session-control', selection.session.workspaceFolder.uri)
 					.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize');
+				const resumeTargetMode = vscode.workspace
+					.getConfiguration('session-control', selection.session.workspaceFolder.uri)
+					.get<ResumeTargetMode>('resume.target', 'origin-agent');
+				const providerCommands = vscode.workspace
+					.getConfiguration('session-control', selection.session.workspaceFolder.uri)
+					.get<ResumeProviderCommands>('resume.providerCommands', {});
+				if (resumeTargetMode === 'origin-agent' && resumed.provider && resumed.provider !== 'copilot') {
+					const openedOriginAgent = await runResumeIntoOriginAgent(
+						resumed,
+						request.prompt,
+						{
+							maxTurns,
+							maxContextChars,
+							overflowStrategy,
+							providerCommands,
+						},
+						createDefaultResumeIntoOriginAgentDeps(stream),
+					);
+					if (openedOriginAgent) {
+						return {
+							metadata: {
+								resumedSessionFile: reassembled.rootFileName,
+								storageDirectory: selection.session.storageDirectory,
+							},
+						};
+					}
+				}
 				const constrained = applyResumeOverflowStrategy(resumed.turns, maxTurns, maxContextChars, overflowStrategy);
 				stream.markdown(
 					[

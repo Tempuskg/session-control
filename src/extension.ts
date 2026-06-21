@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { buildAnalysisPersistenceContract, createAnalysisStore } from './analysisStore';
-import { createAnalysisCandidates, createAnalyzeSessionsFlowDeps, registerChatParticipant, resolveAnalysisSelection, runAnalyzeSessionsFlow } from './chatParticipant';
+import { createAnalysisCandidates, createAnalyzeSessionsFlowDeps, registerChatParticipant, resolveAnalysisSelection, runAnalyzeSessionsFlow, runResumeIntoOriginAgent, type ResumeOverflowStrategy, type ResumeTargetMode } from './chatParticipant';
 import { createClaudeCodeSessionReader, deriveClaudeCodeProjectSlug, deriveClaudeCodeProjectsPath, readClaudeCodeSessions } from './claudeCodeSessionReader';
 import { deriveCursorProjectSlug } from './cursorAgentTranscriptReader';
 import { createCursorSessionReader, getDefaultCursorProjectsPath, getDefaultCursorUserDataPath, readCursorSessions } from './cursorSessionReader';
@@ -13,6 +13,7 @@ import { getGitContext } from './gitIntegration';
 import { CopilotSession, deriveChatSessionsPath, readCopilotSessions } from './sessionReader';
 import { ANALYSIS_PROMPT_VERSION, buildImplementationHandoffPrompt, filterCandidatesForAnalysis, type AnalysisCandidateSession } from './sessionAnalysis';
 import { SessionExplorerProvider, SessionExplorerSessionItem } from './sessionExplorer';
+import { ResumeProviderCommands } from './resumeTarget';
 import { SessionViewerPanel } from './sessionViewer';
 import { createSessionStore, SessionFileNameOptions, SessionPruneAction } from './sessionStore';
 import { applySaveBloatControls, createChatSession, SaveOverflowStrategy } from './sessionWriter';
@@ -1822,11 +1823,54 @@ export async function runResumeSessionFromViewerCommand(): Promise<void> {
 		return;
 	}
 
-	// Open the chat panel with a pre-filled resume command
-	try {
+	const openCopilotResume = async (): Promise<void> => {
 		await vscode.commands.executeCommand('workbench.action.chat.open', {
 			query: `@session-control /resume ${sessionTitle}`,
 		});
+	};
+
+	const session = panel.getSession();
+	const provider = panel.getSessionProvider();
+	if (session && provider && provider !== 'copilot') {
+		const fileUri = vscode.Uri.file(panel.getFilePath());
+		const workspaceFolder = vscode.workspace.getWorkspaceFolder(fileUri) ?? getImplicitWorkspaceFolder();
+		const configuration = vscode.workspace.getConfiguration('session-control', workspaceFolder?.uri ?? fileUri);
+		const resumeTargetMode = configuration.get<ResumeTargetMode>('resume.target', 'origin-agent');
+		if (resumeTargetMode === 'origin-agent') {
+			const openedOriginAgent = await runResumeIntoOriginAgent(
+				session,
+				'Continue this session.',
+				{
+					maxTurns: configuration.get<number>('resume.maxTurns', 50),
+					maxContextChars: configuration.get<number>('resume.maxContextChars', 80000),
+					overflowStrategy: configuration.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize'),
+					providerCommands: configuration.get<ResumeProviderCommands>('resume.providerCommands', {}),
+				},
+				{
+					getCommands: async () => vscode.commands.getCommands(true),
+					executeCommand: async (commandId: string, args?: unknown) => {
+						if (args === undefined) {
+							await vscode.commands.executeCommand(commandId);
+							return;
+						}
+
+						await vscode.commands.executeCommand(commandId, args);
+					},
+					writeClipboard: async (text: string) => vscode.env.clipboard.writeText(text),
+					streamMarkdown: (markdown: string) => {
+						void vscode.window.showInformationMessage(markdown.replace(/\s+/g, ' ').trim());
+					},
+				},
+			);
+			if (openedOriginAgent) {
+				return;
+			}
+		}
+	}
+
+	// Open the chat panel with a pre-filled resume command
+	try {
+		await openCopilotResume();
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		await vscode.window.showErrorMessage(`Failed to open chat: ${message}`);

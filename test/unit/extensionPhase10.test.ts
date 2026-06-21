@@ -392,6 +392,58 @@ suite('runResumeSessionFromViewerCommand', () => {
 			(SessionViewerPanel as any).currentPanel = originalCurrentPanel;
 		}
 	});
+
+	test('routes a non-Copilot viewer session directly to the origin agent', async () => {
+		const originalCurrentPanel = (SessionViewerPanel as any).currentPanel;
+		const originalExecuteCommand = vscode.commands.executeCommand;
+		const originalGetCommands = vscode.commands.getCommands;
+		const originalWriteText = vscode.env.clipboard.writeText;
+		const originalShowInformationMessage = vscode.window.showInformationMessage;
+		const session = {
+			...createChatSession(createCopilotSession('Viewer Codex Session'), {
+				title: 'Viewer Codex Session',
+				savedAt: '2026-04-13T12:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'codex' as const,
+		};
+		const executedCommands: string[] = [];
+		let clipboardText: string | undefined;
+
+		try {
+			(SessionViewerPanel as any).currentPanel = {
+				getSessionTitle: () => session.title,
+				getSessionProvider: () => session.provider,
+				getSession: () => session,
+				getFilePath: () => 'C:/repo/.chat/viewer-codex-session.json',
+			};
+			(vscode.commands as any).getCommands = async () => ['chatgpt.openSidebar', 'chatgpt.sidebarView.focus', 'workbench.action.chat.open'];
+			(vscode.commands as any).executeCommand = async (commandId: string) => {
+				executedCommands.push(commandId);
+				return undefined;
+			};
+			(vscode.env.clipboard as any).writeText = async (text: string) => {
+				clipboardText = text;
+			};
+			(vscode.window as any).showInformationMessage = async () => undefined;
+
+			await runResumeSessionFromViewerCommand();
+
+			assert.deepEqual(executedCommands, [
+				'chatgpt.openSidebar',
+				'chatgpt.openSidebar',
+				'editor.action.clipboardPasteAction',
+			]);
+			assert.equal(clipboardText?.includes('Viewer Codex Session'), false);
+			assert.equal(clipboardText?.includes('User follow-up: Continue this session.'), true);
+		} finally {
+			(SessionViewerPanel as any).currentPanel = originalCurrentPanel;
+			(vscode.commands as any).executeCommand = originalExecuteCommand;
+			(vscode.commands as any).getCommands = originalGetCommands;
+			(vscode.env.clipboard as any).writeText = originalWriteText;
+			(vscode.window as any).showInformationMessage = originalShowInformationMessage;
+		}
+	});
 });
 
 suite('runImplementLatestAnalysisCommand', () => {
