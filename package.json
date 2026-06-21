@@ -40,22 +40,22 @@
     "commands": [
       {
         "command": "session-control.saveSession",
-        "title": "Session Control: Save Current Chat Session",
+        "title": "Save Current Chat Session",
         "category": "Session Control"
       },
       {
         "command": "session-control.saveSessionFromProvider",
-        "title": "Session Control: Save Session From Provider...",
+        "title": "Save Session From Provider...",
         "category": "Session Control"
       },
       {
         "command": "session-control.listSessions",
-        "title": "Session Control: Browse Saved Sessions",
+        "title": "Browse Saved Sessions",
         "category": "Session Control"
       },
       {
         "command": "session-control.deleteSession",
-        "title": "Session Control: Delete Saved Session",
+        "title": "Delete Saved Session",
         "category": "Session Control"
       },
       {
@@ -71,7 +71,7 @@
       },
       {
         "command": "session-control.viewSessionFile",
-        "title": "Session Control: View Session",
+        "title": "View Session",
         "category": "Session Control",
         "icon": "$(open-preview)"
       },
@@ -83,29 +83,29 @@
       },
       {
         "command": "session-control.analyzeSavedChats",
-        "title": "Session Control: Analyze Saved Chats",
+        "title": "Analyze Saved Chats",
         "category": "Session Control",
         "icon": "$(search-sparkle)"
       },
       {
         "command": "session-control.implementLatestAnalysis",
-        "title": "Session Control: Implement Latest Analysis",
+        "title": "Implement Latest Analysis",
         "category": "Session Control",
         "icon": "$(sparkle)"
       },
       {
         "command": "session-control.importCopilotSkillsToCursor",
-        "title": "Session Control: Import Copilot Guidance as Cursor Skills",
+        "title": "Import Copilot Guidance as Cursor Skills",
         "category": "Session Control"
       },
       {
         "command": "session-control.importCopilotSkillsToCodex",
-        "title": "Session Control: Import Copilot Guidance as Codex Skills",
+        "title": "Import Copilot Guidance as Codex Skills",
         "category": "Session Control"
       },
       {
         "command": "session-control.importCopilotSkillsToClaudeCode",
-        "title": "Session Control: Import Copilot Guidance as Claude Code Skills",
+        "title": "Import Copilot Guidance as Claude Code Skills",
         "category": "Session Control"
       },
       {

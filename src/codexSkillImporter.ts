@@ -16,6 +16,12 @@ interface CodexSkillImporterDeps {
 	exists(filePath: string): Promise<boolean>;
 }
 
+interface ExistingSkillSignature {
+	relativeSkillFilePath: string;
+	importedGuidance?: string;
+	importedSourcePath?: string;
+}
+
 export interface CodexSkillImportResult {
 	created: string[];
 	skipped: string[];
@@ -94,6 +100,10 @@ function stripLeadingFrontmatter(content: string): string {
 	return content.slice(match[0].length).trim();
 }
 
+function normalizeComparableText(content: string): string {
+	return content.replace(/\r\n/g, '\n').trim();
+}
+
 function isGuidanceFileName(fileName: string): boolean {
 	return /(?:\.instructions|\.prompt|\.agent)\.md$/i.test(fileName) || /^SKILL\.md$/i.test(fileName);
 }
@@ -166,6 +176,17 @@ function renderSkillContent(skillName: string, relativeSourcePath: string, sourc
 	].join('\n');
 }
 
+function extractImportedSourcePath(skillContent: string): string | undefined {
+	const match = skillContent.match(/Follow this imported repository guidance from `([^`]+)` when the task overlaps with its original scope\./);
+	return match?.[1]?.trim();
+}
+
+function extractImportedGuidance(skillContent: string): string | undefined {
+	const match = skillContent.match(/^## Imported guidance\r?\n\r?\n([\s\S]*)$/m);
+	const importedGuidance = match?.[1]?.trim();
+	return importedGuidance ? normalizeComparableText(importedGuidance) : undefined;
+}
+
 async function collectMatchingFiles(
 	directoryPath: string,
 	deps: CodexSkillImporterDeps,
@@ -214,6 +235,34 @@ async function collectWorkspaceGuidanceFiles(
 	}
 }
 
+async function collectExistingSkillSignatures(
+	workspaceRoot: string,
+	skillRoot: string,
+	deps: CodexSkillImporterDeps,
+): Promise<ExistingSkillSignature[]> {
+	const skillFiles = new Set<string>();
+	await collectMatchingFiles(skillRoot, deps, isGuidanceFileName, skillFiles);
+	const signatures: ExistingSkillSignature[] = [];
+
+	for (const skillFilePath of [...skillFiles].sort((left, right) => left.localeCompare(right))) {
+		const skillContent = await deps.readFile(skillFilePath);
+		const importedSourcePath = extractImportedSourcePath(skillContent);
+		const importedGuidance = extractImportedGuidance(skillContent);
+		const signature: ExistingSkillSignature = {
+			relativeSkillFilePath: normalizeRelativePath(workspaceRoot, skillFilePath),
+		};
+		if (importedSourcePath) {
+			signature.importedSourcePath = importedSourcePath;
+		}
+		if (importedGuidance) {
+			signature.importedGuidance = importedGuidance;
+		}
+		signatures.push(signature);
+	}
+
+	return signatures;
+}
+
 export function createCodexSkillImporter(overrides: Partial<CodexSkillImporterDeps> = {}): {
 	discoverSourceFiles(workspaceRoot: string): Promise<string[]>;
 	importSkills(workspaceRoot: string, options?: CodexSkillImportOptions): Promise<CodexSkillImportResult>;
@@ -249,6 +298,20 @@ export function createCodexSkillImporter(overrides: Partial<CodexSkillImporterDe
 			const skipped: string[] = [];
 			const reservedTargets = new Set<string>();
 			const skillDirectorySegments = resolveSkillDirectorySegments(options);
+			const skillRoot = path.join(workspaceRoot, ...skillDirectorySegments);
+			const existingSkillSignatures = await collectExistingSkillSignatures(workspaceRoot, skillRoot, deps);
+			const existingSkillBySourcePath = new Map<string, string>();
+			const existingSkillByGuidance = new Map<string, string>();
+
+			for (const signature of existingSkillSignatures) {
+				if (signature.importedSourcePath) {
+					existingSkillBySourcePath.set(signature.importedSourcePath.toLowerCase(), signature.relativeSkillFilePath);
+				}
+
+				if (signature.importedGuidance) {
+					existingSkillByGuidance.set(signature.importedGuidance, signature.relativeSkillFilePath);
+				}
+			}
 
 			for (const sourcePath of sourceFiles) {
 				const relativeSourcePath = normalizeRelativePath(workspaceRoot, sourcePath);
@@ -265,12 +328,29 @@ export function createCodexSkillImporter(overrides: Partial<CodexSkillImporterDe
 				}
 
 				const sourceContent = await deps.readFile(sourcePath);
+				const normalizedImportedGuidance = normalizeComparableText(stripLeadingFrontmatter(sourceContent));
+				const existingSkillForSource = existingSkillBySourcePath.get(relativeSourcePath.toLowerCase());
+				if (existingSkillForSource) {
+					skipped.push(existingSkillForSource);
+					reservedTargets.add(normalizedTarget);
+					continue;
+				}
+
+				const existingSkillForGuidance = existingSkillByGuidance.get(normalizedImportedGuidance);
+				if (existingSkillForGuidance) {
+					skipped.push(existingSkillForGuidance);
+					reservedTargets.add(normalizedTarget);
+					continue;
+				}
+
 				const skillContent = renderSkillContent(skillName, relativeSourcePath, sourceContent);
 				await deps.mkdir(skillDirectory);
 				await deps.writeFile(skillFilePath, skillContent);
 
 				reservedTargets.add(normalizedTarget);
 				created.push(relativeSkillFilePath);
+				existingSkillBySourcePath.set(relativeSourcePath.toLowerCase(), relativeSkillFilePath);
+				existingSkillByGuidance.set(normalizedImportedGuidance, relativeSkillFilePath);
 			}
 
 			return {

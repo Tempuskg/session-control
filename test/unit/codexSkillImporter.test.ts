@@ -156,6 +156,196 @@ suite('codexSkillImporter', () => {
 		}
 	});
 
+	test('skips creating a new Claude Code skill when the same source was already imported under a different skill folder', async () => {
+		const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-claude-skill-importer-'));
+		const importer = createCodexSkillImporter();
+
+		try {
+			await fs.mkdir(path.join(workspaceRoot, '.github'), { recursive: true });
+			await fs.mkdir(path.join(workspaceRoot, '.claude', 'skills', 'custom-copilot-guidance'), { recursive: true });
+			await fs.writeFile(
+				path.join(workspaceRoot, '.github', 'copilot-instructions.md'),
+				'# Copilot\nUse the local test workflow.\n',
+				'utf8',
+			);
+			await fs.writeFile(
+				path.join(workspaceRoot, '.claude', 'skills', 'custom-copilot-guidance', 'SKILL.md'),
+				[
+					'---',
+					'name: custom-copilot-guidance',
+					'description: "Imported repository guidance from .github/copilot-instructions.md. Use when working in this repository and the original guidance is relevant."',
+					'---',
+					'',
+					'Follow this imported repository guidance from `.github/copilot-instructions.md` when the task overlaps with its original scope.',
+					'',
+					'## Instructions',
+					'- Preserve the original guidance.',
+					'',
+					'## Imported guidance',
+					'',
+					'# Copilot',
+					'Use the local test workflow.',
+					'',
+				].join('\n'),
+				'utf8',
+			);
+
+			const result = await importer.importSkills(workspaceRoot, {
+				skillDirectorySegments: ['.claude', 'skills'],
+			});
+			assert.deepEqual(result.created, []);
+			assert.deepEqual(result.skipped, [
+				'.claude/skills/custom-copilot-guidance/SKILL.md',
+			]);
+			await assert.rejects(
+				fs.access(path.join(workspaceRoot, '.claude', 'skills', 'github-copilot-instructions', 'SKILL.md')),
+			);
+		} finally {
+			await fs.rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('skips creating a new Claude Code skill when imported guidance content already exists in another imported skill', async () => {
+		const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-claude-skill-importer-'));
+		const importer = createCodexSkillImporter();
+
+		try {
+			await fs.mkdir(path.join(workspaceRoot, 'guides'), { recursive: true });
+			await fs.mkdir(path.join(workspaceRoot, '.claude', 'skills', 'existing-review-guidance'), { recursive: true });
+			await fs.writeFile(
+				path.join(workspaceRoot, 'guides', 'onboarding.agent.md'),
+				'Pair patiently and explain local conventions clearly.\n',
+				'utf8',
+			);
+			await fs.writeFile(
+				path.join(workspaceRoot, '.claude', 'skills', 'existing-review-guidance', 'SKILL.md'),
+				[
+					'---',
+					'name: existing-review-guidance',
+					'description: "Imported repository guidance from .github/prompts/review.prompt.md. Use when working in this repository and the original guidance is relevant."',
+					'---',
+					'',
+					'Follow this imported repository guidance from `.github/prompts/review.prompt.md` when the task overlaps with its original scope.',
+					'',
+					'## Instructions',
+					'- Preserve the original guidance.',
+					'',
+					'## Imported guidance',
+					'',
+					'Pair patiently and explain local conventions clearly.',
+					'',
+				].join('\n'),
+				'utf8',
+			);
+
+			const result = await importer.importSkills(workspaceRoot, {
+				skillDirectorySegments: ['.claude', 'skills'],
+			});
+			assert.deepEqual(result.created, []);
+			assert.deepEqual(result.skipped, [
+				'.claude/skills/existing-review-guidance/SKILL.md',
+			]);
+			await assert.rejects(
+				fs.access(path.join(workspaceRoot, '.claude', 'skills', 'guides-onboarding-agent', 'SKILL.md')),
+			);
+		} finally {
+			await fs.rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('skips creating a new skill when the same source was already imported under a different skill folder', async () => {
+		const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-codex-skill-importer-'));
+		const importer = createCodexSkillImporter();
+
+		try {
+			await fs.mkdir(path.join(workspaceRoot, '.github'), { recursive: true });
+			await fs.mkdir(path.join(workspaceRoot, '.agents', 'skills', 'custom-copilot-guidance'), { recursive: true });
+			await fs.writeFile(
+				path.join(workspaceRoot, '.github', 'copilot-instructions.md'),
+				'# Copilot\nUse the local test workflow.\n',
+				'utf8',
+			);
+			await fs.writeFile(
+				path.join(workspaceRoot, '.agents', 'skills', 'custom-copilot-guidance', 'SKILL.md'),
+				[
+					'---',
+					'name: custom-copilot-guidance',
+					'description: "Imported repository guidance from .github/copilot-instructions.md. Use when working in this repository and the original guidance is relevant."',
+					'---',
+					'',
+					'Follow this imported repository guidance from `.github/copilot-instructions.md` when the task overlaps with its original scope.',
+					'',
+					'## Instructions',
+					'- Preserve the original guidance.',
+					'',
+					'## Imported guidance',
+					'',
+					'# Copilot',
+					'Use the local test workflow.',
+					'',
+				].join('\n'),
+				'utf8',
+			);
+
+			const result = await importer.importSkills(workspaceRoot);
+			assert.deepEqual(result.created, []);
+			assert.deepEqual(result.skipped, [
+				'.agents/skills/custom-copilot-guidance/SKILL.md',
+			]);
+			await assert.rejects(
+				fs.access(path.join(workspaceRoot, '.agents', 'skills', 'github-copilot-instructions', 'SKILL.md')),
+			);
+		} finally {
+			await fs.rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('skips creating a new skill when imported guidance content already exists in another imported skill', async () => {
+		const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-codex-skill-importer-'));
+		const importer = createCodexSkillImporter();
+
+		try {
+			await fs.mkdir(path.join(workspaceRoot, 'guides'), { recursive: true });
+			await fs.mkdir(path.join(workspaceRoot, '.agents', 'skills', 'existing-review-guidance'), { recursive: true });
+			await fs.writeFile(
+				path.join(workspaceRoot, 'guides', 'onboarding.agent.md'),
+				'Pair patiently and explain local conventions clearly.\n',
+				'utf8',
+			);
+			await fs.writeFile(
+				path.join(workspaceRoot, '.agents', 'skills', 'existing-review-guidance', 'SKILL.md'),
+				[
+					'---',
+					'name: existing-review-guidance',
+					'description: "Imported repository guidance from .github/prompts/review.prompt.md. Use when working in this repository and the original guidance is relevant."',
+					'---',
+					'',
+					'Follow this imported repository guidance from `.github/prompts/review.prompt.md` when the task overlaps with its original scope.',
+					'',
+					'## Instructions',
+					'- Preserve the original guidance.',
+					'',
+					'## Imported guidance',
+					'',
+					'Pair patiently and explain local conventions clearly.',
+					'',
+				].join('\n'),
+				'utf8',
+			);
+
+			const result = await importer.importSkills(workspaceRoot);
+			assert.deepEqual(result.created, []);
+			assert.deepEqual(result.skipped, [
+				'.agents/skills/existing-review-guidance/SKILL.md',
+			]);
+			await assert.rejects(
+				fs.access(path.join(workspaceRoot, '.agents', 'skills', 'guides-onboarding-agent', 'SKILL.md')),
+			);
+		} finally {
+			await fs.rm(workspaceRoot, { recursive: true, force: true });
+		}
+	});
+
 	test('skips unreadable workspace directories during guidance discovery', async () => {
 		const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-codex-skill-importer-'));
 		const blockedDirectory = path.join(workspaceRoot, '.tmp_pytest', 'pytest-adjacent');

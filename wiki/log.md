@@ -139,3 +139,7 @@ Pages touched: README.md, CHANGELOG.md, package.json, log.md
 ## [2026-06-10] update | Codex Host Auto-save
 Extended the existing provider-aware save flow so Session Control now auto-detects Codex when running inside Codex and can auto-save Codex session transcript updates. Codex auto-save watches the local Codex sessions directory, filters sessions to the active workspace using transcript `cwd`, and preserves the existing Copilot and Cursor integrations.
 Pages touched: README.md, CHANGELOG.md, package.json, src/types.ts, src/codexSessionReader.ts, src/extension.ts, test/unit/codexSessionReader.test.ts, test/unit/extensionAutoSave.test.ts, test/unit/extensionPhase10.test.ts, log.md
+
+## [2026-06-21] update | Command Title Cleanup
+Synced the wiki file manifest with the shorter command titles now used in `package.json`, including the import, analyze, save, and toggle-auto-save entries.
+Pages touched: file-manifest.md, log.md

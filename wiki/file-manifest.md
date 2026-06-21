@@ -2,7 +2,7 @@
 title: "File Manifest"
 type: entity
 created: 2026-04-12
-updated: 2026-05-17
+updated: 2026-06-21
 sources:
   - raw/plan.md
 tags:
@@ -89,15 +89,21 @@ graph TD
 ## Package.json Contributions
 
 ### Commands
-- `session-control.saveSession` — "Session Control: Save Current Chat Session"
-- `session-control.listSessions` — "Session Control: Browse Saved Sessions"
-- `session-control.deleteSession` — "Session Control: Delete Saved Session"
-- `session-control.viewSessionFile` — "Session Control: View Session" (editor title preview action)
-- `session-control.openSessionFromExplorer` — "Open Saved Session" (Session Explorer inline action)
-- `session-control.deleteSessionFromExplorer` — "Delete Saved Session" (Session Explorer inline action)
+- `session-control.saveSession` — "Save Current Chat Session"
+- `session-control.saveSessionFromProvider` — "Save Session From Provider..."
+- `session-control.listSessions` — "Browse Saved Sessions"
+- `session-control.deleteSession` — "Delete Saved Session"
 - `session-control.refreshSessionExplorer` — "Refresh Session Explorer"
-- `session-control.implementLatestAnalysis` — "Session Control: Implement Latest Analysis"
-- `session-control.toggleAutoSave` — "Toggle Auto-Save" (toggles `autoSaveOnChatResponse`)
+- `session-control.openSessionFromExplorer` — "Open Saved Session" (Session Explorer inline action)
+- `session-control.viewSessionFile` — "View Session" (editor title preview action)
+- `session-control.resumeSessionFromViewer` — "Resume This Session in Chat" (editor title action)
+- `session-control.analyzeSavedChats` — "Analyze Saved Chats"
+- `session-control.implementLatestAnalysis` — "Implement Latest Analysis"
+- `session-control.importCopilotSkillsToCursor` — "Import Copilot Guidance as Cursor Skills"
+- `session-control.importCopilotSkillsToCodex` — "Import Copilot Guidance as Codex Skills"
+- `session-control.importCopilotSkillsToClaudeCode` — "Import Copilot Guidance as Claude Code Skills"
+- `session-control.deleteSessionFromExplorer` — "Delete Saved Session" (Session Explorer inline action)
+- `session-control.toggleAutoSave` — "Toggle Auto-Save on Chat Response" (toggles `autoSaveOnChatResponse`)
 
 ### Chat Participant
 - **ID**: `session-control.resume`
@@ -106,7 +112,7 @@ graph TD
 - **Commands**: `resume`, `list`, `analyze`, `implement`
 
 ### Menus
-- "Save Chat Session" in `chat/context` menu or command palette
+- Command palette entries cover save, browse, analyze, implement, import, delete, and auto-save actions.
 
 ### Tree View
 - `session-control.sessionExplorer` — Sidebar panel listing saved sessions grouped by workspace
