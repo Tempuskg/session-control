@@ -50,6 +50,7 @@ const AI_RECOMMENDATION_FILE_PATTERNS = [
 const AI_RECOMMENDATION_EXCLUDE_GLOB = '**/{.git,node_modules,dist,dist-test,.vscode-test}/**';
 const MAX_AI_RECOMMENDATION_BASELINE_CHARS = 16000;
 const MAX_AI_RECOMMENDATION_FILE_CHARS = 4000;
+const CLAUDE_CODE_PASTE_SETTLE_MS = 75;
 
 export type ResumeOverflowStrategy = 'summarize' | 'truncate' | 'recent-only';
 export type ResumeTargetMode = 'origin-agent' | 'vscode-chat';
@@ -670,14 +671,20 @@ export async function runResumeIntoOriginAgent(
 		if (focusCommand) {
 			try {
 				await deps.executeCommand(focusCommand);
-				if (provider === 'codex') {
+				if (provider === 'codex' || provider === 'claude-code') {
+					const tabLabel = provider === 'codex' ? 'Codex' : 'Claude Code';
+					if (provider === 'claude-code' && focusCommand === 'claude-vscode.focus') {
+						// Claude's focus command dispatches through the webview bridge, so
+						// give the input a beat to claim focus before we paste.
+						await new Promise((resolve) => setTimeout(resolve, CLAUDE_CODE_PASTE_SETTLE_MS));
+					}
 					try {
 						await deps.executeCommand('editor.action.clipboardPasteAction');
-						deps.streamMarkdown('Opened the Codex chat tab and pasted the conversation context.');
+						deps.streamMarkdown(`Opened the ${tabLabel} chat tab and pasted the conversation context.`);
 						return true;
 					} catch (pasteError) {
 						const pasteMessage = pasteError instanceof Error ? pasteError.message : String(pasteError);
-						deps.streamMarkdown(`Opened the Codex chat tab and copied the conversation context, but automatic paste failed (${pasteMessage}) - paste (Ctrl+V) to continue.`);
+						deps.streamMarkdown(`Opened the ${tabLabel} chat tab and copied the conversation context, but automatic paste failed (${pasteMessage}) - paste (Ctrl+V) to continue.`);
 						return true;
 					}
 				}

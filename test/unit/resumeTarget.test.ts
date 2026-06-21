@@ -27,6 +27,13 @@ suite('resumeTarget', () => {
 		assert.equal(target?.commandId, 'custom.claude.open');
 	});
 
+	test('uses the first available Claude Code candidate', () => {
+		const target = resolveResumeTarget('claude-code', ['claude-vscode.sidebar.open', 'claude-vscode.newConversation']);
+
+		assert.equal(target?.commandId, 'claude-vscode.sidebar.open');
+		assert.equal(target?.supportsQuery, false);
+	});
+
 	test('returns undefined when no command is available', () => {
 		const target = resolveResumeTarget('cursor', ['workbench.action.chat.open']);
 
@@ -49,6 +56,16 @@ suite('resumeTarget', () => {
 		]);
 
 		assert.equal(focusCommand, 'workbench.view.extension.codexSecondaryViewContainer');
+	});
+
+	test('resolves the first available Claude Code focus command', () => {
+		const focusCommand = resolveProviderFocusCommand('claude-code', [
+			'claude-vscode.focus',
+			'claudeVSCodeSidebar.focus',
+			'workbench.view.extension.claude-sidebar',
+		]);
+
+		assert.equal(focusCommand, 'claude-vscode.focus');
 	});
 
 	test('returns undefined when no focus command is available', () => {

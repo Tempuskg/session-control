@@ -444,6 +444,58 @@ suite('runResumeSessionFromViewerCommand', () => {
 			(vscode.window as any).showInformationMessage = originalShowInformationMessage;
 		}
 	});
+
+	test('routes a Claude Code viewer session to the Claude sidebar tab', async () => {
+		const originalCurrentPanel = (SessionViewerPanel as any).currentPanel;
+		const originalExecuteCommand = vscode.commands.executeCommand;
+		const originalGetCommands = vscode.commands.getCommands;
+		const originalWriteText = vscode.env.clipboard.writeText;
+		const originalShowInformationMessage = vscode.window.showInformationMessage;
+		const session = {
+			...createChatSession(createCopilotSession('Viewer Claude Session'), {
+				title: 'Viewer Claude Session',
+				savedAt: '2026-04-13T12:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'claude-code' as const,
+		};
+		const executedCommands: string[] = [];
+		let clipboardText: string | undefined;
+
+		try {
+			(SessionViewerPanel as any).currentPanel = {
+				getSessionTitle: () => session.title,
+				getSessionProvider: () => session.provider,
+				getSession: () => session,
+				getFilePath: () => 'C:/repo/.chat/viewer-claude-session.json',
+			};
+			(vscode.commands as any).getCommands = async () => ['claude-vscode.sidebar.open', 'claude-vscode.focus', 'claudeVSCodeSidebar.focus', 'workbench.action.chat.open'];
+			(vscode.commands as any).executeCommand = async (commandId: string) => {
+				executedCommands.push(commandId);
+				return undefined;
+			};
+			(vscode.env.clipboard as any).writeText = async (text: string) => {
+				clipboardText = text;
+			};
+			(vscode.window as any).showInformationMessage = async () => undefined;
+
+			await runResumeSessionFromViewerCommand();
+
+			assert.deepEqual(executedCommands, [
+				'claude-vscode.sidebar.open',
+				'claude-vscode.focus',
+				'editor.action.clipboardPasteAction',
+			]);
+			assert.equal(clipboardText?.includes('Viewer Claude Session'), false);
+			assert.equal(clipboardText?.includes('User follow-up: Continue this session.'), true);
+		} finally {
+			(SessionViewerPanel as any).currentPanel = originalCurrentPanel;
+			(vscode.commands as any).executeCommand = originalExecuteCommand;
+			(vscode.commands as any).getCommands = originalGetCommands;
+			(vscode.env.clipboard as any).writeText = originalWriteText;
+			(vscode.window as any).showInformationMessage = originalShowInformationMessage;
+		}
+	});
 });
 
 suite('runImplementLatestAnalysisCommand', () => {

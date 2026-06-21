@@ -15,7 +15,9 @@ const COMMANDS_SUPPORTING_QUERY = new Set([
 // Verified locally from openai.chatgpt package.json: chatgpt.openSidebar,
 // chatgpt.newChat, chatgpt.newCodexPanel.
 // Verified locally from anthropic.claude-code package.json:
-// claude-vscode.newConversation, claude-vscode.sidebar.open.
+// claude-vscode.sidebar.open, claude-vscode.newConversation,
+// views claudeVSCodeSidebar / claudeVSCodeSidebarSecondary in containers
+// claude-sidebar / claude-sidebar-secondary.
 // Cursor's agent UI is host-provided in current installs, so these candidates
 // are intentionally conservative and can be overridden with resume.providerCommands.
 const RESUME_TARGET_CANDIDATES: Record<SessionProviderId, readonly string[]> = {
@@ -26,8 +28,8 @@ const RESUME_TARGET_CANDIDATES: Record<SessionProviderId, readonly string[]> = {
 		'chatgpt.newCodexPanel',
 	],
 	'claude-code': [
-		'claude-vscode.newConversation',
 		'claude-vscode.sidebar.open',
+		'claude-vscode.newConversation',
 		'claude-vscode.editor.open',
 		'claude-vscode.editor.openLast',
 	],
@@ -45,7 +47,9 @@ const RESUME_TARGET_CANDIDATES: Record<SessionProviderId, readonly string[]> = {
 // appear in getCommands(true) when the provider extension is installed.
 // Verified locally from openai.chatgpt package.json: views chatgpt.sidebarView /
 // chatgpt.sidebarSecondaryView in containers codexViewContainer /
-// codexSecondaryViewContainer.
+// codexSecondaryViewContainer. Verified locally from anthropic.claude-code
+// package.json/extension.js: claude-vscode.focus is the dedicated command that
+// pushes focus into Claude's chat experience after the sidebar is revealed.
 const FOCUS_COMMAND_CANDIDATES: Partial<Record<SessionProviderId, readonly string[]>> = {
 	codex: [
 		'chatgpt.openSidebar',
@@ -53,6 +57,13 @@ const FOCUS_COMMAND_CANDIDATES: Partial<Record<SessionProviderId, readonly strin
 		'chatgpt.sidebarSecondaryView.focus',
 		'workbench.view.extension.codexViewContainer',
 		'workbench.view.extension.codexSecondaryViewContainer',
+	],
+	'claude-code': [
+		'claude-vscode.focus',
+		'claudeVSCodeSidebarSecondary.focus',
+		'claudeVSCodeSidebar.focus',
+		'workbench.view.extension.claude-sidebar',
+		'workbench.view.extension.claude-sidebar-secondary',
 	],
 };
 

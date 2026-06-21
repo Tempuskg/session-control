@@ -343,7 +343,7 @@ suite('chatParticipant integration', () => {
 		assert.equal((executedArgs as { query?: string } | undefined)?.query?.includes('User follow-up: What next?'), true);
 	});
 
-	test('runResumeIntoOriginAgent opens non-query targets and copies context', async () => {
+	test('runResumeIntoOriginAgent opens the Claude Code sidebar tab and pastes context', async () => {
 		const saved = {
 			...createChatSession(createCopilotSession(), {
 				title: 'Claude resume',
@@ -352,6 +352,7 @@ suite('chatParticipant integration', () => {
 			}),
 			provider: 'claude-code' as const,
 		};
+		const executedCommands: string[] = [];
 		let executedCommand: string | undefined;
 		let clipboardText: string | undefined;
 
@@ -360,9 +361,10 @@ suite('chatParticipant integration', () => {
 			maxContextChars: 30000,
 			overflowStrategy: 'recent-only',
 		}, {
-			getCommands: async () => ['claude-vscode.newConversation'],
+			getCommands: async () => ['claude-vscode.sidebar.open', 'claude-vscode.focus', 'claudeVSCodeSidebar.focus'],
 			executeCommand: async (commandId: string) => {
 				executedCommand = commandId;
+				executedCommands.push(commandId);
 			},
 			writeClipboard: async (text: string) => {
 				clipboardText = text;
@@ -371,7 +373,12 @@ suite('chatParticipant integration', () => {
 		});
 
 		assert.equal(opened, true);
-		assert.equal(executedCommand, 'claude-vscode.newConversation');
+		assert.equal(executedCommand, 'editor.action.clipboardPasteAction');
+		assert.deepEqual(executedCommands, [
+			'claude-vscode.sidebar.open',
+			'claude-vscode.focus',
+			'editor.action.clipboardPasteAction',
+		]);
 		assert.equal(clipboardText?.includes('User follow-up: Continue'), true);
 		assert.equal(clipboardText?.includes('Earlier turns omitted ('), true);
 	});
