@@ -397,7 +397,6 @@ suite('runResumeSessionFromViewerCommand', () => {
 		const originalCurrentPanel = (SessionViewerPanel as any).currentPanel;
 		const originalExecuteCommand = vscode.commands.executeCommand;
 		const originalGetCommands = vscode.commands.getCommands;
-		const originalWriteText = vscode.env.clipboard.writeText;
 		const originalShowInformationMessage = vscode.window.showInformationMessage;
 		const session = {
 			...createChatSession(createCopilotSession('Viewer Codex Session'), {
@@ -422,12 +421,13 @@ suite('runResumeSessionFromViewerCommand', () => {
 				executedCommands.push(commandId);
 				return undefined;
 			};
-			(vscode.env.clipboard as any).writeText = async (text: string) => {
-				clipboardText = text;
-			};
 			(vscode.window as any).showInformationMessage = async () => undefined;
 
-			await runResumeSessionFromViewerCommand();
+			await runResumeSessionFromViewerCommand({
+				writeClipboard: async (text: string) => {
+					clipboardText = text;
+				},
+			});
 
 			assert.deepEqual(executedCommands, [
 				'chatgpt.openSidebar',
@@ -440,7 +440,6 @@ suite('runResumeSessionFromViewerCommand', () => {
 			(SessionViewerPanel as any).currentPanel = originalCurrentPanel;
 			(vscode.commands as any).executeCommand = originalExecuteCommand;
 			(vscode.commands as any).getCommands = originalGetCommands;
-			(vscode.env.clipboard as any).writeText = originalWriteText;
 			(vscode.window as any).showInformationMessage = originalShowInformationMessage;
 		}
 	});
@@ -449,7 +448,6 @@ suite('runResumeSessionFromViewerCommand', () => {
 		const originalCurrentPanel = (SessionViewerPanel as any).currentPanel;
 		const originalExecuteCommand = vscode.commands.executeCommand;
 		const originalGetCommands = vscode.commands.getCommands;
-		const originalWriteText = vscode.env.clipboard.writeText;
 		const originalShowInformationMessage = vscode.window.showInformationMessage;
 		const session = {
 			...createChatSession(createCopilotSession('Viewer Claude Session'), {
@@ -474,12 +472,13 @@ suite('runResumeSessionFromViewerCommand', () => {
 				executedCommands.push(commandId);
 				return undefined;
 			};
-			(vscode.env.clipboard as any).writeText = async (text: string) => {
-				clipboardText = text;
-			};
 			(vscode.window as any).showInformationMessage = async () => undefined;
 
-			await runResumeSessionFromViewerCommand();
+			await runResumeSessionFromViewerCommand({
+				writeClipboard: async (text: string) => {
+					clipboardText = text;
+				},
+			});
 
 			assert.deepEqual(executedCommands, [
 				'claude-vscode.sidebar.open',
@@ -494,7 +493,6 @@ suite('runResumeSessionFromViewerCommand', () => {
 			(SessionViewerPanel as any).currentPanel = originalCurrentPanel;
 			(vscode.commands as any).executeCommand = originalExecuteCommand;
 			(vscode.commands as any).getCommands = originalGetCommands;
-			(vscode.env.clipboard as any).writeText = originalWriteText;
 			(vscode.window as any).showInformationMessage = originalShowInformationMessage;
 		}
 	});

@@ -491,7 +491,7 @@ suite('extension auto-save on chat response', () => {
 		);
 
 		assert.equal(watchedTargets.length, 1);
-		assert.equal(watchedTargets[0]?.directory.replace(/\\/g, '/'), 'C:/Users/test/.claude/projects/e-chat-commit');
+		assert.equal(watchedTargets[0]?.directory.replace(/\\/g, '/'), 'C:/Users/test/.claude/projects/e--chat-commit');
 		assert.equal(watchedTargets[0]?.glob, '*.jsonl');
 
 		watcher.emitChange();

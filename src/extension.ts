@@ -97,6 +97,10 @@ interface ImportCopilotGuidanceCommandOptions {
 	skillDirectorySegments?: readonly string[];
 }
 
+interface ResumeSessionFromViewerCommandDeps {
+	writeClipboard: (text: string) => Promise<void>;
+}
+
 interface SaveSourceSessionFlowDeps {
 	selectSession: (sessions: SourceChatSession[], provider: SessionProviderId) => Promise<SourceChatSession | undefined>;
 	promptTitle: (defaultTitle: string, provider: SessionProviderId) => Promise<string | undefined>;
@@ -1810,7 +1814,13 @@ function updateAutoSaveStatusBar(item: vscode.StatusBarItem): void {
 	item.show();
 }
 
-export async function runResumeSessionFromViewerCommand(): Promise<void> {
+export async function runResumeSessionFromViewerCommand(
+	depsOverrides: Partial<ResumeSessionFromViewerCommandDeps> = {},
+): Promise<void> {
+	const deps: ResumeSessionFromViewerCommandDeps = {
+		writeClipboard: async (text: string) => vscode.env.clipboard.writeText(text),
+		...depsOverrides,
+	};
 	const panel = SessionViewerPanel.currentPanel;
 	if (!panel) {
 		await vscode.window.showInformationMessage('No session viewer is currently open.');
@@ -1856,7 +1866,7 @@ export async function runResumeSessionFromViewerCommand(): Promise<void> {
 
 						await vscode.commands.executeCommand(commandId, args);
 					},
-					writeClipboard: async (text: string) => vscode.env.clipboard.writeText(text),
+					writeClipboard: deps.writeClipboard,
 					streamMarkdown: (markdown: string) => {
 						void vscode.window.showInformationMessage(markdown.replace(/\s+/g, ' ').trim());
 					},
