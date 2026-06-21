@@ -88,7 +88,7 @@ jobs:
           set -e
           printf '%s\n' "$publish_output"
           if [ "$publish_status" -ne 0 ]; then
-            if printf '%s' "$publish_output" | grep -qi 'already exists'; then
+            if printf '%s' "$publish_output" | grep -Eqi 'already (exists|published)'; then
               echo 'VS Code Marketplace already has this version; continuing.'
             else
               exit "$publish_status"
@@ -106,7 +106,7 @@ jobs:
           set -e
           printf '%s\n' "$publish_output"
           if [ "$publish_status" -ne 0 ]; then
-            if printf '%s' "$publish_output" | grep -qi 'already exists'; then
+            if printf '%s' "$publish_output" | grep -Eqi 'already (exists|published)'; then
               echo 'Open VSX already has this version; continuing.'
             else
               exit "$publish_status"
