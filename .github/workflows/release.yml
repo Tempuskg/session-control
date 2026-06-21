@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag to publish'
+        required: false
+        type: string
 
 jobs:
   publish:
@@ -23,6 +28,21 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Resolve release tag
+        id: release_tag
+        shell: bash
+        run: |
+          tag_name="${GITHUB_REF_NAME}"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            tag_name="${{ inputs.tag_name }}"
+            if [ -z "$tag_name" ]; then
+              echo "workflow_dispatch requires an explicit tag_name input." >&2
+              exit 1
+            fi
+          fi
+
+          echo "tag_name=$tag_name" >> "$GITHUB_OUTPUT"
 
       - name: Validate publish secrets
         env:
@@ -70,4 +90,5 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release_tag.outputs.tag_name }}
           files: ${{ steps.package.outputs.vsix_path }}
