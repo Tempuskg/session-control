@@ -142,11 +142,11 @@ Replaces the current "A VS Code extension that saves GitHub Copilot…" framing.
 
 Human owner: review and approve before the next release.
 
-- [ ] Sign off on the new `description` string (Section 3.2).
-- [ ] Sign off on the new README hero (Section 3.3).
-- [ ] Confirm the keyword additions in Section 3.1 are acceptable for both Open VSX and the
+- [x] Sign off on the new `description` string (Section 3.2).
+- [x] Sign off on the new README hero (Section 3.3).
+- [x] Confirm the keyword additions in Section 3.1 are acceptable for both Open VSX and the
       residual VS Marketplace listing.
-- [ ] Decide whether to ship this as a patch (`1.3.4`) or wait and bundle with Phase 2 Step 2
+- [x] Decide whether to ship this as a patch (`1.3.4`) or wait and bundle with Phase 2 Step 2
       (screenshots + GIF) under `1.4.0`.
 - [ ] After version bump, push the `v*` tag. `release.yml` publishes the same VSIX to VS
       Marketplace and Open VSX.
