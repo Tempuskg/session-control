@@ -200,6 +200,122 @@ suite('sessionReader', () => {
 		}
 	});
 
+	test('reads legacy snapshot json sessions from top-level requests', async () => {
+		const errorMessages: string[] = [];
+		const warnings: string[] = [];
+		const setup = await setupWorkspaceStorageRoot();
+
+		try {
+			const legacySession = {
+				version: 3,
+				responderUsername: 'GitHub Copilot',
+				initialLocation: 'panel',
+				customTitle: 'Legacy build session',
+				requests: [
+					{
+						requestId: 'legacy-request-1',
+						timestamp: 1769991000000,
+						agent: { name: 'agent' },
+						message: {
+							text: 'build solution',
+							parts: [{ kind: 'text', text: 'build solution' }],
+						},
+						response: [
+							{ kind: 'thinking', value: 'internal reasoning' },
+							{
+								kind: 'toolInvocationSerialized',
+								toolId: 'run_in_terminal',
+								pastTenseMessage: { value: 'Built solution' },
+							},
+							{ kind: 'markdownContent', value: 'Build completed successfully.' },
+						],
+					},
+				],
+				sessionId: 'legacy-session',
+				creationDate: 1769990927064,
+				lastMessageDate: 1769991005000,
+				hasPendingEdits: false,
+			};
+
+			await fs.writeFile(
+				path.join(setup.sessionsDirectory, 'legacy-snapshot.json'),
+				JSON.stringify(legacySession, null, 2),
+				'utf8',
+			);
+
+			const reader = createSessionReader({
+				showInformationMessage: async () => undefined,
+				showErrorMessage: async (message: string) => {
+					errorMessages.push(message);
+				},
+				logWarning: (message: string) => {
+					warnings.push(message);
+				},
+				vscodeVersion: '1.126.0',
+			});
+
+			const sessions = await reader.readCopilotSessions({ storageUri: { fsPath: setup.storageUriPath } });
+			const responseTurn = sessions[0]?.turns[1] as { content: string; toolCalls: Array<{ name: string; summary?: string }> };
+
+			assert.equal(sessions.length, 1);
+			assert.equal(sessions[0]?.id, 'legacy-session');
+			assert.equal(sessions[0]?.title, 'Legacy build session');
+			assert.equal(sessions[0]?.turns[0]?.type, 'request');
+			assert.equal((sessions[0]?.turns[0] as { prompt: string }).prompt, 'build solution');
+			assert.equal(responseTurn.content, 'Build completed successfully.');
+			assert.equal(responseTurn.toolCalls[0]?.name, 'run_in_terminal');
+			assert.equal(responseTurn.toolCalls[0]?.summary, 'Built solution');
+			assert.equal(errorMessages.length, 0);
+			assert.equal(warnings.length, 0);
+		} finally {
+			await fs.rm(setup.root, { recursive: true, force: true });
+		}
+	});
+
+	test('skips empty legacy snapshot json sessions without showing unknown format error', async () => {
+		const errorMessages: string[] = [];
+		const warnings: string[] = [];
+		const setup = await setupWorkspaceStorageRoot();
+
+		try {
+			const emptyLegacySession = {
+				version: 3,
+				responderUsername: 'GitHub Copilot',
+				initialLocation: 'panel',
+				requests: [],
+				sessionId: 'legacy-empty',
+				creationDate: 1769990927064,
+				lastMessageDate: 1769990927064,
+				hasPendingEdits: false,
+			};
+
+			await fs.writeFile(
+				path.join(setup.sessionsDirectory, 'legacy-empty.json'),
+				JSON.stringify(emptyLegacySession, null, 2),
+				'utf8',
+			);
+
+			const reader = createSessionReader({
+				showInformationMessage: async () => undefined,
+				showErrorMessage: async (message: string) => {
+					errorMessages.push(message);
+				},
+				logWarning: (message: string) => {
+					warnings.push(message);
+				},
+				vscodeVersion: '1.126.0',
+			});
+
+			const sessions = await reader.readCopilotSessions({ storageUri: { fsPath: setup.storageUriPath } });
+
+			assert.equal(sessions.length, 0);
+			assert.equal(errorMessages.length, 0);
+			assert.ok(warnings.some((message) => message.includes('legacy-empty.json')));
+		} finally {
+			await fs.rm(setup.root, { recursive: true, force: true });
+		}
+	});
+
 	test('empty snapshot-patch session alongside valid sessions returns the valid sessions without error', async () => {
 		const errorMessages: string[] = [];
 		const setup = await setupWorkspaceStorageRoot();

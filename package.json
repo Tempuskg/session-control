@@ -2,7 +2,7 @@
   "name": "session-control",
   "displayName": "Session Control",
   "description": "Save and resume GitHub Copilot, Cursor, Codex, and Claude Code chat sessions linked to git commits",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "publisher": "darrenjmcleod",
   "icon": "media/session-control.png",
   "license": "MIT",
@@ -118,6 +118,21 @@
         "command": "session-control.toggleAutoSave",
         "title": "Toggle Auto-Save on Chat Response",
         "category": "Session Control"
+      },
+      {
+        "command": "session-control.enterProLicenseKey",
+        "title": "Enter Pro License Key",
+        "category": "Session Control Pro"
+      },
+      {
+        "command": "session-control.clearProLicenseKey",
+        "title": "Clear Pro License Key",
+        "category": "Session Control Pro"
+      },
+      {
+        "command": "session-control.showProLicenseStatus",
+        "title": "Show Pro License Status",
+        "category": "Session Control Pro"
       }
     ],
     "configuration": {
@@ -310,6 +325,18 @@
           "default": "archive",
           "description": "What to do with the oldest sessions when save.maxSavedSessions is exceeded.",
           "scope": "resource"
+        },
+        "session-control.pro.polar.organizationId": {
+          "type": "string",
+          "default": "",
+          "description": "Polar organization ID used to validate Session Control Pro license keys.",
+          "scope": "application"
+        },
+        "session-control.pro.polar.apiBaseUrl": {
+          "type": "string",
+          "default": "https://api.polar.sh",
+          "description": "Polar API base URL used to validate Session Control Pro license keys. Use https://sandbox-api.polar.sh for Polar sandbox testing.",
+          "scope": "application"
         }
       }
     },
@@ -385,6 +412,15 @@
         },
         {
           "command": "session-control.toggleAutoSave"
+        },
+        {
+          "command": "session-control.enterProLicenseKey"
+        },
+        {
+          "command": "session-control.clearProLicenseKey"
+        },
+        {
+          "command": "session-control.showProLicenseStatus"
         }
       ],
       "view/title": [

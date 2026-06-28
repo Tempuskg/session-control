@@ -37,6 +37,7 @@ For `/implement`, `/proceed`, direct implementation requests, or generated imple
 - Strict optional-property typing is active in this repo, so omit optional keys rather than passing `undefined`.
 - Plain chat participants are not coding agents unless tool and workspace access are explicitly wired.
 - Repo type: VS Code extension. For patch version bumps, prefer `npm run version:build`. For explicit version sets, use the documented exact `npm version` path without automatic git tag or commit creation.
+- Shipping model: one customer-facing `session-control` extension install. Do not tell users to install, configure, or look for a standalone `session-control-pro` extension. Treat private Pro or license-layer work as companion package functionality that loads through this extension.
 - Release-relevant files are `package.json`, `package-lock.json`, `README.md`, and `scripts/bump-package-version.cjs`. Verify only the expected release files for versioning tasks.
 - On resumed chats, re-read the current version and workspace state before release steps, and prefer repo scripts or repo-local AI skills over generic CLI advice.
 - Evidenced local AI files here are `AGENTS.md` and `.github/copilot-instructions.md`; `CLAUDE.md` was not evidenced.

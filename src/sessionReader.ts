@@ -339,7 +339,159 @@ function normalizeTurns(rawTurns: unknown): SavedTurn[] {
 	return rawTurns.flatMap((turn) => normalizeTurnEntry(turn));
 }
 
+function cloneJsonArray(value: unknown[]): unknown[] {
+	return JSON.parse(JSON.stringify(value)) as unknown[];
+}
+
+function isSnapshotPayload(payload: Record<string, unknown>): payload is Record<string, unknown> & { requests: unknown[] } {
+	return Array.isArray(payload.requests)
+		&& (
+			typeof payload.version === 'number'
+			|| typeof payload.sessionId === 'string'
+			|| typeof payload.creationDate === 'number'
+			|| typeof payload.lastMessageDate === 'number'
+		);
+}
+
+function shouldIgnoreSnapshotResponsePart(part: Record<string, unknown>): boolean {
+	return part.kind === 'thinking' || part.kind === 'mcpServersStarting';
+}
+
+function normalizeSnapshotToolCall(part: Record<string, unknown>): ToolCall {
+	const name = typeof part.toolId === 'string'
+		? part.toolId
+		: typeof part.toolCallId === 'string'
+			? part.toolCallId
+			: 'unknown';
+	const toolCall: ToolCall = { name };
+	const summary = firstNonEmpty(part.pastTenseMessage, part.invocationMessage);
+	if (summary) {
+		toolCall.summary = summary;
+	}
+
+	return toolCall;
+}
+
+function normalizeSnapshotSession(
+	snapshot: Record<string, unknown>,
+	requests: unknown[],
+	sourceFile: string,
+): CopilotSession | null {
+	const turns: SavedTurn[] = [];
+	for (const request of requests) {
+		if (!isRecord(request)) {
+			continue;
+		}
+
+		const userText = firstNonEmpty(request.message) ?? '';
+
+		if (userText) {
+			const references: string[] = [];
+			if (Array.isArray(request.contentReferences)) {
+				for (const ref of request.contentReferences) {
+					if (!isRecord(ref)) {
+						continue;
+					}
+					const refObj = isRecord(ref.reference) ? ref.reference : ref;
+					const refPath = typeof refObj.fsPath === 'string'
+						? refObj.fsPath
+						: typeof refObj.path === 'string'
+							? refObj.path
+							: undefined;
+					if (typeof refPath === 'string') {
+						references.push(refPath);
+					}
+				}
+			}
+
+			const agentName = isRecord(request.agent) && typeof request.agent.name === 'string'
+				? request.agent.name
+				: 'copilot';
+
+			turns.push({
+				type: 'request',
+				participant: agentName,
+				prompt: userText,
+				references,
+				timestamp: typeof request.timestamp === 'number'
+					? new Date(request.timestamp).toISOString()
+					: toIsoTimestamp(request.timestamp),
+			});
+		}
+
+		if (Array.isArray(request.response)) {
+			const textParts: string[] = [];
+			const toolCalls: ToolCall[] = [];
+
+			for (const part of request.response) {
+				if (!isRecord(part)) {
+					continue;
+				}
+
+				if (part.kind === 'toolInvocationSerialized') {
+					toolCalls.push(normalizeSnapshotToolCall(part));
+					continue;
+				}
+
+				if (shouldIgnoreSnapshotResponsePart(part)) {
+					continue;
+				}
+
+				const text = firstNonEmpty(part.value, part.text, part.message, part.content, part.parts);
+				if (text) {
+					textParts.push(text);
+				}
+			}
+
+			const content = textParts.join('\n\n').trim();
+			if (content) {
+				const agentName = isRecord(request.agent) && typeof request.agent.name === 'string'
+					? request.agent.name
+					: 'copilot';
+
+				turns.push({
+					type: 'response',
+					participant: agentName,
+					content,
+					toolCalls,
+					timestamp: typeof request.timestamp === 'number'
+						? new Date(request.timestamp + 1).toISOString()
+						: toIsoTimestamp(request.timestamp),
+				});
+			}
+		}
+	}
+
+	if (!turns.length) {
+		return null;
+	}
+
+	const id = typeof snapshot.sessionId === 'string' ? snapshot.sessionId : sourceFile;
+	const title = typeof snapshot.customTitle === 'string'
+		? snapshot.customTitle
+		: typeof snapshot.title === 'string'
+			? snapshot.title
+			: id;
+	const lastMessageDate = turns[turns.length - 1]?.timestamp
+		?? (typeof snapshot.creationDate === 'number'
+			? new Date(snapshot.creationDate).toISOString()
+			: new Date().toISOString());
+
+	return {
+		provider: 'copilot',
+		id,
+		title,
+		lastMessageDate,
+		turns,
+		sourceFile,
+	};
+}
+
 function normalizeObjectPayload(payload: Record<string, unknown>, sourceFile: string): CopilotSession | null {
+	if (isSnapshotPayload(payload)) {
+		return normalizeSnapshotSession(payload, cloneJsonArray(payload.requests), sourceFile);
+	}
+
 	const payloadTurns = pickRawTurns(payload);
 	if (Array.isArray(payloadTurns)) {
 		const turns = normalizeTurns(payloadTurns);
@@ -406,7 +558,7 @@ function normalizeSnapshotPatchPayload(records: unknown[], sourceFile: string): 
 		return null;
 	}
 
-	const requests: unknown[] = JSON.parse(JSON.stringify(snapshot.requests));
+	const requests = cloneJsonArray(snapshot.requests);
 
 	// Apply kind:1 scalar patches to a mutable copy of the snapshot top-level properties.
 	// These records set fields like `customTitle` after the initial snapshot is written.
@@ -461,125 +613,7 @@ function normalizeSnapshotPatchPayload(records: unknown[], sourceFile: string): 
 		}
 	}
 
-	const turns: SavedTurn[] = [];
-	for (const request of requests) {
-		if (!isRecord(request)) {
-			continue;
-		}
-
-		const msgObj = isRecord(request.message) ? request.message : undefined;
-		const userText = msgObj && typeof msgObj.text === 'string' ? msgObj.text.trim() : '';
-
-		if (userText) {
-			const references: string[] = [];
-			if (Array.isArray(request.contentReferences)) {
-				for (const ref of request.contentReferences) {
-					if (!isRecord(ref)) {
-						continue;
-					}
-					const refObj = isRecord(ref.reference) ? ref.reference : ref;
-					const refPath = typeof refObj.fsPath === 'string'
-						? refObj.fsPath
-						: typeof refObj.path === 'string'
-							? refObj.path
-							: undefined;
-					if (typeof refPath === 'string') {
-						references.push(refPath);
-					}
-				}
-			}
-
-			const agentName = isRecord(request.agent) && typeof request.agent.name === 'string'
-				? request.agent.name
-				: 'copilot';
-
-			turns.push({
-				type: 'request',
-				participant: agentName,
-				prompt: userText,
-				references,
-				timestamp: typeof request.timestamp === 'number'
-					? new Date(request.timestamp).toISOString()
-					: toIsoTimestamp(request.timestamp),
-			});
-		}
-
-		if (Array.isArray(request.response)) {
-			const textParts: string[] = [];
-			const toolCalls: ToolCall[] = [];
-
-			for (const part of request.response) {
-				if (!isRecord(part)) {
-					continue;
-				}
-
-				if (part.kind === 'toolInvocationSerialized') {
-					const name = typeof part.toolId === 'string'
-						? part.toolId
-						: typeof part.toolCallId === 'string'
-							? part.toolCallId
-							: 'unknown';
-					const toolCall: ToolCall = { name };
-					if (isRecord(part.pastTenseMessage) && typeof part.pastTenseMessage.value === 'string') {
-						toolCall.summary = String(part.pastTenseMessage.value);
-					} else if (isRecord(part.invocationMessage) && typeof part.invocationMessage.value === 'string') {
-						toolCall.summary = String(part.invocationMessage.value);
-					}
-					toolCalls.push(toolCall);
-					continue;
-				}
-
-				if (typeof part.kind === 'string' || typeof part.kind === 'number') {
-					continue;
-				}
-
-				if (typeof part.value === 'string' && part.value.trim()) {
-					textParts.push(part.value.trim());
-				}
-			}
-
-			const content = textParts.join('\n\n').trim();
-			if (content) {
-				const agentName = isRecord(request.agent) && typeof request.agent.name === 'string'
-					? request.agent.name
-					: 'copilot';
-
-				turns.push({
-					type: 'response',
-					participant: agentName,
-					content,
-					toolCalls,
-					timestamp: typeof request.timestamp === 'number'
-						? new Date(request.timestamp + 1).toISOString()
-						: toIsoTimestamp(request.timestamp),
-				});
-			}
-		}
-	}
-
-	if (!turns.length) {
-		return null;
-	}
-
-	const id = typeof effectiveSnapshot.sessionId === 'string' ? effectiveSnapshot.sessionId : sourceFile;
-	const title = typeof effectiveSnapshot.customTitle === 'string'
-		? effectiveSnapshot.customTitle
-		: typeof effectiveSnapshot.title === 'string'
-			? effectiveSnapshot.title
-			: id;
-	const lastMessageDate = turns[turns.length - 1]?.timestamp
-		?? (typeof effectiveSnapshot.creationDate === 'number'
-			? new Date(effectiveSnapshot.creationDate).toISOString()
-			: new Date().toISOString());
-
-	return {
-		provider: 'copilot',
-		id,
-		title,
-		lastMessageDate,
-		turns,
-		sourceFile,
-	};
+	return normalizeSnapshotSession(effectiveSnapshot, requests, sourceFile);
 }
 
 function normalizeJsonlPayload(records: unknown[], sourceFile: string): CopilotSession | null {
@@ -641,6 +675,9 @@ function parseJson(content: string, sourceFile: string): CopilotSession {
 
 	const normalized = normalizeObjectPayload(parsed, sourceFile);
 	if (!normalized) {
+		if (isSnapshotPayload(parsed) && parsed.requests.length === 0) {
+			throw new EmptySessionError(sourceFile);
+		}
 		throw new UnknownFormatError(sourceFile);
 	}
 

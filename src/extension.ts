@@ -17,6 +17,7 @@ import { ResumeProviderCommands } from './resumeTarget';
 import { SessionViewerPanel } from './sessionViewer';
 import { createSessionStore, SessionFileNameOptions, SessionPruneAction } from './sessionStore';
 import { applySaveBloatControls, createChatSession, SaveOverflowStrategy } from './sessionWriter';
+import { activateProFeatures, hasProLicense, initializeProLicenseCommands, showUpgradePrompt } from './pro';
 import { type AnalysisReportReference, type AnalysisSelection, isChatSession, isSessionProviderId, SessionMeta, SessionProviderId, SourceChatSession } from './types';
 import { parseFileSize } from './utils';
 
@@ -48,14 +49,27 @@ function filterSessionsForWorkspace(
 	workspaceFolder: vscode.WorkspaceFolder,
 	provider: SessionProviderId,
 ): SourceChatSession[] {
-	const matches = sessions.filter(
-		(session) => session.provider === provider
-			&& typeof session.cwd === 'string'
+	const forProvider = sessions.filter((session) => session.provider === provider);
+
+	const matches = forProvider.filter(
+		(session) => typeof session.cwd === 'string'
 			&& session.cwd.length > 0
 			&& pathsOverlap(session.cwd, workspaceFolder.uri.fsPath),
 	);
+	if (matches.length > 0) {
+		return matches;
+	}
 
-	return matches.length > 0 ? matches : sessions;
+	// No session's cwd overlaps this workspace. Only fall back to the unfiltered
+	// list when NONE of the sessions carry cwd metadata (we genuinely cannot tell
+	// which workspace they belong to). When sessions DO have cwd values that just
+	// don't match, they belong to other workspaces and must be excluded — otherwise
+	// a globally-shared store (e.g. Codex's ~/.codex/sessions, watched by every VS
+	// Code window) leaks another workspace's sessions into this one's auto-save.
+	const anyHasCwd = forProvider.some(
+		(session) => typeof session.cwd === 'string' && session.cwd.length > 0,
+	);
+	return anyHasCwd ? [] : forProvider;
 }
 
 export interface WorkspaceSessionMeta extends SavedSessionPickItem, SessionMeta {
@@ -1155,23 +1169,6 @@ async function runImportCopilotSkillsToClaudeCodeCommand(): Promise<void> {
 	});
 }
 
-async function runListSessionsCommand(): Promise<void> {
-	if (!vscode.workspace.workspaceFolders?.length) {
-		await vscode.window.showInformationMessage('Open a workspace folder before listing sessions.');
-		return;
-	}
-
-	const sessions = await listSessionsAcrossWorkspaceFolders(vscode.workspace.workspaceFolders);
-	if (!sessions.length) {
-		await vscode.window.showInformationMessage('No saved sessions found.');
-		return;
-	}
-
-	await vscode.window.showQuickPick<SavedSessionPickItem>(
-		sessions,
-		{ title: 'Saved chat sessions' },
-	);
-}
 
 async function runDeleteSessionCommand(): Promise<void> {
 	if (!vscode.workspace.workspaceFolders?.length) {
@@ -1927,6 +1924,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	updateSessionFileContext(vscode.window.activeTextEditor);
 
 	context.subscriptions.push(
+		...initializeProLicenseCommands(context),
 		vscode.commands.registerCommand('session-control.saveSession', async () => {
 			await runSaveSessionCommand(context);
 			sessionExplorerProvider.refresh();
@@ -1935,7 +1933,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			await runSaveSessionFromProviderCommand(context);
 			sessionExplorerProvider.refresh();
 		}),
-		vscode.commands.registerCommand('session-control.listSessions', async () => runListSessionsCommand()),
+		vscode.commands.registerCommand('session-control.listSessions', async () => runOpenSavedSessionCommand(context, undefined)),
 		vscode.commands.registerCommand('session-control.deleteSession', async () => {
 			await runDeleteSessionCommand();
 			sessionExplorerProvider.refresh();
@@ -2046,6 +2044,14 @@ export function activate(context: vscode.ExtensionContext): void {
 			updateSessionFileContext(vscode.window.activeTextEditor);
 		}
 	}));
+
+	void activateProFeatures({
+		extensionContext: context,
+		hasProLicense,
+		showUpgradePrompt,
+		log: (message) => output.appendLine(`[pro] ${message}`),
+		registerDisposable: (disposable) => context.subscriptions.push(disposable),
+	});
 
 	registerChatParticipant(context);
 }

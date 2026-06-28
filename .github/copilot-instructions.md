@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Session Control is a VS Code extension that saves and resumes GitHub Copilot Chat sessions linked to git commits. It is written in TypeScript, bundled with webpack, and published under the `darrenjmcleod` publisher.
+Session Control is a VS Code extension that saves and resumes GitHub Copilot Chat sessions linked to git commits. It is written in TypeScript, bundled with webpack, and published under the `darrenjmcleod` publisher. The intended shipping model is one customer-facing `session-control` extension install; private Pro or license-layer work should be described as capability that loads into this extension, not as a separate `session-control-pro` customer extension.
 
 ## AI Execution Rules
 
@@ -16,6 +16,7 @@ Session Control is a VS Code extension that saves and resumes GitHub Copilot Cha
 - When public documentation already shows that a supported API or command is unavailable, stop command-id hunting and choose the documented fallback.
 - When the user asks about publishing, answer with the repo's exact VS Marketplace and Open VSX flow first instead of generic marketplace guidance. On Windows, default to PowerShell syntax unless the user explicitly asks for `cmd` or bash.
 - Do not read unrelated prompt or policy files unless the active task explicitly depends on them.
+- Do not tell users to install, configure, or look for a standalone `session-control-pro` extension. In user-facing guidance, keep Pro settings, commands, and activation attached to the public `session-control` extension surface.
 - When multiple repositories are in scope, return per-repo closeouts first and keep state, persistence assumptions, and conclusions isolated per workspace unless the user explicitly asks to merge them.
 
 ## Language & Build

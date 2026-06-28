@@ -6,6 +6,7 @@ description: "Use when versioning, packaging, publishing, or documenting a Sessi
 # VS Code Extension Release
 
 - This repo is a VS Code extension published as `darrenjmcleod.session-control`.
+- This is the only customer-facing extension install. If discussing Pro or licensing, describe it as capability that ships through `session-control`, not as a separate `session-control-pro` marketplace extension.
 - For patch bumps, prefer `npm run version:build`. It updates `package.json`, `package-lock.json`, and the VS Marketplace badge in `README.md`.
 - For explicit version sets, use the documented `npm version <version> --no-git-tag-version` path and verify only the expected release files.
 - Release-relevant files are `package.json`, `package-lock.json`, `README.md`, and `scripts/bump-package-version.cjs`. Check `.github/workflows/release.yml` only when publish automation itself changes.

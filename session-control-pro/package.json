@@ -1,0 +1,19 @@
+{
+  "name": "@tempuskg/session-control-pro",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Private Pro feature package for Session Control.",
+  "license": "UNLICENSED",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  }
+}

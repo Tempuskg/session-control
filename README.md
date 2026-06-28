@@ -1,6 +1,6 @@
 # Session Control
 
-[![VS Code Marketplace](https://img.shields.io/badge/VS%20Marketplace-v1.3.2-blue)](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Marketplace-v1.3.3-blue)](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
 [![Open VSX](https://img.shields.io/open-vsx/v/darrenjmcleod/session-control)](https://open-vsx.org/extension/darrenjmcleod/session-control)
 [![CI](https://github.com/tempuskg/session-control/actions/workflows/ci.yml/badge.svg)](https://github.com/tempuskg/session-control/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -35,6 +35,8 @@ Session Control can save Copilot, Cursor, Codex, and Claude Code sessions. When 
 ## Installation
 
 Search for **Session Control** in the VS Code Extensions view, or install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control).
+
+Architecture note: Session Control is the only customer-facing extension install. Private Pro or license-layer work is intended to load inside this extension rather than through a separate `session-control-pro` extension install.
 
 ## Usage
 
