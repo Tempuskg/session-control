@@ -2,7 +2,7 @@
 title: "Wiki Index"
 type: index
 created: 2026-04-12
-updated: 2026-05-17
+updated: 2026-06-28
 ---
 
 # Session Control Wiki Index
@@ -29,10 +29,11 @@ Master catalog of all wiki pages for the **session-control** VS Code extension.
 
 ## Reference
 - [File Manifest](file-manifest.md) — Planned source files, their roles, and dependencies
+- [Open VSX Listing — Audit & Rewrite](open-vsx-listing.md) — Phase 2 Step 1 listing audit, keyword plan, and rewrite rationale for the Open VSX / VS Marketplace listings
 
 ## Source Summaries
 - [Source: PLAN.md](source-plan.md) — Initial project plan covering all phases, architecture, and implementation details
 
 ---
 
-*Last updated: 2026-05-17 — 10 pages*
+*Last updated: 2026-06-28 — 11 pages*

@@ -2,7 +2,7 @@
 title: "Wiki Log"
 type: log
 created: 2026-04-12
-updated: 2026-05-17
+updated: 2026-06-28
 ---
 
 # Wiki Log
@@ -10,6 +10,10 @@ updated: 2026-05-17
 Chronological record of all wiki operations.
 
 ---
+
+## [2026-06-28] add | Open VSX Listing — Audit & Rewrite
+Drafted `wiki/open-vsx-listing.md` with the current-state audit (v1.3.3 `description` + keywords + README hero), the keyword plan (added `windsurf`, `chat-history`, `session-manager`, `ai-sessions`, `cross-ide`, `ai-chat`, `agent`, `transcript`, `history`, `vscodium`), the new `description` string, the new README hero, and the human-approval checklist. Reordered keywords in `package.json` to put the audience-priority providers first (Cursor, Claude Code, Codex, Copilot). Rewrote `README.md` to lead with "Save your Cursor, Claude Code, Codex, and GitHub Copilot chat history across git commits", added a "Why Session Control" section above the features list, expanded the installation section to surface the Open VSX install path explicitly for Cursor / Windsurf / VSCodium users. No feature, command, or behavior claims changed; configuration table, command list, and privacy warning are unchanged. Screenshots/GIF (Phase 2 Step 2) deferred to a separate task. Pending human approval before the next tagged release.
+Pages touched: open-vsx-listing.md, index.md (+ repo files: README.md, package.json, CHANGELOG.md)
 
 ## [2026-04-12] ingest | PLAN.md
 Initial wiki creation from project plan (`raw/plan.md`).

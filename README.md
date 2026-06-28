@@ -5,24 +5,59 @@
 [![CI](https://github.com/tempuskg/session-control/actions/workflows/ci.yml/badge.svg)](https://github.com/tempuskg/session-control/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A VS Code extension that saves GitHub Copilot, Cursor, local Codex, and Claude Code chat sessions as structured JSON files in your repository, linked to git commits and branches. Resume saved conversations via the `@session-control` chat participant.
+**Save your Cursor, Claude Code, Codex, and GitHub Copilot chat history across git commits.**
+
+Session Control is a cross-IDE session manager for AI chats. Every conversation with Cursor
+Agent, Claude Code, Codex, or Copilot can be captured as a structured JSON file in your repo,
+linked to the branch and commit it belongs to, and resumed later as context in a new chat —
+through the `@session-control` chat participant.
+
+Your conversations never leave your machine. They live next to the code they produced, in
+source control you already trust. Works inside VS Code, Cursor, VSCodium, and other
+VS-Code-compatible editors via the Open VSX Registry.
+
+## Why Session Control
+
+- **Cross-IDE by design.** Save and import chats from Cursor Agent, Claude Code, Codex, and
+  GitHub Copilot — the four assistants polyglot AI users actually run.
+- **Linked to the commit that produced the code.** Every saved session records the branch and
+  SHA, so future you (or a reviewer) can open the chat that explains the diff.
+- **Lives in your repo, not in someone else's cloud.** Sessions are plain JSON in
+  `.chat/`, reviewable in diffs and PRs. Optional `.gitignore` toggle if you would rather keep
+  them local.
+- **Resume into a fresh chat.** `@session-control /resume <name>` reloads a saved conversation
+  as LLM context. No copy-paste, no lost decisions.
 
 ## Features
 
-- **Provider choice** - Keep Copilot as the default save source, switch to Codex or Claude Code for local transcript import, and let Session Control auto-detect Cursor, Codex, or Claude Code when running inside those hosts.
-- **Import AI skills** - Convert repository Copilot guidance into repo-scoped Cursor, Codex, or Claude Code skills under `.cursor/skills/`, `.agents/skills/`, or `.claude/skills/`.
+- **Provider choice** — Keep Copilot as the default save source, switch to Codex or Claude Code
+  for local transcript import, and let Session Control auto-detect Cursor, Codex, or Claude
+  Code when running inside those hosts.
+- **Import AI skills** — Convert repository Copilot guidance into repo-scoped Cursor, Codex, or
+  Claude Code skills under `.cursor/skills/`, `.agents/skills/`, or `.claude/skills/`.
+- **Save sessions** — Capture Copilot, Cursor, Codex, or Claude Code chats as JSON files in
+  `.chat/`, enriched with branch and commit metadata.
+- **Resume sessions** — Use `@session-control /resume <name>` to reload a saved conversation as
+  LLM context in a new chat.
+- **Analyze saved chats** — Use `@session-control /analyze` to review a timeframe of saved
+  sessions or only chats that have not been analyzed yet.
+- **Implement recommendations** — Use `@session-control /implement` to open a generated
+  implementation prompt in chat or an agent session.
+- **Browse, preview, delete** — Manage saved sessions via the Session Explorer and command
+  palette.
+- **Resume from viewer** — When viewing a saved session, click the Resume icon in the editor
+  title bar to resume it directly in chat.
+- **Auto-save on chat response** — Optionally auto-save Copilot chat responses, Cursor Agent
+  transcript updates, Codex transcript updates, or Claude Code transcript updates after every
+  response.
+- **Lives in source control** — Sessions are plain JSON files tracked alongside your code,
+  reviewable in diffs and PRs.
+- **Bloat controls** — Configurable file size limits, session splitting, tool output
+  stripping, and automatic pruning of old sessions.
 
-- **Save sessions** - Capture Copilot, Cursor, Codex, or Claude Code chats as JSON files in `.chat/`, enriched with branch and commit metadata.
-- **Resume sessions** - Use `@session-control /resume <name>` to reload a saved conversation as LLM context in a new chat.
-- **Analyze saved chats** - Use `@session-control /analyze` to review a timeframe of saved sessions or only chats that have not been analyzed yet.
-- **Implement recommendations** - Use `@session-control /implement` to open a generated implementation prompt in chat or an agent session.
-- **Browse, preview, delete** - Manage saved sessions via the Session Explorer and command palette.
-- **Resume from viewer** - When viewing a saved session, click the Resume icon in the editor title bar to resume it directly in chat.
-- **Auto-save on chat response** - Optionally auto-save Copilot chat responses, Cursor Agent transcript updates, Codex transcript updates, or Claude Code transcript updates after every response.
-- **Lives in source control** - Sessions are plain JSON files tracked alongside your code, reviewable in diffs and PRs.
-- **Bloat controls** - Configurable file size limits, session splitting, tool output stripping, and automatic pruning of old sessions.
-
-Session Control can save Copilot, Cursor, Codex, and Claude Code sessions. When the save provider setting is unset, it auto-detects Cursor, Codex, and Claude Code from the current host app. Outside Cursor, auto-save watches Copilot, Codex, and Claude Code sources by default.
+Session Control can save Copilot, Cursor, Codex, and Claude Code sessions. When the save
+provider setting is unset, it auto-detects Cursor, Codex, and Claude Code from the current host
+app. Outside Cursor, auto-save watches Copilot, Codex, and Claude Code sources by default.
 
 ## Requirements
 
@@ -34,9 +69,12 @@ Session Control can save Copilot, Cursor, Codex, and Claude Code sessions. When 
 
 ## Installation
 
-Search for **Session Control** in the VS Code Extensions view, or install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control).
+Search for **Session Control** in your editor's extensions view, or install from:
 
-Architecture note: Session Control is the only customer-facing extension install. Private Pro or license-layer work is intended to load inside this extension rather than through a separate `session-control-pro` extension install.
+- [Open VSX Registry](https://open-vsx.org/extension/darrenjmcleod/session-control) — for
+  Cursor, Windsurf, VSCodium, Codium, Positron, Trae, and other VS-Code-compatible editors.
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
+  — for stock Visual Studio Code.
 
 ## Usage
 

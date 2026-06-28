@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Rewrote the marketplace listing hero in `README.md` to lead with "Save your Cursor, Claude Code, Codex, and GitHub Copilot chat history across git commits" and frame Session Control as a cross-IDE session manager for the Open VSX / Cursor / Windsurf / VSCodium audience, with a new "Why Session Control" section above the feature list.
+- Updated `package.json` `description` to "Save your Cursor, Claude Code, Codex, and Copilot chat history across git commits. Cross-IDE session manager that keeps every AI conversation in your repo, locally." and reordered/expanded `keywords` to add `windsurf`, `vscodium`, `chat-history`, `session-manager`, `ai-sessions`, `ai-chat`, `cross-ide`, `agent`, `transcript`, and `history` for Open VSX search ranking.
+- Expanded the README installation section to surface the Open VSX install path alongside the VS Marketplace link.
+
+### Added
+- Added `wiki/open-vsx-listing.md` with the Phase 2 Step 1 listing audit, keyword plan, rewrite rationale, and human-approval checklist for the Open VSX and VS Marketplace listings.
+
 ## [1.3.2] - 2026-06-21
 
 ### Fixed
