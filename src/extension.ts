@@ -12,7 +12,7 @@ import { createCodexSessionReader, readCodexSessions } from './codexSessionReade
 import { getGitContext } from './gitIntegration';
 import { CopilotSession, deriveChatSessionsPath, readCopilotSessions } from './sessionReader';
 import { ANALYSIS_PROMPT_VERSION, buildImplementationHandoffPrompt, filterCandidatesForAnalysis, type AnalysisCandidateSession } from './sessionAnalysis';
-import { SessionExplorerProvider, SessionExplorerSessionItem } from './sessionExplorer';
+import { SessionExplorerProvider, SessionExplorerSessionItem, registerSessionExplorerVisibilityRefresh } from './sessionExplorer';
 import { ResumeProviderCommands } from './resumeTarget';
 import { SessionViewerPanel } from './sessionViewer';
 import { createSessionStore, SessionFileNameOptions, SessionPruneAction } from './sessionStore';
@@ -82,7 +82,7 @@ interface SourceSessionPickItem extends vscode.QuickPickItem {
 	session: SourceChatSession;
 }
 
-interface ProviderPickItem extends vscode.QuickPickItem {
+export interface ProviderPickItem extends vscode.QuickPickItem {
 	provider: SessionProviderId;
 }
 
@@ -194,6 +194,19 @@ interface OpenSavedSessionDeps {
 	readSession: (storageDirectory: string, fileName: string) => Promise<ReturnType<typeof createChatSession>>;
 	showSession: (session: ReturnType<typeof createChatSession>, extensionUri: vscode.Uri, storageDirectory: string, fileName: string) => void;
 	showInformationMessage: (message: string) => Thenable<unknown>;
+}
+
+interface DeleteSessionFromExplorerCommandDeps {
+	confirmDelete: (label: string) => Promise<boolean>;
+	deleteSession: (storageDirectory: string, fileName: string) => Promise<boolean>;
+	refreshSessionExplorer: () => void;
+	showInformationMessage: (message: string) => Thenable<unknown>;
+}
+
+interface DeleteSessionCommandDeps extends DeleteSessionFromExplorerCommandDeps {
+	getWorkspaceFolders: () => readonly vscode.WorkspaceFolder[] | undefined;
+	listSessionsAcrossWorkspaceFolders: (workspaceFolders: readonly vscode.WorkspaceFolder[] | undefined) => Promise<WorkspaceSessionMeta[]>;
+	pickSession: (sessions: WorkspaceSessionMeta[]) => Promise<WorkspaceSessionMeta | undefined>;
 }
 
 interface ViewSessionFileDeps {
@@ -948,7 +961,7 @@ function createDefaultSaveFlowDeps(): SaveSessionFlowDeps {
 	};
 }
 
-async function runSaveSourceSessionFlow(
+export async function runSaveSourceSessionFlow(
 	provider: SessionProviderId,
 	sessions: SourceChatSession[],
 	workspaceFolder: vscode.WorkspaceFolder,
@@ -995,25 +1008,30 @@ async function runSaveSourceSessionFlow(
 		await deps.ensureGitignoreEntry(workspaceFolder, storageDirectory);
 	}
 
+	// Never await these notification toasts: vscode.window.showInformationMessage
+	// only resolves once the notification is dismissed, and a toast that auto-hides
+	// into the notification center may never resolve. Awaiting it here stalled the
+	// rest of the flow (pruning) and the caller's sidebar refresh, so freshly saved
+	// sessions did not appear in the Session Control explorer until reload.
 	if (saveResult.warning) {
-		await deps.showInformationMessage(saveResult.warning);
+		void deps.showInformationMessage(saveResult.warning);
 	}
 
 	if (writtenFiles.length === 1) {
-		await deps.showInformationMessage(`Saved chat session to ${path.join(storageDirectory, writtenFiles[0] ?? '')}`);
+		void deps.showInformationMessage(`Saved chat session to ${path.join(storageDirectory, writtenFiles[0] ?? '')}`);
 	} else {
-		await deps.showInformationMessage(`Saved ${writtenFiles.length} session part files to ${storageDirectory}`);
+		void deps.showInformationMessage(`Saved ${writtenFiles.length} session part files to ${storageDirectory}`);
 	}
 
 	const pruneConfig = deps.getPruneConfiguration(workspaceFolder);
 	if (pruneConfig.maxSavedSessions > 0) {
 		const pruneResult = await deps.pruneSessions(storageDirectory, pruneConfig.maxSavedSessions, pruneConfig.pruneAction);
 		if (pruneResult.archived > 0) {
-			await deps.showInformationMessage(`Archived ${pruneResult.archived} old session file(s) after save.`);
+			void deps.showInformationMessage(`Archived ${pruneResult.archived} old session file(s) after save.`);
 		}
 
 		if (pruneResult.deleted > 0) {
-			await deps.showInformationMessage(`Deleted ${pruneResult.deleted} old session file(s) after save.`);
+			void deps.showInformationMessage(`Deleted ${pruneResult.deleted} old session file(s) after save.`);
 		}
 	}
 
@@ -1035,26 +1053,24 @@ export async function runSaveSessionFlow(
 	return runSaveSourceSessionFlow('copilot', sessions, workspaceFolder, storageDirectory, deps);
 }
 
-async function runSaveSessionCommand(context: vscode.ExtensionContext): Promise<void> {
-	const workspaceFolder = await resolveManualWorkspaceFolder();
-	if (!workspaceFolder) {
-		await vscode.window.showInformationMessage('Open a workspace folder before saving a chat session.');
-		return;
-	}
-
-	const storageDirectory = getStoragePath(workspaceFolder);
-	const provider = getSaveProvider(workspaceFolder);
-	const sessions = await loadSessionsForProvider(context, workspaceFolder, provider);
-	await runSaveSourceSessionFlow(provider, sessions, workspaceFolder, storageDirectory);
-}
-
-async function pickSessionProvider(): Promise<SessionProviderId | undefined> {
-	const pick = await vscode.window.showQuickPick<ProviderPickItem>([
-		{
+export function createSessionProviderPickItems(appName: string): ProviderPickItem[] {
+	// Inside Cursor the workbench has no Copilot chat storage to save from, and
+	// the host's own agent transcripts are what the user means by "this chat",
+	// so the Copilot entry is replaced by Cursor.
+	const hostItem: ProviderPickItem = /cursor/i.test(appName)
+		? {
+			label: 'Cursor',
+			description: 'Import from local Cursor agent transcripts',
+			provider: 'cursor',
+		}
+		: {
 			label: 'Copilot',
 			description: 'Save from VS Code Copilot chat storage',
 			provider: 'copilot',
-		},
+		};
+
+	return [
+		hostItem,
 		{
 			label: 'Codex',
 			description: 'Import from local Codex session transcripts',
@@ -1065,9 +1081,16 @@ async function pickSessionProvider(): Promise<SessionProviderId | undefined> {
 			description: 'Import from local Claude Code JSONL transcripts',
 			provider: 'claude-code',
 		},
-	], {
-		title: 'Choose a session provider',
-	});
+	];
+}
+
+async function pickSessionProvider(): Promise<SessionProviderId | undefined> {
+	const pick = await vscode.window.showQuickPick<ProviderPickItem>(
+		createSessionProviderPickItems(vscode.env.appName),
+		{
+			title: 'Choose a session provider',
+		},
+	);
 
 	return pick?.provider;
 }
@@ -1170,44 +1193,103 @@ async function runImportCopilotSkillsToClaudeCodeCommand(): Promise<void> {
 }
 
 
-async function runDeleteSessionCommand(): Promise<void> {
-	if (!vscode.workspace.workspaceFolders?.length) {
-		await vscode.window.showInformationMessage('Open a workspace folder before deleting sessions.');
+function createDefaultDeleteSessionCommandDeps(): DeleteSessionCommandDeps {
+	return {
+		getWorkspaceFolders: () => vscode.workspace.workspaceFolders,
+		listSessionsAcrossWorkspaceFolders,
+		pickSession: async (sessions: WorkspaceSessionMeta[]) => vscode.window.showQuickPick<WorkspaceSessionMeta>(
+			sessions,
+			{ title: 'Select saved session to delete' },
+		),
+		confirmDelete: async (label: string) => {
+			const confirmation = await vscode.window.showWarningMessage(
+				`Delete session '${label}'?`,
+				{ modal: true },
+				'Delete',
+			);
+			return confirmation === 'Delete';
+		},
+		deleteSession: (storageDirectory: string, fileName: string) => sessionStore.deleteSession(storageDirectory, fileName),
+		refreshSessionExplorer: () => undefined,
+		showInformationMessage: (message: string) => vscode.window.showInformationMessage(message),
+	};
+}
+
+export async function runDeleteSessionCommand(
+	depsOverrides: Partial<DeleteSessionCommandDeps> = {},
+): Promise<void> {
+	const deps = {
+		...createDefaultDeleteSessionCommandDeps(),
+		...depsOverrides,
+	};
+
+	const workspaceFolders = deps.getWorkspaceFolders();
+	if (!workspaceFolders?.length) {
+		await deps.showInformationMessage('Open a workspace folder before deleting sessions.');
 		return;
 	}
 
-	const sessions = await listSessionsAcrossWorkspaceFolders(vscode.workspace.workspaceFolders);
+	const sessions = await deps.listSessionsAcrossWorkspaceFolders(workspaceFolders);
 	if (!sessions.length) {
-		await vscode.window.showInformationMessage('No saved sessions found.');
+		await deps.showInformationMessage('No saved sessions found.');
 		return;
 	}
 
-	const pick = await vscode.window.showQuickPick<WorkspaceSessionMeta>(
-		sessions,
-		{ title: 'Select saved session to delete' },
-	);
-
+	const pick = await deps.pickSession(sessions);
 	if (!pick) {
 		return;
 	}
 
-	const confirmation = await vscode.window.showWarningMessage(
-		`Delete session '${pick.label}'?`,
-		{ modal: true },
-		'Delete',
-	);
-
-	if (confirmation !== 'Delete') {
+	if (!(await deps.confirmDelete(pick.label))) {
 		return;
 	}
 
-	const deleted = await sessionStore.deleteSession(pick.storageDirectory, pick.fileName);
+	const deleted = await deps.deleteSession(pick.storageDirectory, pick.fileName);
+	// Refresh before notifying: a non-modal notification's promise only
+	// resolves once the toast is dismissed, so refreshing after it would leave
+	// the deleted entry visible in the Session Explorer until then. Refresh
+	// even when the file was already gone so the stale entry disappears.
+	deps.refreshSessionExplorer();
 	if (!deleted) {
-		await vscode.window.showInformationMessage('Session file no longer exists.');
+		await deps.showInformationMessage('Session file no longer exists.');
 		return;
 	}
 
-	await vscode.window.showInformationMessage(`Deleted session ${pick.label}`);
+	await deps.showInformationMessage(`Deleted session ${pick.label}`);
+}
+
+function createDefaultDeleteSessionFromExplorerCommandDeps(): DeleteSessionFromExplorerCommandDeps {
+	const defaults = createDefaultDeleteSessionCommandDeps();
+	return {
+		confirmDelete: defaults.confirmDelete,
+		deleteSession: defaults.deleteSession,
+		refreshSessionExplorer: defaults.refreshSessionExplorer,
+		showInformationMessage: defaults.showInformationMessage,
+	};
+}
+
+export async function runDeleteSessionFromExplorerCommand(
+	item: SessionExplorerSessionItem,
+	depsOverrides: Partial<DeleteSessionFromExplorerCommandDeps> = {},
+): Promise<void> {
+	const deps = {
+		...createDefaultDeleteSessionFromExplorerCommandDeps(),
+		...depsOverrides,
+	};
+
+	if (!(await deps.confirmDelete(String(item.label)))) {
+		return;
+	}
+
+	const deleted = await deps.deleteSession(item.storageDirectory, item.fileName);
+	// Refresh before notifying — see runDeleteSessionCommand for why.
+	deps.refreshSessionExplorer();
+	if (!deleted) {
+		await deps.showInformationMessage('Session file no longer exists.');
+		return;
+	}
+
+	await deps.showInformationMessage(`Deleted session ${item.label}`);
 }
 
 function createDefaultOpenSavedSessionDeps(): OpenSavedSessionDeps {
@@ -1885,18 +1967,29 @@ export async function runResumeSessionFromViewerCommand(
 }
 
 export function activate(context: vscode.ExtensionContext): void {
-	const sessionExplorerProvider = new SessionExplorerProvider();
+	const output = vscode.window.createOutputChannel('Session Control');
+	context.subscriptions.push(output);
+
+	// Route session files skipped by listSessions (parse/validation failures) to
+	// the Session Control output channel so they are diagnosable instead of
+	// silently missing from the sidebar.
+	const explorerSessionStore = createSessionStore({
+		logWarning: (message) => output.appendLine(`[session-explorer] ${message}`),
+	});
+	const sessionExplorerProvider = new SessionExplorerProvider({
+		listSessions: (storageDirectory) => explorerSessionStore.listSessions(storageDirectory),
+	});
 	const sessionExplorerView = vscode.window.createTreeView('session-control.sessionExplorer', {
 		treeDataProvider: sessionExplorerProvider,
 		showCollapseAll: true,
 	});
 	context.subscriptions.push(sessionExplorerView);
+	context.subscriptions.push(
+		registerSessionExplorerVisibilityRefresh(sessionExplorerView, () => sessionExplorerProvider.refresh()),
+	);
 	const autoSaveStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
 	autoSaveStatusBar.command = 'session-control.toggleAutoSave';
 	context.subscriptions.push(autoSaveStatusBar);
-
-	const output = vscode.window.createOutputChannel('Session Control');
-	context.subscriptions.push(output);
 
 	let autoSaveOnChatResponseListener: vscode.Disposable | undefined;
 	const syncAutoSaveOnChatResponseListener = () => {
@@ -1925,18 +2018,15 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	context.subscriptions.push(
 		...initializeProLicenseCommands(context),
-		vscode.commands.registerCommand('session-control.saveSession', async () => {
-			await runSaveSessionCommand(context);
-			sessionExplorerProvider.refresh();
-		}),
 		vscode.commands.registerCommand('session-control.saveSessionFromProvider', async () => {
 			await runSaveSessionFromProviderCommand(context);
 			sessionExplorerProvider.refresh();
 		}),
 		vscode.commands.registerCommand('session-control.listSessions', async () => runOpenSavedSessionCommand(context, undefined)),
 		vscode.commands.registerCommand('session-control.deleteSession', async () => {
-			await runDeleteSessionCommand();
-			sessionExplorerProvider.refresh();
+			await runDeleteSessionCommand({
+				refreshSessionExplorer: () => sessionExplorerProvider.refresh(),
+			});
 		}),
 		vscode.commands.registerCommand('session-control.refreshSessionExplorer', () => sessionExplorerProvider.refresh()),
 		vscode.commands.registerCommand('session-control.openSessionFromExplorer', async (item: SessionExplorerSessionItem | undefined) => {
@@ -1969,25 +2059,9 @@ export function activate(context: vscode.ExtensionContext): void {
 			await runImportCopilotSkillsToClaudeCodeCommand();
 		}),
 		vscode.commands.registerCommand('session-control.deleteSessionFromExplorer', async (item: SessionExplorerSessionItem) => {
-			const confirmation = await vscode.window.showWarningMessage(
-				`Delete session '${item.label}'?`,
-				{ modal: true },
-				'Delete',
-			);
-
-			if (confirmation !== 'Delete') {
-				return;
-			}
-
-			const deleted = await sessionStore.deleteSession(item.storageDirectory, item.fileName);
-			if (!deleted) {
-				await vscode.window.showInformationMessage('Session file no longer exists.');
-				sessionExplorerProvider.refresh();
-				return;
-			}
-
-			await vscode.window.showInformationMessage(`Deleted session ${item.label}`);
-			sessionExplorerProvider.refresh();
+			await runDeleteSessionFromExplorerCommand(item, {
+				refreshSessionExplorer: () => sessionExplorerProvider.refresh(),
+			});
 		}),
 		vscode.commands.registerCommand('session-control.toggleAutoSave', async () => {
 			const workspaceFolder = await resolveManualWorkspaceFolder({

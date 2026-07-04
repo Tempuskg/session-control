@@ -3,7 +3,9 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { runSaveSessionFlow } from '../../src/extension';
+import { createClaudeCodeSessionReader, deriveClaudeCodeProjectSlug } from '../../src/claudeCodeSessionReader';
+import { runSaveSessionFlow, runSaveSourceSessionFlow } from '../../src/extension';
+import { listSessionExplorerGroups } from '../../src/sessionExplorer';
 import { CopilotSession } from '../../src/sessionReader';
 import { createSessionStore } from '../../src/sessionStore';
 import { createChatSession } from '../../src/sessionWriter';
@@ -173,6 +175,151 @@ suite('extension save flow', () => {
 			);
 
 			assert.equal(infoMessages.some((message) => message.includes('Archived 1 old session file(s)')), true);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('runSaveSessionFlow completes save and pruning without waiting on notification dismissal', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-extension-save-flow-notify-'));
+		const workspaceRoot = path.join(tempRoot, 'workspace');
+		const storageDirectory = path.join(workspaceRoot, '.chat');
+		const store = createSessionStore();
+		let pruneCalled = false;
+		let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+		try {
+			await fs.mkdir(workspaceRoot, { recursive: true });
+
+			const workspaceFolder = {
+				uri: vscode.Uri.file(workspaceRoot),
+				name: 'workspace',
+				index: 0,
+			} as vscode.WorkspaceFolder;
+
+			const flow = runSaveSessionFlow(
+				{} as vscode.ExtensionContext,
+				workspaceFolder,
+				storageDirectory,
+				{
+					readCopilotSessions: async () => [createCopilotSession()],
+					selectSession: async (sessions) => sessions[0],
+					promptTitle: async () => 'Auth Bug Investigation',
+					getGitContext: async () => null,
+					getPruneConfiguration: () => ({ maxSavedSessions: 5, pruneAction: 'delete' }),
+					pruneSessions: async () => {
+						pruneCalled = true;
+						return { archived: 0, deleted: 0 };
+					},
+					// Simulate VS Code notifications that are never dismissed: the
+					// thenable returned by showInformationMessage never resolves.
+					showInformationMessage: () => new Promise<unknown>(() => undefined),
+				},
+			);
+
+			const fileName = await Promise.race([
+				flow,
+				new Promise<never>((_, reject) => {
+					timeoutHandle = setTimeout(
+						() => reject(new Error('runSaveSessionFlow is blocked awaiting notification dismissal')),
+						5000,
+					);
+				}),
+			]);
+
+			assert.ok(fileName);
+			assert.equal(pruneCalled, true);
+			const restored = await store.readSession(storageDirectory, fileName as string);
+			assert.equal(isChatSession(restored), true);
+		} finally {
+			if (timeoutHandle !== undefined) {
+				clearTimeout(timeoutHandle);
+			}
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('Claude Code provider save appears in listSessions and the session explorer', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-extension-save-flow-claude-'));
+		const workspaceRoot = path.join(tempRoot, 'workspace');
+		const storageDirectory = path.join(workspaceRoot, '.chat');
+		const claudeHome = path.join(tempRoot, 'claude-home');
+		const store = createSessionStore();
+
+		try {
+			await fs.mkdir(workspaceRoot, { recursive: true });
+			const projectDirectory = path.join(claudeHome, 'projects', deriveClaudeCodeProjectSlug(workspaceRoot));
+			await fs.mkdir(projectDirectory, { recursive: true });
+
+			const records = [
+				{
+					sessionId: 'claude-session-1',
+					timestamp: '2026-07-02T10:00:00.000Z',
+					cwd: workspaceRoot,
+					type: 'user',
+					message: {
+						role: 'user',
+						content: [{ type: 'text', text: 'Investigate the sidebar bug.' }],
+					},
+				},
+				{
+					sessionId: 'claude-session-1',
+					timestamp: '2026-07-02T10:01:00.000Z',
+					cwd: workspaceRoot,
+					type: 'assistant',
+					message: {
+						role: 'assistant',
+						content: [{ type: 'text', text: 'The sidebar refresh was blocked by an awaited notification.' }],
+					},
+				},
+			];
+			await fs.writeFile(
+				path.join(projectDirectory, 'claude-session-1.jsonl'),
+				records.map((record) => JSON.stringify(record)).join('\n'),
+				'utf8',
+			);
+
+			const reader = createClaudeCodeSessionReader({
+				showInformationMessage: async () => undefined,
+				logWarning: () => undefined,
+			});
+			const sources = await reader.readClaudeCodeSessions(claudeHome, workspaceRoot);
+			assert.equal(sources.length, 1);
+
+			const workspaceFolder = {
+				uri: vscode.Uri.file(workspaceRoot),
+				name: 'workspace',
+				index: 0,
+			} as vscode.WorkspaceFolder;
+
+			const fileName = await runSaveSourceSessionFlow(
+				'claude-code',
+				sources,
+				workspaceFolder,
+				storageDirectory,
+				{
+					selectSession: async (sessions) => sessions[0],
+					promptTitle: async (defaultTitle) => defaultTitle,
+					getGitContext: async () => null,
+					getIncludeInGitignore: () => false,
+					getPruneConfiguration: () => ({ maxSavedSessions: 0, pruneAction: 'archive' }),
+					showInformationMessage: async () => undefined,
+				},
+			);
+
+			assert.ok(fileName);
+			const listed = await store.listSessions(storageDirectory);
+			assert.equal(listed.length, 1);
+			assert.equal(listed[0]?.fileName, fileName);
+			assert.equal(listed[0]?.provider, 'claude-code');
+
+			const groups = await listSessionExplorerGroups({
+				getWorkspaceFolders: () => [workspaceFolder],
+				getStoragePath: () => storageDirectory,
+				listSessions: (directory) => store.listSessions(directory),
+			});
+			assert.equal(groups.length, 1);
+			assert.equal(groups[0]?.sessions.some((session) => session.fileName === fileName), true);
 		} finally {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}

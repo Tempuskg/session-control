@@ -20,6 +20,9 @@ interface SessionExplorerDeps {
 export class SessionExplorerWorkspaceItem extends vscode.TreeItem {
 	constructor(public readonly group: SessionExplorerGroup) {
 		super(group.workspaceFolder.name, vscode.TreeItemCollapsibleState.Expanded);
+		// Explicit, stable id keyed by storage directory. Without an id VS Code
+		// derives one from the label, which collides when folder names repeat.
+		this.id = `workspace:${group.storageDirectory}`;
 		this.description = `${group.sessions.length} session${group.sessions.length === 1 ? '' : 's'}`;
 		this.tooltip = group.workspaceFolder.uri.fsPath;
 		this.contextValue = 'session-control.workspace';
@@ -37,6 +40,11 @@ export class SessionExplorerSessionItem extends vscode.TreeItem {
 		this.fileName = session.fileName;
 		this.storageDirectory = group.storageDirectory;
 		this.workspaceFolder = group.workspaceFolder;
+		// Explicit, stable id keyed by the file path so VS Code can track each
+		// node individually. Without an id VS Code derives one from the title,
+		// so sessions sharing a title (e.g. multi-part saves) collide and a
+		// deleted session keeps showing because a sibling node reuses its id.
+		this.id = `session:${path.join(group.storageDirectory, session.fileName)}`;
 		this.resourceUri = vscode.Uri.file(path.join(group.storageDirectory, session.fileName));
 		this.description = `${session.turnCount} turns`;
 		this.tooltip = `${session.savedAt}\n${session.fileName}`;
@@ -108,6 +116,25 @@ export async function listSessionExplorerGroups(
 	);
 
 	return groups.filter((group) => group.sessions.length > 0);
+}
+
+export interface SessionExplorerViewLike {
+	onDidChangeVisibility(listener: (event: { visible: boolean }) => void): vscode.Disposable;
+}
+
+// VS Code keeps a hidden tree view's nodes cached and does not re-query them
+// when the view is shown again, so sessions saved while the sidebar was closed
+// (e.g. by auto-save) would not appear until some other trigger refreshed the
+// tree. Refresh whenever the view becomes visible.
+export function registerSessionExplorerVisibilityRefresh(
+	view: SessionExplorerViewLike,
+	refresh: () => void,
+): vscode.Disposable {
+	return view.onDidChangeVisibility((event) => {
+		if (event.visible) {
+			refresh();
+		}
+	});
 }
 
 export class SessionExplorerProvider implements vscode.TreeDataProvider<SessionExplorerNode> {

@@ -25,9 +25,21 @@ Monetization*.md
 raw/**
 wiki/**
 
+# Marketplace screenshot capture brief — dev-only; the PNG/GIF assets in this
+# folder still ship in the VSIX so the listing README images resolve offline.
+media/screenshots/README.md
+
 # Local workspace/session data
 .chat/**
+
+# Kanban board / task tracking — dev-only
+.mwnn/**
+
+# Pro extension workspace stub — separate product, not part of this VSIX
+session-control-pro/**
 
 # Build / development only
 scripts/**
 node_modules/**
+debug.log
+**/*.log

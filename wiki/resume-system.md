@@ -87,6 +87,26 @@ On subsequent turns in the same conversation (detected via `context.history`):
 
 This ensures the LLM "remembers" the saved conversation across the entire resumed session, not just the first message.
 
+## Origin-Agent Resume
+
+When `resume.target` is `origin-agent` (the default), resuming a session saved from Codex, Claude Code, or Cursor opens that provider's own chat surface instead of VS Code chat. The flow (`runResumeIntoOriginAgent` in `src/chatParticipant.ts`):
+
+1. Resolve an open command for the provider from built-in candidates (overridable per provider via `resume.providerCommands`)
+2. Compose the resume prompt (same overflow limits as above) and copy it to the clipboard
+3. Resolve a focus command (`FOCUS_COMMAND_CANDIDATES` in `src/resumeTarget.ts`) that pushes focus into the provider's chat input
+4. Auto-paste the clipboard into the focused input (with provider-tuned settle/retry timing for cold sidebar opens)
+5. If focus resolution or paste fails, fall back to a "paste (Ctrl+V) to continue" message — the prompt is already on the clipboard
+
+Provider focus commands (verified against local installs):
+
+| Provider | Focus commands | Notes |
+|----------|----------------|-------|
+| Codex | `chatgpt.sidebarSecondaryView.focus`, `chatgpt.sidebarView.focus`, view-container commands | Webview sidebar; paste routes through the webview |
+| Claude Code | `claude-vscode.focus`, sidebar view focus commands | Extra mount delay before focus/paste on cold opens |
+| Cursor | `composer.focusComposer`, `workbench.panel.aichat.view.focus` | Verified against Cursor 3.9.16. The open command prefers `composer.newAgentChat` so the resume prompt lands in a fresh agent chat tab rather than the currently open conversation/draft (`aichat.newchataction` is the fallback and reuses the open composer). The agent composer is host-provided (not an extension webview), so auto-paste relies on VS Code's generic DOM paste fallback; if a Cursor release blocks it, the flow degrades to the clipboard fallback message. Override command IDs with `resume.providerCommands` if a Cursor build renames them. |
+
+Copilot sessions always resume through VS Code chat (`workbench.action.chat.open` supports passing the prompt directly, no clipboard involved).
+
 ## Session Selection UX
 
 - **With argument**: `@session-control /resume fix-auth-bug` — fuzzy match on title/filename

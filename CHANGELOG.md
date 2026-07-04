@@ -5,15 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.4] - 2026-07-04
+
+### Fixed
+- Resuming a Cursor-originated session into Cursor's agent chat now auto-pastes the resume prompt instead of only copying it to the clipboard: the flow focuses Cursor's composer (`composer.focusComposer`, falling back to `workbench.panel.aichat.view.focus`) and pastes with the same settle/retry handling as Codex and Claude Code. If Cursor's host UI blocks the focus or paste, the prompt is still on the clipboard and the message says to paste (Ctrl+V) to continue.
+- Resuming in Cursor now starts a fresh agent chat (`composer.newAgentChat`) instead of pasting the resume prompt into whatever conversation or draft is currently open in the composer, matching the Claude Code flow's new-conversation behavior. Older Cursor builds without that command fall back to `aichat.newchataction`.
+- The published VSIX no longer packages development-only files: `.mwnn/` kanban cards, `debug.log` (and other `*.log` files), and the `session-control-pro/` workspace stub are now excluded via `.vscodeignore`.
+- The Session Control sidebar now refreshes its session list automatically whenever the view becomes visible (e.g. clicking the Session Control activity bar icon), so sessions saved while the sidebar was closed appear without a manual refresh.
+- Fixed saved sessions (e.g. from the Claude Code provider) not appearing in the Session Control sidebar until reload: the save flow awaited its "Saved chat session to ..." notification, and VS Code only resolves that promise when the notification is dismissed, which blocked both post-save pruning and the sidebar refresh. Notifications are now fire-and-forget.
+- Session files skipped by the sidebar because they fail to parse or validate are no longer dropped silently; the file name and reason are logged to the "Session Control" output channel.
+
+### Removed
+- Removed the `Session Control: Save Current Chat Session` command. Its provider was inferred from the host app (or the `save.provider` override), which could silently save the wrong agent's transcript. Saving is now always an explicit provider choice.
 
 ### Changed
+- Renamed the `Session Control: Save Session From Provider...` command to `Session Control: Save Session...`. It is now the single manual save entry point: it prompts for the provider and then for the session, so what gets saved is never guessed from the active window.
+- The `Session Control: Save Session...` provider picker is host-aware: inside Cursor it offers Cursor (agent transcripts) in place of Copilot — Cursor has no Copilot chat storage to save from — alongside Codex and Claude Code. In VS Code and other hosts it still offers Copilot, Codex, and Claude Code.
 - Rewrote the marketplace listing hero in `README.md` to lead with "Save your Cursor, Claude Code, Codex, and GitHub Copilot chat history across git commits" and frame Session Control as a cross-IDE session manager for the Open VSX / Cursor / Windsurf / VSCodium audience, with a new "Why Session Control" section above the feature list.
 - Updated `package.json` `description` to "Save your Cursor, Claude Code, Codex, and Copilot chat history across git commits. Cross-IDE session manager that keeps every AI conversation in your repo, locally." and reordered/expanded `keywords` to add `windsurf`, `vscodium`, `chat-history`, `session-manager`, `ai-sessions`, `ai-chat`, `cross-ide`, `agent`, `transcript`, and `history` for Open VSX search ranking.
 - Expanded the README installation section to surface the Open VSX install path alongside the VS Marketplace link.
 
 ### Added
 - Added `wiki/open-vsx-listing.md` with the Phase 2 Step 1 listing audit, keyword plan, rewrite rationale, and human-approval checklist for the Open VSX and VS Marketplace listings.
+- Added a `## Screenshots` section to `README.md` above the feature list with five image references (`demo.gif`, `save-session.png`, `resume-session.png`, `session-explorer.png`, `provider-picker.png`) using absolute `raw.githubusercontent.com` URLs so both Open VSX and VS Marketplace resolve the images.
+- Added the captured screenshot and demo GIF assets under `media/screenshots/` and removed the `screenshots:pending` comment markers so the `## Screenshots` section renders live on the Open VSX and VS Marketplace listing pages.
+- Added `media/screenshots/README.md` capture brief with required filenames, target dimensions, max sizes, OS/UI prep checklist, per-shot scripts, privacy sweep, and the post-capture uncomment-and-release flow. The brief itself is excluded from the published VSIX via `.vscodeignore` so only the PNG/GIF assets ship to users.
 
 ## [1.3.2] - 2026-06-21
 

@@ -92,6 +92,38 @@ suite('sessionStore', () => {
 		}
 	});
 
+	test('listSessions logs skipped files that fail to parse or validate', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const warnings: string[] = [];
+		const store = createSessionStore({
+			logWarning: (message) => {
+				warnings.push(message);
+			},
+		});
+
+		try {
+			await fs.mkdir(storageDirectory, { recursive: true });
+			await fs.writeFile(path.join(storageDirectory, 'broken.json'), '{ not json', 'utf8');
+			await fs.writeFile(path.join(storageDirectory, 'invalid-schema.json'), JSON.stringify({ id: 'missing-fields' }), 'utf8');
+			await store.writeSession(storageDirectory, createSession('valid-a', '2026-04-12T10:00:00.000Z', 'Valid Session'), {
+				includeTimestampInFileName: false,
+			});
+
+			const sessions = await store.listSessions(storageDirectory);
+
+			assert.equal(sessions.length, 1);
+			assert.equal(sessions[0]?.id, 'valid-a');
+			assert.equal(warnings.some((warning) => warning.includes('broken.json')), true);
+			assert.equal(
+				warnings.some((warning) => warning.includes('invalid-schema.json') && warning.includes('Invalid session schema')),
+				true,
+			);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
 	test('writeSessions preserves linked part filenames when title-only split names collide', async () => {
 		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
 		const storageDirectory = path.join(tempRoot, '.chat');

@@ -2,7 +2,7 @@
   "name": "session-control",
   "displayName": "Session Control",
   "description": "Save your Cursor, Claude Code, Codex, and Copilot chat history across git commits. Cross-IDE session manager that keeps every AI conversation in your repo, locally.",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "publisher": "darrenjmcleod",
   "icon": "media/session-control.png",
   "license": "MIT",
@@ -49,13 +49,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "session-control.saveSession",
-        "title": "Save Current Chat Session",
-        "category": "Session Control"
-      },
-      {
         "command": "session-control.saveSessionFromProvider",
-        "title": "Save Session From Provider...",
+        "title": "Save Session...",
         "category": "Session Control"
       },
       {
@@ -169,7 +164,7 @@
             "Override host detection and import from local Claude Code JSONL transcripts under CLAUDE_CONFIG_DIR or the configured Claude Code home path."
           ],
           "default": "copilot",
-          "description": "Explicit provider override used by Session Control: Save Current Chat Session. When unset, Session Control auto-detects Cursor, Codex, or Claude Code based on the host app, and otherwise defaults to Copilot.",
+          "description": "Explicit provider override used by auto-save. (Session Control: Save Session... always prompts for the provider.) When unset, Session Control auto-detects Cursor, Codex, or Claude Code based on the host app, and otherwise defaults to Copilot.",
           "scope": "resource"
         },
         "session-control.codex.homePath": {
@@ -396,9 +391,6 @@
     },
     "menus": {
       "commandPalette": [
-        {
-          "command": "session-control.saveSession"
-        },
         {
           "command": "session-control.saveSessionFromProvider"
         },

@@ -18,8 +18,13 @@ const COMMANDS_SUPPORTING_QUERY = new Set([
 // claude-vscode.sidebar.open, claude-vscode.newConversation,
 // views claudeVSCodeSidebar / claudeVSCodeSidebarSecondary in containers
 // claude-sidebar / claude-sidebar-secondary.
-// Cursor's agent UI is host-provided in current installs, so these candidates
-// are intentionally conservative and can be overridden with resume.providerCommands.
+// Cursor's agent UI is host-provided; verified against Cursor 3.9.16:
+// composer.newAgentChat starts a fresh agent chat tab, so the resume prompt is
+// pasted into a clean conversation instead of whatever chat/draft is already
+// open. aichat.newchataction is kept as a fallback for older builds, but it
+// reuses the currently open composer. cursor.chat.open and
+// cursorai.action.openChat are unverified legacy guesses kept last; all of
+// this can be overridden with resume.providerCommands.
 const RESUME_TARGET_CANDIDATES: Record<SessionProviderId, readonly string[]> = {
 	copilot: ['workbench.action.chat.open'],
 	codex: [
@@ -34,8 +39,8 @@ const RESUME_TARGET_CANDIDATES: Record<SessionProviderId, readonly string[]> = {
 		'claude-vscode.editor.openLast',
 	],
 	cursor: [
-		'aichat.newchataction',
 		'composer.newAgentChat',
+		'aichat.newchataction',
 		'cursor.chat.open',
 		'cursorai.action.openChat',
 	],
@@ -54,7 +59,12 @@ const RESUME_TARGET_CANDIDATES: Record<SessionProviderId, readonly string[]> = {
 // paste wait/retry briefly on cold starts. Verified locally from
 // anthropic.claude-code package.json/extension.js: claude-vscode.focus is the
 // dedicated command that pushes focus into Claude's chat experience after the
-// sidebar is revealed.
+// sidebar is revealed. Verified locally against Cursor 3.9.16's workbench
+// bundle: composer.focusComposer is Cursor's registered "Focus Agent" action
+// (Cursor's own workbench code executes it to push focus into the composer
+// input), and workbench.panel.aichat.view is the chat panel view id, so VS
+// Code core auto-registers workbench.panel.aichat.view.focus as a fallback
+// that at least reveals the panel.
 const FOCUS_COMMAND_CANDIDATES: Partial<Record<SessionProviderId, readonly string[]>> = {
 	codex: [
 		'chatgpt.sidebarSecondaryView.focus',
@@ -69,6 +79,10 @@ const FOCUS_COMMAND_CANDIDATES: Partial<Record<SessionProviderId, readonly strin
 		'claudeVSCodeSidebar.focus',
 		'workbench.view.extension.claude-sidebar',
 		'workbench.view.extension.claude-sidebar-secondary',
+	],
+	cursor: [
+		'composer.focusComposer',
+		'workbench.panel.aichat.view.focus',
 	],
 };
 

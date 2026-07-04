@@ -40,6 +40,18 @@ suite('resumeTarget', () => {
 		assert.equal(target, undefined);
 	});
 
+	test('prefers a fresh Cursor agent chat over reusing the open composer', () => {
+		const target = resolveResumeTarget('cursor', ['aichat.newchataction', 'composer.newAgentChat']);
+
+		assert.equal(target?.commandId, 'composer.newAgentChat');
+	});
+
+	test('falls back to aichat.newchataction on Cursor builds without composer.newAgentChat', () => {
+		const target = resolveResumeTarget('cursor', ['aichat.newchataction']);
+
+		assert.equal(target?.commandId, 'aichat.newchataction');
+	});
+
 	test('resolves the first available Codex focus command', () => {
 		const focusCommand = resolveProviderFocusCommand('codex', [
 			'chatgpt.sidebarSecondaryView.focus',
@@ -67,8 +79,26 @@ suite('resumeTarget', () => {
 		assert.equal(focusCommand, 'claude-vscode.focus');
 	});
 
+	test('resolves the first available Cursor focus command', () => {
+		const focusCommand = resolveProviderFocusCommand('cursor', [
+			'composer.focusComposer',
+			'workbench.panel.aichat.view.focus',
+		]);
+
+		assert.equal(focusCommand, 'composer.focusComposer');
+	});
+
+	test('falls back to the aichat panel focus command when the Cursor composer focus is unavailable', () => {
+		const focusCommand = resolveProviderFocusCommand('cursor', [
+			'workbench.panel.aichat.view.focus',
+		]);
+
+		assert.equal(focusCommand, 'workbench.panel.aichat.view.focus');
+	});
+
 	test('returns undefined when no focus command is available', () => {
 		assert.equal(resolveProviderFocusCommand('codex', ['chatgpt.newCodexPanel']), undefined);
 		assert.equal(resolveProviderFocusCommand('claude-code', ['claude-vscode.sidebar.open']), undefined);
+		assert.equal(resolveProviderFocusCommand('cursor', ['aichat.newchataction']), undefined);
 	});
 });

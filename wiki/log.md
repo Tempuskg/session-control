@@ -2,7 +2,7 @@
 title: "Wiki Log"
 type: log
 created: 2026-04-12
-updated: 2026-06-28
+updated: 2026-07-03
 ---
 
 # Wiki Log
@@ -10,6 +10,30 @@ updated: 2026-06-28
 Chronological record of all wiki operations.
 
 ---
+
+## [2026-07-04] change | VSIX packaging cleanup
+Added `.mwnn/**` (kanban cards), `session-control-pro/**` (Pro workspace stub), `debug.log`, and `**/*.log` to `.vscodeignore`. These development-only files were shipping in the published VSIX (discovered while packaging the dev build for Cursor testing). Package contents verified after the change: 10 files (LICENSE, changelog, package.json, readme, dist/extension.js, media assets), down from 20.
+Pages touched: (repo files: .vscodeignore, CHANGELOG.md)
+
+## [2026-07-04] change | Cursor resume opens a fresh agent chat
+Reordered `RESUME_TARGET_CANDIDATES.cursor` to prefer `composer.newAgentChat` over `aichat.newchataction` so resuming pastes into a new agent chat tab instead of the currently open conversation/draft (parity with Claude Code's new-conversation step). Probe-verified in Cursor 3.9.16: with an existing draft in the composer, `composer.newAgentChat` opens a second chat tab and the paste lands only in the fresh composer. `aichat.newchataction` kept as fallback for older builds; unverified legacy candidates retained last.
+Pages touched: resume-system.md (+ repo files: src/resumeTarget.ts, test/unit/resumeTarget.test.ts, test/unit/chatParticipant.integration.test.ts, CHANGELOG.md)
+
+## [2026-07-04] change | Host-aware provider picker for Save Session...
+`Session Control: Save Session...` now builds its provider quick pick from the host app: inside Cursor (detected via `vscode.env.appName`, same regex as `resolveImplicitSaveProviderForHost`) the Copilot entry is replaced with a Cursor entry that imports from local Cursor agent transcripts, since Cursor has no Copilot chat storage to save from. Other hosts keep Copilot/Codex/Claude Code. Implemented as the exported pure helper `createSessionProviderPickItems(appName)` in `src/extension.ts` with unit coverage in `extensionPhase10.test.ts`.
+Pages touched: (repo files: src/extension.ts, test/unit/extensionPhase10.test.ts, CHANGELOG.md)
+
+## [2026-07-03] change | Cursor resume auto-paste parity
+Brought the Cursor origin-agent resume flow to parity with Codex/Claude Code: added `cursor` focus-command candidates (`composer.focusComposer`, `workbench.panel.aichat.view.focus`) to `FOCUS_COMMAND_CANDIDATES` — verified against Cursor 3.9.16's workbench bundle, where `composer.focusComposer` is the registered "Focus Agent" action — and included `cursor` in the auto-paste branch of `runResumeIntoOriginAgent` with Codex-style settle/retry constants. On success the message now says the context was pasted; if focus or paste fails, the existing copied-to-clipboard "paste (Ctrl+V) to continue" fallback is unchanged. Cursor's composer is host-provided (not an extension webview), so the paste relies on VS Code's generic DOM paste fallback; this caveat is documented in the code and in resume-system.md. `resume.providerCommands` overrides keep working.
+Pages touched: resume-system.md (+ repo files: src/resumeTarget.ts, src/chatParticipant.ts, test/unit/resumeTarget.test.ts, test/unit/chatParticipant.integration.test.ts, CHANGELOG.md)
+
+## [2026-06-30] change | Consolidate manual save onto a single explicit picker
+Removed the `session-control.saveSession` ("Save Current Chat Session") command: it inferred the provider from the host app or the `save.provider` override, which could silently save the wrong agent's transcript when the user expected a different one. Renamed `session-control.saveSessionFromProvider` to "Save Session..." so the provider quick pick is now the single manual save entry point. Reverted the short-lived dedicated `saveCodexSession`/`saveClaudeCodeSession` commands, the `Save Current Session` view-title submenu, and the exported `runSaveSessionForProviderFlow` test seam (the explored "active chat window" detection was rejected because recency-based detection does not match which chat the user has focused, and there is no VS Code API to detect the focused chat panel). The exported `runSaveSessionFlow` copilot test seam and its coverage are retained. Updated the `save.provider` setting description to note it now only affects auto-save.
+Pages touched: (repo files: src/extension.ts, package.json, test/unit/extensionSaveFlow.test.ts, README.md, CHANGELOG.md)
+
+## [2026-06-28] add | Open VSX Listing — Phase 2 Step 2 (screenshots markup + capture brief)
+Added a `## Screenshots` section to `README.md` above the Features list with five staged image references (`demo.gif`, `save-session.png`, `resume-session.png`, `session-explorer.png`, `provider-picker.png`) using absolute `raw.githubusercontent.com/tempuskg/session-control/main/media/screenshots/` URLs so both Open VSX and VS Marketplace resolve them. Wrapped the image block in `<!-- screenshots:pending … -->` HTML comment markers so the live listing renders no broken-image icons until the human captures and commits the five files. Created `media/screenshots/README.md` as a precise capture brief with required filenames, target dimensions, max sizes, OS/UI prep checklist, per-shot scripts, privacy sweep, and post-capture uncomment-and-release flow. Extended `wiki/open-vsx-listing.md` with §3.5 (Step 2 strategy, asset table, URL pattern, comment-wrap rationale, anti-patterns) and added a dedicated Step 2 approval checklist to §4. No image binaries were committed; the visual capture remains human-owned.
+Pages touched: open-vsx-listing.md (+ repo files: README.md, media/screenshots/README.md, CHANGELOG.md)
 
 ## [2026-06-28] add | Open VSX Listing — Audit & Rewrite
 Drafted `wiki/open-vsx-listing.md` with the current-state audit (v1.3.3 `description` + keywords + README hero), the keyword plan (added `windsurf`, `chat-history`, `session-manager`, `ai-sessions`, `cross-ide`, `ai-chat`, `agent`, `transcript`, `history`, `vscodium`), the new `description` string, the new README hero, and the human-approval checklist. Reordered keywords in `package.json` to put the audience-priority providers first (Cursor, Claude Code, Codex, Copilot). Rewrote `README.md` to lead with "Save your Cursor, Claude Code, Codex, and GitHub Copilot chat history across git commits", added a "Why Session Control" section above the features list, expanded the installation section to surface the Open VSX install path explicitly for Cursor / Windsurf / VSCodium users. No feature, command, or behavior claims changed; configuration table, command list, and privacy warning are unchanged. Screenshots/GIF (Phase 2 Step 2) deferred to a separate task. Pending human approval before the next tagged release.
@@ -147,3 +171,7 @@ Pages touched: README.md, CHANGELOG.md, package.json, src/types.ts, src/codexSes
 ## [2026-06-21] update | Command Title Cleanup
 Synced the wiki file manifest with the shorter command titles now used in `package.json`, including the import, analyze, save, and toggle-auto-save entries.
 Pages touched: file-manifest.md, log.md
+
+## [2026-07-04] update | Screenshots Live + v1.3.4 Release
+Committed the five captured listing assets (demo.gif, save-session.png, resume-session.png, session-explorer.png, provider-picker.png) under media/screenshots/, removed the screenshots:pending comment markers so the README Screenshots section renders on the Open VSX and VS Marketplace listings, bumped to 1.3.4, and signed off the Step 2 rows in the open-vsx-listing approval checklist. Release tag v1.3.4 triggers release.yml to publish the same VSIX to both registries.
+Pages touched: README.md, CHANGELOG.md, package.json, media/screenshots/README.md, open-vsx-listing.md, log.md

@@ -565,6 +565,171 @@ suite('chatParticipant integration', () => {
 		assert.equal(messages[0], 'Opened Codex chat and copied the conversation context - paste to continue.');
 	});
 
+	test('runResumeIntoOriginAgent opens the Cursor agent chat and pastes context', async () => {
+		const saved = {
+			...createChatSession(createCopilotSession(), {
+				title: 'Cursor resume',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'cursor' as const,
+		};
+		const executedCommands: string[] = [];
+		const waits: number[] = [];
+		let clipboardText: string | undefined;
+		const messages: string[] = [];
+
+		const opened = await runResumeIntoOriginAgent(saved, 'Continue in Cursor', {
+			maxTurns: 50,
+			maxContextChars: 30000,
+			overflowStrategy: 'truncate',
+		}, {
+			getCommands: async () => ['composer.newAgentChat', 'aichat.newchataction', 'composer.focusComposer'],
+			executeCommand: async (commandId: string) => {
+				executedCommands.push(commandId);
+			},
+			writeClipboard: async (text: string) => {
+				clipboardText = text;
+			},
+			sleep: async (ms: number) => {
+				waits.push(ms);
+			},
+			streamMarkdown: (markdown: string) => {
+				messages.push(markdown);
+			},
+		});
+
+		assert.equal(opened, true);
+		assert.deepEqual(executedCommands, [
+			'composer.newAgentChat',
+			'composer.focusComposer',
+			'editor.action.clipboardPasteAction',
+		]);
+		assert.deepEqual(waits, [250]);
+		assert.equal(clipboardText?.includes('User follow-up: Continue in Cursor'), true);
+		assert.equal(messages[0], 'Opened the Cursor chat tab and pasted the conversation context.');
+	});
+
+	test('runResumeIntoOriginAgent waits and retries paste for a cold Cursor composer', async () => {
+		const saved = {
+			...createChatSession(createCopilotSession(), {
+				title: 'Cursor cold start',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'cursor' as const,
+		};
+		const executedCommands: string[] = [];
+		const waits: number[] = [];
+		const messages: string[] = [];
+		let pasteAttempts = 0;
+
+		const opened = await runResumeIntoOriginAgent(saved, 'Continue in Cursor', {
+			maxTurns: 50,
+			maxContextChars: 30000,
+			overflowStrategy: 'truncate',
+		}, {
+			getCommands: async () => ['composer.newAgentChat', 'composer.focusComposer'],
+			executeCommand: async (commandId: string) => {
+				executedCommands.push(commandId);
+				if (commandId === 'editor.action.clipboardPasteAction' && pasteAttempts < 2) {
+					pasteAttempts += 1;
+					throw new Error('Cursor composer not ready');
+				}
+			},
+			writeClipboard: async () => undefined,
+			sleep: async (ms: number) => {
+				waits.push(ms);
+			},
+			streamMarkdown: (markdown: string) => {
+				messages.push(markdown);
+			},
+		});
+
+		assert.equal(opened, true);
+		assert.deepEqual(executedCommands, [
+			'composer.newAgentChat',
+			'composer.focusComposer',
+			'editor.action.clipboardPasteAction',
+			'editor.action.clipboardPasteAction',
+			'editor.action.clipboardPasteAction',
+		]);
+		assert.deepEqual(waits, [250, 150, 150]);
+		assert.equal(messages[0], 'Opened the Cursor chat tab and pasted the conversation context.');
+	});
+
+	test('runResumeIntoOriginAgent falls back to a paste instruction when Cursor auto-paste keeps failing', async () => {
+		const saved = {
+			...createChatSession(createCopilotSession(), {
+				title: 'Cursor resume',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'cursor' as const,
+		};
+		const messages: string[] = [];
+		let clipboardText: string | undefined;
+
+		const opened = await runResumeIntoOriginAgent(saved, 'Continue in Cursor', {
+			maxTurns: 50,
+			maxContextChars: 30000,
+			overflowStrategy: 'truncate',
+		}, {
+			getCommands: async () => ['composer.newAgentChat', 'composer.focusComposer'],
+			executeCommand: async (commandId: string) => {
+				if (commandId === 'editor.action.clipboardPasteAction') {
+					throw new Error('paste blocked by host');
+				}
+			},
+			writeClipboard: async (text: string) => {
+				clipboardText = text;
+			},
+			sleep: async () => undefined,
+			streamMarkdown: (markdown: string) => {
+				messages.push(markdown);
+			},
+		});
+
+		assert.equal(opened, true);
+		assert.equal(clipboardText?.includes('User follow-up: Continue in Cursor'), true);
+		assert.equal(
+			messages[0],
+			'Opened the Cursor chat tab and copied the conversation context, but automatic paste failed (paste blocked by host) - paste (Ctrl+V) to continue.',
+		);
+	});
+
+	test('runResumeIntoOriginAgent falls back to a paste instruction when no Cursor focus command exists', async () => {
+		const saved = {
+			...createChatSession(createCopilotSession(), {
+				title: 'Cursor resume',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'cursor' as const,
+		};
+		const executedCommands: string[] = [];
+		const messages: string[] = [];
+
+		const opened = await runResumeIntoOriginAgent(saved, 'Continue in Cursor', {
+			maxTurns: 50,
+			maxContextChars: 30000,
+			overflowStrategy: 'truncate',
+		}, {
+			getCommands: async () => ['aichat.newchataction'],
+			executeCommand: async (commandId: string) => {
+				executedCommands.push(commandId);
+			},
+			writeClipboard: async () => undefined,
+			streamMarkdown: (markdown: string) => {
+				messages.push(markdown);
+			},
+		});
+
+		assert.equal(opened, true);
+		assert.deepEqual(executedCommands, ['aichat.newchataction']);
+		assert.equal(messages[0], 'Opened Cursor chat and copied the conversation context - paste to continue.');
+	});
+
 	test('runResumeIntoOriginAgent returns false when provider command is unavailable', async () => {
 		const saved = {
 			...createChatSession(createCopilotSession(), {

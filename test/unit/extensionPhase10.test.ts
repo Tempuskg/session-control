@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import {
+	createSessionProviderPickItems,
 	createStorageGitignoreEntry,
 	ensureStoragePathInGitignore,
 	listSessionsAcrossWorkspaceFolders,
@@ -110,6 +111,23 @@ suite('extension phase 10', () => {
 		assert.equal(resolveImplicitSaveProviderForHost('OpenAI Codex'), 'codex');
 		assert.equal(resolveImplicitSaveProviderForHost('Claude Code'), 'claude-code');
 		assert.equal(resolveImplicitSaveProviderForHost('Visual Studio Code'), 'copilot');
+	});
+
+	test('createSessionProviderPickItems replaces Copilot with Cursor inside Cursor hosts', () => {
+		const cursorItems = createSessionProviderPickItems('Cursor');
+		assert.deepEqual(cursorItems.map((item) => item.provider), ['cursor', 'codex', 'claude-code']);
+		assert.equal(cursorItems[0]?.label, 'Cursor');
+
+		const nightlyItems = createSessionProviderPickItems('Cursor Nightly');
+		assert.equal(nightlyItems[0]?.provider, 'cursor');
+	});
+
+	test('createSessionProviderPickItems offers Copilot outside Cursor hosts', () => {
+		for (const appName of ['Visual Studio Code', 'Codex', 'Claude Code']) {
+			const items = createSessionProviderPickItems(appName);
+			assert.deepEqual(items.map((item) => item.provider), ['copilot', 'codex', 'claude-code']);
+			assert.equal(items[0]?.label, 'Copilot');
+		}
 	});
 
 	test('resolveSaveProviderForHost prefers explicit provider overrides', () => {

@@ -11,6 +11,7 @@ interface SessionStoreDeps {
 	exists(filePath: string): Promise<boolean>;
 	rename(fromPath: string, toPath: string): Promise<void>;
 	unlink(filePath: string): Promise<void>;
+	logWarning(message: string): void;
 }
 
 export type SessionPruneAction = 'archive' | 'delete';
@@ -45,6 +46,9 @@ function createDefaultDeps(): SessionStoreDeps {
 		},
 		rename: async (fromPath: string, toPath: string) => fs.rename(fromPath, toPath),
 		unlink: async (filePath: string) => fs.unlink(filePath),
+		logWarning: (message: string) => {
+			console.warn(message);
+		},
 	};
 }
 
@@ -241,7 +245,9 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 				try {
 					const session = await readSession(storageDirectory, fileName);
 					return toSessionMeta(fileName, session);
-				} catch {
+				} catch (error) {
+					const reason = error instanceof Error ? error.message : String(error);
+					deps.logWarning(`Skipped session file ${fileName}: ${reason}`);
 					return null;
 				}
 			}),

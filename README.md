@@ -1,6 +1,6 @@
 # Session Control
 
-[![VS Code Marketplace](https://img.shields.io/badge/VS%20Marketplace-v1.3.3-blue)](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Marketplace-v1.3.4-blue)](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
 [![Open VSX](https://img.shields.io/open-vsx/v/darrenjmcleod/session-control)](https://open-vsx.org/extension/darrenjmcleod/session-control)
 [![CI](https://github.com/tempuskg/session-control/actions/workflows/ci.yml/badge.svg)](https://github.com/tempuskg/session-control/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -27,6 +27,22 @@ VS-Code-compatible editors via the Open VSX Registry.
   them local.
 - **Resume into a fresh chat.** `@session-control /resume <name>` reloads a saved conversation
   as LLM context. No copy-paste, no lost decisions.
+
+## Screenshots
+
+![Animated demo: save a Copilot chat session, browse it in the Session Explorer, and resume it as context in a new chat.](https://raw.githubusercontent.com/tempuskg/session-control/main/media/screenshots/demo.gif)
+
+*Save a chat, browse saved sessions in the Session Explorer, and resume one as context in a new chat — all without leaving your editor.*
+
+| Save any chat | Resume as context |
+| :--: | :--: |
+| ![Session Control: Save Session running from the Command Palette in VS Code, with a saved JSON file appearing under .chat/ in the explorer.](https://raw.githubusercontent.com/tempuskg/session-control/main/media/screenshots/save-session.png) | ![@session-control /resume cursor-debug-loop selected in VS Code Chat, loading a prior Cursor Agent transcript as LLM context for a new conversation.](https://raw.githubusercontent.com/tempuskg/session-control/main/media/screenshots/resume-session.png) |
+| Capture a Cursor, Claude Code, Codex, or Copilot chat as JSON in `.chat/`, linked to the branch and commit you were on. | Type `@session-control /resume <name>` in chat to reload a saved session as context. Fuzzy match on the title. |
+
+| Session Explorer | Cross-IDE provider picker |
+| :--: | :--: |
+| ![Session Control activity bar view showing saved sessions grouped by workspace folder, with open, resume, and delete actions on hover.](https://raw.githubusercontent.com/tempuskg/session-control/main/media/screenshots/session-explorer.png) | ![Session Control: Save Session quick pick offering Copilot, Cursor, Codex, and Claude Code options.](https://raw.githubusercontent.com/tempuskg/session-control/main/media/screenshots/provider-picker.png) |
+| Browse every saved session per workspace folder. Open, resume, or delete from the activity bar. | Pick a provider per save — Cursor, Claude Code, Codex, or Copilot. Auto-detects when running inside Cursor, Codex, or Claude Code. |
 
 ## Features
 
@@ -83,18 +99,12 @@ Search for **Session Control** in your editor's extensions view, or install from
 Open the Command Palette (`Ctrl+Shift+P`) and run:
 
 ```
-Session Control: Save Current Chat Session
+Session Control: Save Session...
 ```
 
-By default this uses the provider configured in `session-control.save.provider` when you set one explicitly. If the setting is unset, Session Control auto-detects Cursor, Codex, or Claude Code based on the host app and otherwise defaults to Copilot. The JSON file is written to `.chat/` in your workspace root.
+Session Control prompts for the provider so what gets saved is always your explicit choice rather than a guess from the active window. Choose **Copilot** to read VS Code chat storage, **Codex** to import local transcripts from `CODEX_HOME` or `~/.codex`, or **Claude Code** to import JSONL transcripts from `CLAUDE_CONFIG_DIR` or `~/.claude`. After picking a provider, choose the session to save. The JSON file is written to `.chat/` in your workspace root.
 
-For a one-off provider choice, run:
-
-```
-Session Control: Save Session From Provider...
-```
-
-Choose **Copilot** to read VS Code chat storage, **Codex** to import local transcripts from `CODEX_HOME` or `~/.codex`, or **Claude Code** to import JSONL transcripts from `CLAUDE_CONFIG_DIR` or `~/.claude`. Cursor support is automatic when the extension is running inside Cursor. In that case, Session Control reads Agent transcript JSONL files from `~/.cursor/projects/<project-slug>/agent-transcripts` and falls back to legacy Cursor workspace `chatSessions` JSONL files when possible.
+Cursor support is automatic when the extension is running inside Cursor. In that case, Session Control reads Agent transcript JSONL files from `~/.cursor/projects/<project-slug>/agent-transcripts` and falls back to legacy Cursor workspace `chatSessions` JSONL files when possible.
 
 Claude Code transcripts are read from:
 
@@ -214,7 +224,7 @@ This command opens the web viewer for the active JSON file when it matches Sessi
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `session-control.storagePath` | `.chat` | Folder (relative to workspace root) where sessions are saved |
-| `session-control.save.provider` | `copilot` | Explicit provider override for `Session Control: Save Current Chat Session`; when unset, Session Control auto-detects Cursor, Codex, or Claude Code based on the host app and otherwise defaults to Copilot |
+| `session-control.save.provider` | `copilot` | Explicit provider override for auto-save (`Session Control: Save Session...` always prompts for the provider); when unset, Session Control auto-detects Cursor, Codex, or Claude Code based on the host app and otherwise defaults to Copilot |
 | `session-control.codex.homePath` | `""` | Optional Codex home directory override; when empty, Session Control uses `CODEX_HOME` or `~/.codex` |
 | `session-control.claudeCode.homePath` | `""` | Optional Claude Code home directory override; when empty, Session Control uses `CLAUDE_CONFIG_DIR` or `~/.claude` |
 | `session-control.cursor.userDataPath` | `""` | Optional Cursor user data directory for legacy workspace `chatSessions` JSONL fallback; when empty, Session Control uses the default Cursor user data location for this OS |

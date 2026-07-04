@@ -58,6 +58,9 @@ const CLAUDE_CODE_PASTE_MAX_ATTEMPTS = 6;
 const CODEX_PASTE_SETTLE_MS = 250;
 const CODEX_PASTE_RETRY_DELAY_MS = 150;
 const CODEX_PASTE_MAX_ATTEMPTS = 6;
+const CURSOR_PASTE_SETTLE_MS = 250;
+const CURSOR_PASTE_RETRY_DELAY_MS = 150;
+const CURSOR_PASTE_MAX_ATTEMPTS = 6;
 
 export type ResumeOverflowStrategy = 'summarize' | 'truncate' | 'recent-only';
 export type ResumeTargetMode = 'origin-agent' | 'vscode-chat';
@@ -123,6 +126,18 @@ async function pasteClipboardIntoFocusedChat(
 		settleMs = CODEX_PASTE_SETTLE_MS;
 		retryDelayMs = CODEX_PASTE_RETRY_DELAY_MS;
 		attemptCount = CODEX_PASTE_MAX_ATTEMPTS;
+	}
+	if (provider === 'cursor') {
+		// Cursor's agent composer is a host-provided workbench input, not a
+		// webview or monaco editor. VS Code's paste action falls back to a
+		// generic DOM paste when no code editor has focus, which lands in the
+		// focused composer input on current Cursor builds — but because the UI
+		// is host-provided this can break across Cursor releases, in which case
+		// the caller falls back to the copy-to-clipboard message. The composer
+		// can also mount lazily on a cold open, so settle and retry like Codex.
+		settleMs = CURSOR_PASTE_SETTLE_MS;
+		retryDelayMs = CURSOR_PASTE_RETRY_DELAY_MS;
+		attemptCount = CURSOR_PASTE_MAX_ATTEMPTS;
 	}
 	if (settleMs > 0) {
 		await sleep(settleMs);
@@ -337,7 +352,7 @@ async function listSessionsAcrossWorkspaceFolders(
 
 export function renderSessionListMarkdown(sessions: SessionMeta[]): string {
 	if (!sessions.length) {
-		return 'No saved sessions found. Use Command Palette: Session Control: Save Current Chat Session.';
+		return 'No saved sessions found. Use Command Palette: Session Control: Save Session...';
 	}
 
 	return ['## Saved Sessions', '', ...sessions.map((session) => asMarkdownListItem(session))].join('\n');
@@ -345,7 +360,7 @@ export function renderSessionListMarkdown(sessions: SessionMeta[]): string {
 
 function renderWorkspaceSessionListMarkdown(sessions: WorkspaceSessionMeta[]): string {
 	if (!sessions.length) {
-		return 'No saved sessions found. Use Command Palette: Session Control: Save Current Chat Session.';
+		return 'No saved sessions found. Use Command Palette: Session Control: Save Session...';
 	}
 
 	return ['## Saved Sessions', '', ...sessions.map((session) => asWorkspaceMarkdownListItem(session))].join('\n');
@@ -749,8 +764,8 @@ export async function runResumeIntoOriginAgent(
 		if (focusCommand) {
 			try {
 				await deps.executeCommand(focusCommand);
-				if (provider === 'codex' || provider === 'claude-code') {
-					const tabLabel = provider === 'codex' ? 'Codex' : 'Claude Code';
+				if (provider === 'codex' || provider === 'claude-code' || provider === 'cursor') {
+					const tabLabel = providerLabel;
 					try {
 						await pasteClipboardIntoFocusedChat(provider, focusCommand, deps);
 						deps.streamMarkdown(`Opened the ${tabLabel} chat tab and pasted the conversation context.`);

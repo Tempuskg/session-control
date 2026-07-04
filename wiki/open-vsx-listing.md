@@ -2,8 +2,8 @@
 title: "Open VSX Listing — Audit & Rewrite"
 type: reference
 created: 2026-06-28
-updated: 2026-06-28
-status: draft (agent-drafted, awaiting human approval)
+updated: 2026-07-04
+status: shipped (Step 1 + Step 2 bundled in v1.3.4; post-release spot-checks pending)
 ---
 
 # Open VSX Listing — Audit & Rewrite
@@ -130,17 +130,79 @@ Replaces the current "A VS Code extension that saves GitHub Copilot…" framing.
   1 ships before Phase 1 billing infra and Phase 3 Pro features.
 - Does **not** remove or weaken the existing public-repo privacy warning. That stays as-is.
 - Does **not** alter the configuration table, command list, or any documented behavior.
-- Does **not** add screenshots or GIFs. That is Phase 2 Step 2 and depends on human-captured
-  visuals.
 - Does **not** touch `displayName`, `publisher`, `version`, `repository`, `categories`, or the
   release workflow. Categories stay `Other` + `SCM Providers` (the closest accurate fit; Open
   VSX does not have an "AI" category that matches).
 
 ---
 
+## 3.5 Phase 2 Step 2 — Screenshots + GIF (shipped in v1.3.4)
+
+The brief tags Step 2 as 🤖 agent-suitable for the markup and 🤝 human-led for the captures.
+The human owner captured the five assets (2026-07-04) and they now live in `media/screenshots/`;
+the `screenshots:pending` comment markers were removed from `README.md` so the `## Screenshots`
+section renders live on both listings as of v1.3.4.
+
+### 3.5.1 Required assets
+
+Five files under `media/screenshots/`. Filenames are case-sensitive on the marketplace CDNs and
+must match the `README.md` markup exactly:
+
+| File | Type | Target dims | Max size | Purpose |
+| :-- | :-- | :-- | :-- | :-- |
+| `demo.gif` | Animated GIF | 1280×800 | ≤ 5 MB | Save → browse → resume hero loop (~12 s) |
+| `save-session.png` | PNG | 1280×800 | ≤ 400 KB | *Save Current Chat Session* in the Command Palette + new `.chat/<slug>.json` visible |
+| `resume-session.png` | PNG | 1280×800 | ≤ 400 KB | `@session-control /resume cursor-debug-loop` selected in VS Code Chat |
+| `session-explorer.png` | PNG | 1280×800 | ≤ 400 KB | Session Control activity-bar view, sessions grouped per workspace |
+| `provider-picker.png` | PNG | 1280×800 | ≤ 400 KB | *Save Session From Provider…* quick pick showing Cursor / Claude / Codex / Copilot |
+
+Detailed capture script, OS/UI prep, and privacy sweep live in `media/screenshots/README.md`.
+
+### 3.5.2 Listing image-URL strategy
+
+VS Marketplace and Open VSX render the listing README on their own domains and only resolve
+**absolute** image URLs. The README uses the canonical raw GitHub URL pattern:
+
+```
+https://raw.githubusercontent.com/tempuskg/session-control/main/media/screenshots/<file>
+```
+
+This resolves the moment the files are committed to `main`. The same files also ship inside
+the VSIX (`media/**` is not in `.vscodeignore`), so an offline-viewer rendering of the README
+also works.
+
+### 3.5.3 Why the markup is comment-wrapped right now
+
+If the README image references go live before the human captures the visuals, the Open VSX
+listing renders **broken-image icons** until the next deploy. That is worse than no images at
+all. The markup is therefore wrapped in:
+
+```html
+<!-- screenshots:pending — remove this line and the matching closer after committing PNG/GIF assets to media/screenshots/
+
+  ...image markup...
+
+screenshots:pending -->
+```
+
+Going live is a deliberate one-step uncomment: delete both `screenshots:pending` lines after
+the five files are committed.
+
+### 3.5.4 What Step 2 intentionally does *not* do
+
+- Does **not** commit dummy PNG placeholders to the repo. Placeholders would ship inside every
+  VSIX install and waste bytes; the comment-wrapping is cleaner.
+- Does **not** auto-publish the live screenshots. Going live is human-owned: capture, commit,
+  uncomment, tag a release.
+- Does **not** modify VS Marketplace `galleryBanner` or any other badge / theme settings.
+
+---
+
 ## 4. Approval & ship checklist
 
 Human owner: review and approve before the next release.
+
+### Step 1 — listing copy + keywords
 
 - [x] Sign off on the new `description` string (Section 3.2).
 - [x] Sign off on the new README hero (Section 3.3).
@@ -154,11 +216,26 @@ Human owner: review and approve before the next release.
       `claude code session`, `cross-ide ai`, and `windsurf chat`. These are the brief's
       acceptance signals.
 
+### Step 2 — screenshots + GIF
+
+- [x] README `## Screenshots` section drafted with absolute URLs and alt text (Section 3.5).
+- [x] `media/screenshots/README.md` capture brief drafted with per-shot scripts and privacy
+      sweep.
+- [x] Markup comment-wrapped to prevent broken-image rendering on the live listing until the
+      five files exist.
+- [x] Capture `demo.gif`, `save-session.png`, `resume-session.png`, `session-explorer.png`, and
+      `provider-picker.png` per the brief in `media/screenshots/README.md`.
+- [x] Commit the five files to `media/screenshots/`.
+- [x] Delete both `screenshots:pending` comment marker lines in `README.md` to make the markup
+      live.
+- [x] Bump version (recommended bundle with Step 1 copy changes under `1.3.4`) and push the
+      `v*` tag.
+- [ ] Spot-check both listings render the visuals correctly (Open VSX + VS Marketplace).
+
 ---
 
-## 5. Related deferred items (do not block this step)
+## 5. Related deferred items (do not block these steps)
 
-- **Phase 2 Step 2** — screenshots + short GIF (agent-drafts markup, human captures visuals).
 - **Phase 2 Step 3** — VS Marketplace listing re-check + stock-VS-Code smoke test. Same copy
   changes apply; the 30-minute smoke test is the human-owned piece.
 - **Phase 2 Step 4** — landing page. Out of scope for this repo.

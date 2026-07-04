@@ -2,6 +2,7 @@ import * as assert from 'node:assert';
 import * as vscode from 'vscode';
 import {
 	listSessionExplorerGroups,
+	registerSessionExplorerVisibilityRefresh,
 	SessionExplorerProvider,
 	SessionExplorerSessionItem,
 	SessionExplorerWorkspaceItem,
@@ -64,5 +65,55 @@ suite('session explorer', () => {
 		assert.equal(childNodes.length, 1);
 		assert.equal(childNodes[0] instanceof SessionExplorerSessionItem, true);
 		assert.equal(childNodes[0]?.label, 'Alpha Session');
+	});
+
+	test('registerSessionExplorerVisibilityRefresh refreshes when the view becomes visible', () => {
+		let listener: ((event: { visible: boolean }) => void) | undefined;
+		let disposed = false;
+		let refreshCount = 0;
+
+		const registration = registerSessionExplorerVisibilityRefresh(
+			{
+				onDidChangeVisibility: (nextListener) => {
+					listener = nextListener;
+					return { dispose: () => { disposed = true; } } as vscode.Disposable;
+				},
+			},
+			() => {
+				refreshCount += 1;
+			},
+		);
+
+		assert.notEqual(listener, undefined);
+		listener?.({ visible: true });
+		assert.equal(refreshCount, 1);
+
+		listener?.({ visible: false });
+		assert.equal(refreshCount, 1);
+
+		listener?.({ visible: true });
+		assert.equal(refreshCount, 2);
+
+		registration.dispose();
+		assert.equal(disposed, true);
+	});
+
+	test('session leaf nodes get unique ids even when titles collide', async () => {
+		const alpha = createWorkspaceFolder('C:/alpha', 'alpha', 0);
+		const provider = new SessionExplorerProvider({
+			getWorkspaceFolders: () => [alpha],
+			getStoragePath: () => 'C:/alpha/.chat',
+			listSessions: async () => [
+				createSession('Same Title', 'first.json', '2026-04-12T10:00:00.000Z'),
+				createSession('Same Title', 'second.json', '2026-04-12T11:00:00.000Z'),
+			],
+		});
+
+		const rootNodes = await provider.getChildren();
+		const childNodes = await provider.getChildren(rootNodes[0] as SessionExplorerWorkspaceItem);
+
+		assert.equal(childNodes.length, 2);
+		assert.notEqual(childNodes[0]?.id, undefined);
+		assert.notEqual(childNodes[0]?.id, childNodes[1]?.id);
 	});
 });
