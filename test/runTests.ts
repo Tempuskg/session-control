@@ -37,31 +37,35 @@ async function resolveVscodeExecutablePath(): Promise<string> {
 		return explicitExecutablePath;
 	}
 
-	const localExecutablePath = await findExecutableOnPath(
-		process.platform === 'win32'
-			? ['code.cmd', 'code.exe', 'code-insiders.cmd', 'code-insiders.exe']
-			: ['code', 'code-insiders'],
-	);
-	if (localExecutablePath) {
-		return localExecutablePath;
+	// Never launch tests through the `code.cmd` / `code` CLI wrapper: it
+	// starts VS Code detached and exits 0 immediately, so test failures never
+	// propagate and every run reports success. On Windows, resolve a locally
+	// installed VS Code to the electron Code.exe next to its bin\ directory;
+	// otherwise download an archive and use its executable directly.
+	if (process.platform === 'win32') {
+		const localCli = await findExecutableOnPath(['code.cmd', 'code-insiders.cmd']);
+		if (localCli) {
+			const installRoot = path.dirname(path.dirname(localCli));
+			const localExe = path.join(installRoot, 'Code.exe');
+			if (await fileExists(localExe)) {
+				return localExe;
+			}
+		}
 	}
 
 	const testVersion = process.env.VSCODE_TEST_VERSION;
-	const downloadedExecutablePath = testVersion === undefined
-		? await downloadAndUnzipVSCode()
-		: await downloadAndUnzipVSCode({ version: testVersion });
-
-	return process.platform === 'win32'
-		? path.join(
-			path.dirname(downloadedExecutablePath),
-			'bin',
-			testVersion === 'insiders' ? 'code-insiders.cmd' : 'code.cmd',
-		)
-		: downloadedExecutablePath;
+	return testVersion === undefined
+		? downloadAndUnzipVSCode()
+		: downloadAndUnzipVSCode({ version: testVersion });
 }
 
 async function main(): Promise<void> {
 	try {
+		// Inherited from an editor's extension-host shell this variable makes
+		// the spawned Code.exe run as plain Node.js, which rejects the
+		// extension-test flags ("bad option: --extensionTestsPath").
+		delete process.env.ELECTRON_RUN_AS_NODE;
+
 		const extensionDevelopmentPath = path.resolve(__dirname, '..', '..');
 		const extensionTestsPath = path.resolve(__dirname, 'suite', 'index.js');
 		const vscodeExecutablePath = await resolveVscodeExecutablePath();

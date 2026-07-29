@@ -68,7 +68,7 @@ export interface SessionMeta {
 	git: GitContext | null;
 }
 
-export type AnalysisSelectionMode = 'last24Hours' | 'last7Days' | 'last30Days' | 'customRange' | 'needsAnalysis';
+export type AnalysisSelectionMode = 'last24Hours' | 'last7Days' | 'last30Days' | 'customRange' | 'needsAnalysis' | 'singleSession';
 
 export interface AnalysisTimeRange {
 	start: string;
@@ -80,6 +80,8 @@ export interface AnalysisSelection {
 	label: string;
 	range: AnalysisTimeRange | null;
 	onlyUnanalyzed?: boolean;
+	// Present when mode is 'singleSession': the id of the one targeted session.
+	sessionId?: string;
 }
 
 export type AnalysisReportStatus = 'complete' | 'partial';
@@ -142,6 +144,20 @@ export interface AnalysisIndex {
 	updatedAt: string;
 	reports: AnalysisReportReference[];
 	analyzedSessions: AnalysisIndexEntry[];
+}
+
+// Minimal read-only view of the harvest index written by Session Control Pro
+// at <storageDirectory>/harvest/index.json. Only the fields the free
+// extension consumes are validated; Pro owns the full schema and may include
+// additional fields (fingerprint, bundlePath, backend, ...).
+export interface HarvestIndexEntry {
+	sessionId: string;
+	harvestedAt: string;
+}
+
+export interface HarvestIndex {
+	version: number;
+	sessions: HarvestIndexEntry[];
 }
 
 export interface ScoredSession extends SessionMeta {
@@ -241,7 +257,8 @@ function isAnalysisSelectionMode(value: unknown): value is AnalysisSelectionMode
 		|| value === 'last7Days'
 		|| value === 'last30Days'
 		|| value === 'customRange'
-		|| value === 'needsAnalysis';
+		|| value === 'needsAnalysis'
+		|| value === 'singleSession';
 }
 
 function isAnalysisReportStatus(value: unknown): value is AnalysisReportStatus {
@@ -264,6 +281,7 @@ export function isAnalysisSelection(value: unknown): value is AnalysisSelection 
 	return isAnalysisSelectionMode(value.mode)
 		&& typeof value.label === 'string'
 		&& (value.onlyUnanalyzed === undefined || typeof value.onlyUnanalyzed === 'boolean')
+		&& (value.sessionId === undefined || typeof value.sessionId === 'string')
 		&& (value.range === null || isAnalysisTimeRange(value.range));
 }
 
@@ -348,6 +366,25 @@ export function isAnalysisIndex(value: unknown): value is AnalysisIndex {
 		&& value.reports.every((report) => isAnalysisReportReference(report))
 		&& Array.isArray(value.analyzedSessions)
 		&& value.analyzedSessions.every((entry) => isAnalysisIndexEntry(entry));
+}
+
+export function isHarvestIndexEntry(value: unknown): value is HarvestIndexEntry {
+	if (!isRecord(value)) {
+		return false;
+	}
+
+	return typeof value.sessionId === 'string'
+		&& isIsoTimestamp(value.harvestedAt);
+}
+
+export function isHarvestIndex(value: unknown): value is HarvestIndex {
+	if (!isRecord(value)) {
+		return false;
+	}
+
+	return typeof value.version === 'number'
+		&& Array.isArray(value.sessions)
+		&& value.sessions.every((entry) => isHarvestIndexEntry(entry));
 }
 
 export function isChatSession(value: unknown): value is ChatSession {

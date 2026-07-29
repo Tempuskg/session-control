@@ -40,6 +40,8 @@ function createExplorerItem(workspaceFolder: vscode.WorkspaceFolder): SessionExp
 		workspaceFolder,
 		storageDirectory: `${workspaceFolder.uri.fsPath}/.chat`,
 		sessions: [session],
+		analyzedSessions: [],
+		harvestedSessions: [],
 	};
 	return new SessionExplorerSessionItem(group, session);
 }

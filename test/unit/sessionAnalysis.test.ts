@@ -6,12 +6,13 @@ import {
 	createCustomRangeSelection,
 	createNeedsAnalysisSelection,
 	createPresetAnalysisSelection,
+	createSingleSessionSelection,
 	filterCandidatesForAnalysis,
 	parseAnalysisSelectionAlias,
 	splitCandidatesIntoAnalysisBatches,
 	type AnalysisCandidateSession,
 } from '../../src/sessionAnalysis';
-import { ChatSession } from '../../src/types';
+import { ChatSession, isAnalysisSelection } from '../../src/types';
 
 function createSession(id: string, savedAt: string, title: string, content: string, requestPrompt = `Prompt for ${title}`): ChatSession {
 	return {
@@ -135,6 +136,52 @@ suite('sessionAnalysis', () => {
 
 		assert.equal(filtered.length, 1);
 		assert.equal(filtered[0]?.session.id, 'normal');
+	});
+
+	test('createSingleSessionSelection labels the session and pins its id', () => {
+		const selection = createSingleSessionSelection({ id: 'session-1', title: 'Fix auth bug' });
+
+		assert.equal(selection.mode, 'singleSession');
+		assert.equal(selection.label, 'Session: Fix auth bug');
+		assert.equal(selection.sessionId, 'session-1');
+		assert.equal(selection.range, null);
+	});
+
+	test('filterCandidatesForAnalysis with a single-session selection matches only that session', () => {
+		const target = createCandidate('target', '2026-05-17T11:00:00.000Z', 'Target session', 'Target content');
+		const other = createCandidate('other', '2026-05-01T11:00:00.000Z', 'Other session', 'Other content');
+		const selection = createSingleSessionSelection({ id: 'target', title: 'Target session' });
+
+		const filtered = filterCandidatesForAnalysis([other, target], selection, new Set<string>());
+		assert.equal(filtered.length, 1);
+		assert.equal(filtered[0]?.session.id, 'target');
+
+		// An explicit single-session pick re-analyzes even an already-analyzed session.
+		const alreadyAnalyzed = filterCandidatesForAnalysis(
+			[other, target],
+			selection,
+			new Set<string>(['fingerprint-target']),
+		);
+		assert.equal(alreadyAnalyzed.length, 1);
+		assert.equal(alreadyAnalyzed[0]?.session.id, 'target');
+	});
+
+	test('isAnalysisSelection accepts every persisted selection mode including singleSession', () => {
+		const persistedSelections = [
+			createPresetAnalysisSelection('last24Hours', new Date('2026-05-17T12:00:00.000Z')),
+			createPresetAnalysisSelection('last7Days', new Date('2026-05-17T12:00:00.000Z')),
+			createPresetAnalysisSelection('last30Days', new Date('2026-05-17T12:00:00.000Z')),
+			createCustomRangeSelection('2026-05-01T00:00:00.000Z', '2026-05-17T00:00:00.000Z'),
+			createNeedsAnalysisSelection(),
+			createSingleSessionSelection({ id: 'session-1', title: 'Fix auth bug' }),
+		];
+
+		for (const selection of persistedSelections) {
+			assert.equal(isAnalysisSelection(JSON.parse(JSON.stringify(selection))), true, selection.mode);
+		}
+
+		assert.equal(isAnalysisSelection({ mode: 'singleSession', label: 'Session: X', range: null, sessionId: 42 }), false);
+		assert.equal(isAnalysisSelection({ mode: 'unknownMode', label: 'X', range: null }), false);
 	});
 
 	test('splitCandidatesIntoAnalysisBatches splits large candidate sets by evidence size', () => {

@@ -19,6 +19,7 @@ import {
 	resolveManualWorkspaceFolder,
 	validateStoragePath,
 } from '../../src/extension';
+import { type HandoffSelectionId } from '../../src/handoffDispatcher';
 import { ANALYSIS_PROMPT_VERSION } from '../../src/sessionAnalysis';
 import { SessionViewerPanel } from '../../src/sessionViewer';
 import { createSessionStore } from '../../src/sessionStore';
@@ -274,6 +275,41 @@ suite('extension phase 10', () => {
 		assert.equal(opened[0]?.storageDirectory, 'C:/repo/.chat');
 		assert.equal(opened[0]?.fileName, 'saved.json');
 		assert.equal(opened[0]?.extensionUri.fsPath.toLowerCase(), vscode.Uri.file('C:/extension').fsPath.toLowerCase());
+	});
+
+	test('runOpenSavedSessionCommand opens a Session Explorer target directly without prompting', async () => {
+		const opened: Array<{ storageDirectory: string; fileName: string; extensionUri: vscode.Uri }> = [];
+		let pickerUsed = false;
+
+		await runOpenSavedSessionCommand(
+			{ extensionUri: vscode.Uri.file('C:/extension') } as vscode.ExtensionContext,
+			{
+				storageDirectory: 'C:/repo/.chat',
+				fileName: 'saved.json',
+			},
+			{
+				listSessionsAcrossWorkspaceFolders: async () => {
+					pickerUsed = true;
+					return [];
+				},
+				pickSession: async () => {
+					pickerUsed = true;
+					return undefined;
+				},
+				readSession: async () => ({ id: 's1' } as ReturnType<typeof createChatSession>),
+				showSession: (_session, extensionUri, storageDirectory, fileName) => {
+					opened.push({ extensionUri, storageDirectory, fileName });
+				},
+				showInformationMessage: async () => undefined,
+			},
+		);
+
+		assert.equal(pickerUsed, false);
+		assert.deepEqual(opened, [{
+			storageDirectory: 'C:/repo/.chat',
+			fileName: 'saved.json',
+			extensionUri: vscode.Uri.file('C:/extension'),
+		}]);
 	});
 
 	test('runOpenSavedSessionCommand shows guidance when no workspace is open', async () => {
@@ -551,11 +587,18 @@ suite('runImplementLatestAnalysisCommand', () => {
 		assert.deepEqual(infoMessages, ['No saved analysis reports found. Run Session Control: Analyze Saved Chats or @session-control /analyze first.']);
 	});
 
-	test('opens chat with the latest usable saved analysis report', async () => {
+	test('routes the latest usable saved analysis report through the shared dispatcher', async () => {
 		const infoMessages: string[] = [];
 		const workspaceA = createWorkspaceFolder('C:/repo-a', 'alpha', 0);
 		const workspaceB = createWorkspaceFolder('C:/repo-b', 'beta', 1);
-		let openedPrompt: string | undefined;
+		let dispatchedPrompt: string | undefined;
+		let dispatchedTarget: HandoffSelectionId | undefined;
+		const model = {
+			name: 'GPT-4.1',
+			vendor: 'copilot',
+			family: 'gpt-4.1',
+			id: 'copilot-gpt-4.1',
+		} as vscode.LanguageModelChat;
 
 		await runImplementLatestAnalysisCommand({
 			getWorkspaceFolders: () => [workspaceA, workspaceB],
@@ -600,13 +643,20 @@ suite('runImplementLatestAnalysisCommand', () => {
 				return '# Chat Analysis Report';
 			},
 			buildPrompt: (reportFilePath: string) => `IMPLEMENT ${reportFilePath}`,
+			selectChatModels: async () => [model],
 			getCommands: async () => [],
-			pickTarget: async (_agentSessionAvailable: boolean): Promise<'chat'> => 'chat',
-			openChat: async (prompt: string) => {
-				openedPrompt = prompt;
+			pickProvider: async (): Promise<{ kind: 'model'; model: vscode.LanguageModelChat }> => ({ kind: 'model', model }),
+			dispatchHandoff: async (prompt, target) => {
+				dispatchedPrompt = prompt;
+				dispatchedTarget = target;
+				return {
+					selectedTarget: 'chat',
+					deliveredTo: 'chat',
+					method: 'prefill',
+					instruction: 'Opened Chat with the implementation prompt prefilled. Review it and send it when ready.',
+					failures: [],
+				};
 			},
-			openAgentSession: async () => undefined,
-			writeClipboard: async () => undefined,
 			showInformationMessage: async (message: string) => {
 				infoMessages.push(message);
 				return undefined;
@@ -614,18 +664,21 @@ suite('runImplementLatestAnalysisCommand', () => {
 			showWarningMessage: async () => undefined,
 		});
 
+		assert.equal(dispatchedTarget, 'chat');
 		assert.equal(
-			openedPrompt?.toLowerCase(),
+			dispatchedPrompt?.toLowerCase(),
 			`IMPLEMENT ${path.join('C:/repo-a/.chat', 'analysis/reports/alpha-report.md')}`.toLowerCase(),
 		);
-		assert.deepEqual(infoMessages, ['Opened chat with an implementation prompt for Alpha report.']);
+		assert.deepEqual(infoMessages, [
+			'Opened Chat with the implementation prompt prefilled. Review it and send it when ready. Analysis: Alpha report.',
+		]);
 	});
 
-	test('opens an agent session and copies the latest analysis implementation prompt when available', async () => {
+	test('routes the selected provider through the shared dispatcher', async () => {
 		const infoMessages: string[] = [];
 		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
-		let openedCommand: string | undefined;
-		let clipboardText: string | undefined;
+		let dispatchedTarget: HandoffSelectionId | undefined;
+		let dispatchedPrompt: string | undefined;
 
 		await runImplementLatestAnalysisCommand({
 			getWorkspaceFolders: () => [workspaceFolder],
@@ -641,14 +694,19 @@ suite('runImplementLatestAnalysisCommand', () => {
 			}),
 			readReport: async () => '# Chat Analysis Report',
 			buildPrompt: (reportFilePath: string) => `IMPLEMENT ${reportFilePath}`,
-			getCommands: async () => ['github.copilot.cli.newSession'],
-			pickTarget: async (_agentSessionAvailable: boolean): Promise<'agentSession'> => 'agentSession',
-			openChat: async () => undefined,
-			openAgentSession: async (commandId: string) => {
-				openedCommand = commandId;
-			},
-			writeClipboard: async (text: string) => {
-				clipboardText = text;
+			selectChatModels: async () => [],
+			getCommands: async () => ['chatgpt.openSidebar'],
+			pickProvider: async (): Promise<{ kind: 'agent'; provider: 'codex' }> => ({ kind: 'agent', provider: 'codex' }),
+			dispatchHandoff: async (prompt, target) => {
+				dispatchedTarget = target;
+				dispatchedPrompt = prompt;
+				return {
+					selectedTarget: 'codex',
+					deliveredTo: 'codex',
+					method: 'paste',
+					instruction: 'Opened Codex and pasted the implementation prompt. Review it and send it when ready.',
+					failures: [],
+				};
 			},
 			showInformationMessage: async (message: string) => {
 				infoMessages.push(message);
@@ -657,10 +715,10 @@ suite('runImplementLatestAnalysisCommand', () => {
 			showWarningMessage: async () => undefined,
 		});
 
-		assert.equal(openedCommand, 'github.copilot.cli.newSession');
-		assert.equal(clipboardText, `IMPLEMENT ${path.join('C:/repo/.chat', 'analysis/reports/report-1.md')}`);
+		assert.equal(dispatchedTarget, 'codex');
+		assert.equal(dispatchedPrompt, `IMPLEMENT ${path.join('C:/repo/.chat', 'analysis/reports/report-1.md')}`);
 		assert.deepEqual(infoMessages, [
-			'Opened an agent session for the latest saved analysis from repo. The generated implementation prompt is on the clipboard.',
+			'Opened Codex and pasted the implementation prompt. Review it and send it when ready. Source analysis workspace: repo.',
 		]);
 	});
 });
@@ -709,14 +767,15 @@ suite('runAnalyzeSavedChatsCommand', () => {
 		});
 
 		assert.deepEqual(warningMessages, [
-			'No host chat model is available for analysis. Sign in or enable a chat model, then try again.',
+			'No host chat model or installed analysis agent is available. Sign in, enable a chat model, or install Codex/Claude Code, then try again.',
 		]);
 	});
 
-	test('opens chat with a self-contained analysis handoff prompt when Cursor has no extension-callable model', async () => {
+	test('routes a self-contained analysis handoff through the dispatcher when Cursor has no extension-callable model', async () => {
 		const infoMessages: string[] = [];
 		const warningMessages: string[] = [];
-		let openedPrompt: string | undefined;
+		let dispatchedPrompt: string | undefined;
+		let dispatchedTarget: HandoffSelectionId | undefined;
 		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-cursor-handoff-'));
 		const store = createSessionStore();
 
@@ -745,8 +804,16 @@ suite('runAnalyzeSavedChatsCommand', () => {
 				}),
 				selectChatModels: async () => [],
 				getAppName: () => 'Cursor',
-				openChat: async (prompt: string) => {
-					openedPrompt = prompt;
+				dispatchHandoff: async (prompt, target) => {
+					dispatchedPrompt = prompt;
+					dispatchedTarget = target;
+					return {
+						selectedTarget: 'chat',
+						deliveredTo: 'chat',
+						method: 'prefill',
+						instruction: 'Opened Chat with the analysis handoff prompt prefilled. Review it and send it when ready.',
+						failures: [],
+					};
 				},
 				runAnalyzeFlow: async () => {
 					throw new Error('runAnalyzeFlow should not be called without a model.');
@@ -764,8 +831,9 @@ suite('runAnalyzeSavedChatsCommand', () => {
 				},
 			});
 
-			assert.equal(typeof openedPrompt, 'string');
-			const prompt = openedPrompt ?? '';
+			assert.equal(dispatchedTarget, 'chat');
+			assert.equal(typeof dispatchedPrompt, 'string');
+			const prompt = dispatchedPrompt ?? '';
 			assert.equal(prompt.includes('This handoff runs inside the target repository workspace, not inside the Session Control source repository.'), true);
 			assert.equal(prompt.includes('Do not search the target repository for Session Control implementation files'), true);
 			assert.equal(prompt.includes(`Owner workspace for persisted output: ${workspaceFolder.name}`), true);
@@ -784,9 +852,59 @@ suite('runAnalyzeSavedChatsCommand', () => {
 		}
 
 		assert.deepEqual(infoMessages, [
-			'Cursor does not currently expose extension-callable chat models, so Session Control opened chat with an analysis handoff prompt. Send it in chat to continue.',
+			'Cursor does not currently expose extension-callable chat models. Opened Chat with the analysis handoff prompt prefilled. Review it and send it when ready.',
 		]);
 		assert.deepEqual(warningMessages, []);
+	});
+
+	test('routes a selected analysis agent through the shared dispatcher', async () => {
+		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
+		const infoMessages: string[] = [];
+		let dispatchedPrompt: string | undefined;
+		let dispatchedTarget: HandoffSelectionId | undefined;
+
+		await runAnalyzeSavedChatsCommand('', {
+			getWorkspaceFolders: () => [workspaceFolder],
+			listSessionsAcrossWorkspaceFolders: async () => [
+				createWorkspaceSessionMeta(workspaceFolder, 'Session 1'),
+			],
+			resolveSelection: async () => ({
+				mode: 'needsAnalysis',
+				label: 'Needs Analysis',
+				range: null,
+			}),
+			selectChatModels: async () => [],
+			getCommands: async () => ['chatgpt.openSidebar'],
+			pickAnalysisProvider: async () => ({
+				kind: 'agent',
+				provider: 'codex',
+			}),
+			buildAgentHandoffPrompt: async () => ({
+				prompt: 'ANALYZE SAVED CHATS',
+			}),
+			dispatchHandoff: async (prompt, target) => {
+				dispatchedPrompt = prompt;
+				dispatchedTarget = target;
+				return {
+					selectedTarget: 'codex',
+					deliveredTo: 'codex',
+					method: 'paste',
+					instruction: 'Opened Codex and pasted the analysis handoff prompt. Review it and send it when ready.',
+					failures: [],
+				};
+			},
+			showInformationMessage: async (message: string) => {
+				infoMessages.push(message);
+				return undefined;
+			},
+			showWarningMessage: async () => undefined,
+		});
+
+		assert.equal(dispatchedTarget, 'codex');
+		assert.equal(dispatchedPrompt, 'ANALYZE SAVED CHATS');
+		assert.deepEqual(infoMessages, [
+			'Opened Codex and pasted the analysis handoff prompt. Review it and send it when ready.',
+		]);
 	});
 
 	test('opens the saved analysis report after a successful run', async () => {
@@ -804,6 +922,10 @@ suite('runAnalyzeSavedChatsCommand', () => {
 				range: null,
 			}),
 			selectChatModels: async () => [{} as vscode.LanguageModelChat],
+			pickAnalysisProvider: async (models) => {
+				const model = models[0];
+				return model ? { kind: 'model', model } : undefined;
+			},
 			runAnalyzeFlow: async (_workspaceFolders, _workspaceSessions, _selection, _model, _token, onStatus) => {
 				onStatus('Saved analysis report.');
 				return {
@@ -852,6 +974,10 @@ suite('runAnalyzeSavedChatsCommand', () => {
 				range: null,
 			}),
 			selectChatModels: async () => [{} as vscode.LanguageModelChat],
+			pickAnalysisProvider: async (models) => {
+				const model = models[0];
+				return model ? { kind: 'model', model } : undefined;
+			},
 			runAnalyzeFlow: async (_workspaceFolders, _workspaceSessions, _selection, _model, _token, onStatus) => {
 				onStatus('No saved sessions currently need analysis.');
 				return undefined;

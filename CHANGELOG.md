@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- New per-session **Analyze This Session** inline action in the Saved Sessions view. It runs the existing saved-chat analysis pipeline (provider picker, progress notification, report + analysis-index writing, or agent handoff when no host chat model is available) scoped to exactly the clicked session, using a new `singleSession` analysis selection mode. After a successful run the view refreshes so the session's `analyzed` badge and tooltip update immediately.
+- The Saved Sessions view now shows per-session status badges in the item description: `analyzed` for sessions already included in a chat-analysis report (from the workspace's `analysis/index.json`) and `harvested` for sessions already harvested into a knowledge bundle by Session Control Pro (from the workspace's `harvest/index.json`). The badges compose (`analyzed · harvested`), and each state also gets a glanceable icon — plain comment for untouched sessions, a green graph when analyzed, an orange book when harvested, and a purple library when both. The tooltip shows the analysis and harvest dates, status is resolved per workspace folder, and the view falls back to the plain rendering when an index is missing or unreadable.
+- Saved-session rows now prefix their existing turn-count and status metadata with the saved date and time in the user's local time zone, consistently formatted as `YYYY-MM-DD HH:mm`.
+
+### Changed
+- The Saved Sessions inline analysis action now reads **Reanalyze This Session** for sessions already marked `analyzed`, while unanalyzed sessions retain **Analyze This Session**; both labels run the same single-session analysis flow.
+- The saved-chat analysis flow now prompts for the available provider that should generate the report. Direct language-model providers run in-process, while installed Codex, Claude Code, and Cursor agents receive a workspace-aware handoff; all eligible sessions from every provider in the workspace's `.chat` folder remain in scope.
+- The `/implement` and `Session Control: Implement Latest Analysis` flows now use the same provider selector, so users choose a VS Code language model, Codex, Claude Code, or Cursor instead of choosing between an ambiguous chat or agent-session destination.
+
+## [1.3.5] - 2026-07-07
+
+### Fixed
+- Auto-save no longer leaves orphaned part files behind when a large session is split across multiple files. The replacement flow used to remember and delete only the first part of the previous save, so every later part accumulated on disk with a `previousPartFile` link pointing at a deleted file; it now tracks and cleans up every part file of the previous save.
+- Session pruning (`session-control.prune.maxSavedSessions`) now keeps or removes the part files of a split session as one unit instead of applying a per-file cutoff that could delete part 1 while keeping part 2, which broke the part chain.
+- `npm test` now really runs the suite: the test harness resolved VS Code to the `code.cmd` CLI wrapper, which detaches and exits 0 immediately, so failures never propagated. The runner now launches the electron `Code.exe` directly.
+
+### Added
+- New `Session Control: Clean Up Orphaned Session Part Files` command. It scans every workspace folder's session storage for part files whose linked part no longer exists, and — after a confirmation showing the file and session counts — deletes the ones that are superseded by a newer intact save of the same session. Broken files without a newer intact copy are reported but never removed, since they may hold the only surviving turns.
+
 ## [1.3.4] - 2026-07-04
 
 ### Fixed

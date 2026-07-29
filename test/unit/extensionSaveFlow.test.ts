@@ -292,7 +292,7 @@ suite('extension save flow', () => {
 				index: 0,
 			} as vscode.WorkspaceFolder;
 
-			const fileName = await runSaveSourceSessionFlow(
+			const writtenFiles = await runSaveSourceSessionFlow(
 				'claude-code',
 				sources,
 				workspaceFolder,
@@ -307,6 +307,8 @@ suite('extension save flow', () => {
 				},
 			);
 
+			const fileName = writtenFiles?.[0];
+			assert.equal(writtenFiles?.length, 1);
 			assert.ok(fileName);
 			const listed = await store.listSessions(storageDirectory);
 			assert.equal(listed.length, 1);

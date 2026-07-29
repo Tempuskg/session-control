@@ -12,6 +12,7 @@
 *.vsix
 .vscodeignore
 .gitignore
+.npmrc
 webpack.config.js
 eslint.config.mjs
 tsconfig.json
@@ -31,6 +32,7 @@ media/screenshots/README.md
 
 # Local workspace/session data
 .chat/**
+knowledge/**
 
 # Kanban board / task tracking — dev-only
 .mwnn/**
@@ -43,3 +45,11 @@ scripts/**
 node_modules/**
 debug.log
 **/*.log
+
+# @tempuskg/session-control-pro is loaded at runtime via a dynamic
+# require.resolve() (src/pro/loader.ts), so webpack cannot inline it into
+# dist/extension.js — it must ship as a real node_modules directory instead.
+# Only the manifest + compiled entry point are needed; excluding the
+# sourcemap keeps the private package from being trivially de-minified.
+!node_modules/@tempuskg/session-control-pro/package.json
+!node_modules/@tempuskg/session-control-pro/dist/index.js

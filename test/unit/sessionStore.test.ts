@@ -284,4 +284,96 @@ suite('sessionStore', () => {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}
 	});
+
+	test('findOrphanedPartFiles flags dangling part links and marks superseded copies', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createSessionStore();
+
+		try {
+			await fs.mkdir(storageDirectory, { recursive: true });
+			const writeRaw = async (fileName: string, session: ChatSession) =>
+				fs.writeFile(path.join(storageDirectory, fileName), JSON.stringify(session, null, 2), 'utf8');
+
+			// Newest intact chain for the 'split' session.
+			const partOne = createSession('split', '2026-07-04T12:00:00.000Z', 'Split (Part 1/2)');
+			partOne.nextPartFile = 'split-part-2.json';
+			const partTwo = createSession('split', '2026-07-04T12:00:00.000Z', 'Split (Part 2/2)');
+			partTwo.previousPartFile = 'split-part-1.json';
+			await writeRaw('split-part-1.json', partOne);
+			await writeRaw('split-part-2.json', partTwo);
+
+			// Stale auto-save iteration of the same session with a dangling link.
+			const staleOrphan = createSession('split', '2026-07-04T11:00:00.000Z', 'Split (Part 2/2)');
+			staleOrphan.previousPartFile = 'deleted-part-1.json';
+			await writeRaw('split-part-2-stale.json', staleOrphan);
+
+			// Broken chain with no surviving intact copy of its session.
+			const lonely = createSession('lonely', '2026-07-03T10:00:00.000Z', 'Lonely (Part 2/2)');
+			lonely.previousPartFile = 'gone-part-1.json';
+			await writeRaw('lonely-part-2.json', lonely);
+
+			await writeRaw('healthy.json', createSession('healthy', '2026-07-05T10:00:00.000Z', 'Healthy'));
+
+			const orphans = await store.findOrphanedPartFiles(storageDirectory);
+			const byFileName = new Map(orphans.map((orphan) => [orphan.fileName, orphan]));
+
+			assert.equal(orphans.length, 2);
+			assert.equal(byFileName.get('split-part-2-stale.json')?.superseded, true);
+			assert.equal(byFileName.get('split-part-2-stale.json')?.danglingLink, 'deleted-part-1.json');
+			assert.equal(byFileName.get('lonely-part-2.json')?.superseded, false);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('findOrphanedPartFiles returns empty for a missing directory and intact chains', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createSessionStore();
+
+		try {
+			assert.deepEqual(await store.findOrphanedPartFiles(storageDirectory), []);
+
+			const partOne = createSession('split', '2026-07-04T12:00:00.000Z', 'Split (Part 1/2)');
+			const partTwo = createSession('split', '2026-07-04T12:00:00.000Z', 'Split (Part 2/2)');
+			await store.writeSessions(storageDirectory, [partOne, partTwo]);
+
+			assert.deepEqual(await store.findOrphanedPartFiles(storageDirectory), []);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('pruneSessions keeps or removes split-session part files as one unit', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createSessionStore();
+
+		try {
+			await store.writeSession(storageDirectory, createSession('old', '2026-04-10T10:00:00.000Z', 'Old'));
+			await store.writeSession(storageDirectory, createSession('mid', '2026-04-11T10:00:00.000Z', 'Mid'));
+
+			const partOne = createSession('split', '2026-04-12T10:00:00.000Z', 'Split (Part 1/2)');
+			partOne.part = 1;
+			partOne.totalParts = 2;
+			const partTwo = createSession('split', '2026-04-12T10:00:00.000Z', 'Split (Part 2/2)');
+			partTwo.part = 2;
+			partTwo.totalParts = 2;
+			const partFileNames = await store.writeSessions(storageDirectory, [partOne, partTwo]);
+			assert.equal(partFileNames.length, 2);
+
+			const result = await store.pruneSessions(storageDirectory, 2, 'delete');
+			const remainingFiles = await fs.readdir(storageDirectory);
+
+			assert.equal(result.deleted, 1);
+			assert.equal(remainingFiles.filter((file) => file.endsWith('.json')).length, 3);
+			for (const partFileName of partFileNames) {
+				assert.equal(remainingFiles.includes(partFileName), true, `part file ${partFileName} must survive pruning`);
+			}
+			assert.equal(remainingFiles.some((file) => file.includes('old')), false);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
 });

@@ -96,7 +96,7 @@ suite('extension auto-save on chat response', () => {
 				readCursorSessions: async () => [],
 				saveSessionSilently: async (workspaceFolder, storageDirectory) => {
 					saveCalls.push({ workspaceFolder, storageDirectory });
-					return 'saved-session.json';
+					return ['saved-session.json'];
 				},
 				deleteOldAutoSave: async () => undefined,
 				showWarningMessage: async () => undefined,
@@ -153,7 +153,7 @@ suite('extension auto-save on chat response', () => {
 				readCursorSessions: async () => [],
 				saveSessionSilently: async (workspaceFolder, storageDirectory) => {
 					saveCalls.push({ workspaceFolder, storageDirectory });
-					return 'saved-session.json';
+					return ['saved-session.json'];
 				},
 				deleteOldAutoSave: async () => undefined,
 				showWarningMessage: async () => undefined,
@@ -178,7 +178,7 @@ suite('extension auto-save on chat response', () => {
 		assert.equal(saveCalls.length, 1, 'Should not save again when turn count is unchanged');
 	});
 
-	test('deletes previous auto-save file when saving new version', async () => {
+	test('deletes all previous auto-save part files when saving new version', async () => {
 		const watcher = createFakeWatcher();
 		const scheduledCallbacks: Array<() => void> = [];
 		const deletedFiles: Array<{ storageDirectory: string; fileName: string }> = [];
@@ -219,7 +219,7 @@ suite('extension auto-save on chat response', () => {
 				readCursorSessions: async () => [],
 				saveSessionSilently: async () => {
 					saveCounter++;
-					return `saved-v${saveCounter}.json`;
+					return [`saved-v${saveCounter}-part1.json`, `saved-v${saveCounter}-part2.json`];
 				},
 				deleteOldAutoSave: async (storageDirectory, fileName) => {
 					deletedFiles.push({ storageDirectory, fileName });
@@ -240,14 +240,17 @@ suite('extension auto-save on chat response', () => {
 		assert.equal(saveCounter, 1);
 		assert.equal(deletedFiles.length, 0, 'No previous file to delete on first save');
 
-		// Second save with more turns
+		// Second save with more turns: every part file of the previous save
+		// must be removed, or its survivors keep dangling part links.
 		turnCount = 4;
 		watcher.emitChange();
 		scheduledCallbacks[1]?.();
 		await drainAsyncWork();
 		assert.equal(saveCounter, 2);
-		assert.equal(deletedFiles.length, 1);
-		assert.equal(deletedFiles[0]?.fileName, 'saved-v1.json');
+		assert.deepEqual(
+			deletedFiles.map((deleted) => deleted.fileName),
+			['saved-v1-part1.json', 'saved-v1-part2.json'],
+		);
 	});
 
 	test('disables listener after save error', async () => {
@@ -275,7 +278,7 @@ suite('extension auto-save on chat response', () => {
 					throw new Error('read failed');
 				},
 				readCursorSessions: async () => [],
-				saveSessionSilently: async () => 'saved.json',
+				saveSessionSilently: async () => ['saved.json'],
 				deleteOldAutoSave: async () => undefined,
 				showWarningMessage: async (message: string) => {
 					warnings.push(message);
@@ -340,7 +343,7 @@ suite('extension auto-save on chat response', () => {
 				}],
 				saveSessionSilently: async (workspaceFolder, storageDirectory) => {
 					saveCalls.push({ workspaceFolder, storageDirectory });
-					return 'cursor-auto-save.json';
+					return ['cursor-auto-save.json'];
 				},
 				deleteOldAutoSave: async () => undefined,
 				showWarningMessage: async () => undefined,
@@ -408,7 +411,7 @@ suite('extension auto-save on chat response', () => {
 				readCursorSessions: async () => [],
 				saveSessionSilently: async (workspaceFolder, storageDirectory) => {
 					saveCalls.push({ workspaceFolder, storageDirectory });
-					return 'codex-auto-save.json';
+					return ['codex-auto-save.json'];
 				},
 				deleteOldAutoSave: async () => undefined,
 				showWarningMessage: async () => undefined,
@@ -478,7 +481,7 @@ suite('extension auto-save on chat response', () => {
 				readCursorSessions: async () => [],
 				saveSessionSilently: async (workspaceFolder, storageDirectory) => {
 					saveCalls.push({ workspaceFolder, storageDirectory });
-					return 'claude-auto-save.json';
+					return ['claude-auto-save.json'];
 				},
 				deleteOldAutoSave: async () => undefined,
 				showWarningMessage: async () => undefined,
@@ -573,7 +576,7 @@ suite('extension auto-save on chat response', () => {
 				readCursorSessions: async () => [],
 				saveSessionSilently: async (_workspaceFolder, _storageDirectory, provider, sessions) => {
 					saveCalls.push({ provider, title: sessions[0]?.title ?? '' });
-					return `${provider}-auto-save.json`;
+					return [`${provider}-auto-save.json`];
 				},
 				deleteOldAutoSave: async () => undefined,
 				showWarningMessage: async () => undefined,

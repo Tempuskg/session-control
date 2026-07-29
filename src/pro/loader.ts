@@ -1,10 +1,16 @@
 import { createRequire } from 'node:module';
 import * as vscode from 'vscode';
 import {
+	createVSCodeHandoffDispatcher,
+	type HandoffDispatcher,
+} from '../handoffDispatcher';
+import {
 	isProFeatureRegistrarModule,
+	SHARED_HANDOFF_CAPABILITY_VERSION,
 	type ProFeatureRegistrar,
 	type ProFeatureRegistrationContext,
 	type ProFeatureRegistrationResult,
+	type SharedHandoffCapabilityV1,
 } from './contracts';
 
 export const DEFAULT_PRO_PACKAGE_NAME = '@tempuskg/session-control-pro';
@@ -13,6 +19,10 @@ interface LoadProFeatureRegistrarDeps {
 	moduleSpecifier: string;
 	resolveModule: (specifier: string) => string;
 	requireModule: (resolvedPath: string) => unknown;
+}
+
+interface ActivateProFeaturesDeps extends LoadProFeatureRegistrarDeps {
+	createHandoffDispatcher: () => Pick<HandoffDispatcher, 'dispatchSelection'>;
 }
 
 interface AvailableProFeatureLoadResult {
@@ -63,6 +73,16 @@ function normalizeRegistrationResult(
 	}
 
 	return [result as vscode.Disposable];
+}
+
+function createSharedHandoffCapability(
+	dispatcher: Pick<HandoffDispatcher, 'dispatchSelection'>,
+): SharedHandoffCapabilityV1 {
+	return {
+		version: SHARED_HANDOFF_CAPABILITY_VERSION,
+		dispatch: async (prompt, selectedTarget, options) =>
+			dispatcher.dispatchSelection(prompt, selectedTarget, options),
+	};
 }
 
 export function loadProFeatureRegistrar(
@@ -126,7 +146,7 @@ export function loadProFeatureRegistrar(
 
 export async function activateProFeatures(
 	context: ProFeatureRegistrationContext,
-	deps: Partial<LoadProFeatureRegistrarDeps> = {},
+	deps: Partial<ActivateProFeaturesDeps> = {},
 ): Promise<ProFeatureLoadResult> {
 	const loadResult = loadProFeatureRegistrar(deps);
 	if (loadResult.kind !== 'available') {
@@ -135,7 +155,17 @@ export async function activateProFeatures(
 	}
 
 	try {
-		const registrations = normalizeRegistrationResult(await loadResult.registrar(context));
+		const dispatcher = (deps.createHandoffDispatcher ?? createVSCodeHandoffDispatcher)();
+		const registrationContext: ProFeatureRegistrationContext = {
+			...context,
+			capabilities: {
+				...context.capabilities,
+				sharedHandoff: createSharedHandoffCapability(dispatcher),
+			},
+		};
+		const registrations = normalizeRegistrationResult(
+			await loadResult.registrar(registrationContext),
+		);
 		for (const disposable of registrations) {
 			context.registerDisposable(disposable);
 		}

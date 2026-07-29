@@ -6,6 +6,7 @@ import {
 	hasProLicense,
 	loadProFeatureRegistrar,
 	PRO_UPGRADE_PROMPT_LABEL,
+	SHARED_HANDOFF_CAPABILITY_VERSION,
 	showUpgradePrompt,
 	type ProFeatureRegistrationContext,
 } from '../../src/pro';
@@ -90,6 +91,50 @@ suite('pro boundary', () => {
 		assert.equal(invoked, true);
 		assert.equal(registrations.length, 1);
 		assert.ok(logs.some((message) => message.includes('Loaded Pro features')));
+	});
+
+	test('activateProFeatures advertises the versioned shared handoff capability', async () => {
+		const logs: string[] = [];
+		const registrations: vscode.Disposable[] = [];
+		let registrarContext: ProFeatureRegistrationContext | undefined;
+
+		const result = await activateProFeatures(
+			createRegistrationContext(logs, registrations),
+			{
+				moduleSpecifier: 'session-control-pro-test',
+				resolveModule: () => 'C:/temp/pro/index.js',
+				requireModule: () => ({
+					registerProFeatures: async (context: ProFeatureRegistrationContext) => {
+						registrarContext = context;
+					},
+				}),
+				createHandoffDispatcher: () => ({
+					dispatchSelection: async (prompt, selectedTarget, options) => {
+						assert.equal(prompt, 'Harvest this workspace');
+						assert.equal(selectedTarget, 'codex');
+						assert.deepEqual(options, { promptLabel: 'harvest prompt' });
+						return {
+							selectedTarget: 'codex',
+							deliveredTo: 'codex',
+							method: 'paste',
+							instruction: 'Review it and send it when ready.',
+							failures: [],
+						};
+					},
+				}),
+			},
+		);
+
+		assert.equal(result.kind, 'available');
+		const sharedHandoff = registrarContext?.capabilities?.sharedHandoff;
+		assert.ok(sharedHandoff);
+		assert.equal(sharedHandoff.version, SHARED_HANDOFF_CAPABILITY_VERSION);
+		const dispatchResult = await sharedHandoff.dispatch(
+			'Harvest this workspace',
+			'codex',
+			{ promptLabel: 'harvest prompt' },
+		);
+		assert.equal(dispatchResult.method, 'paste');
 	});
 
 	test('hasProLicense defaults to false until billing is wired', async () => {

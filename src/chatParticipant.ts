@@ -1,7 +1,14 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { createAnalysisStore, createSessionAnalysisFingerprint } from './analysisStore';
+import { buildAnalysisPersistenceContract, createAnalysisStore, createSessionAnalysisFingerprint } from './analysisStore';
+import {
+	createVSCodeHandoffDispatcher,
+	detectHandoffAgentProviders,
+	type HandoffAgentProviderId,
+	type HandoffDispatchResult,
+	type HandoffSelectionId,
+} from './handoffDispatcher';
 import {
 	runAnalyzeSessionsFlow,
 	type AnalyzeSessionsFlowDeps,
@@ -16,6 +23,8 @@ import {
 	createNeedsAnalysisSelection,
 	createPresetAnalysisSelection,
 	DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET,
+	ANALYSIS_PROMPT_VERSION,
+	filterCandidatesForAnalysis,
 	parseAnalysisSelectionAlias,
 	splitCandidatesIntoAnalysisBatches,
 	type AnalysisCandidateSession,
@@ -174,19 +183,24 @@ async function prepareClaudeCodeConversationForResume(
 	await sleep(CLAUDE_CODE_NEW_CONVERSATION_SETTLE_MS);
 }
 
-type ImplementationHandoffTarget = 'chat' | 'agentSession';
-
 export interface ImplementationHandoffFlowDeps {
 	findAnalysisReportMeta: (history: readonly (vscode.ChatRequestTurn | vscode.ChatResponseTurn)[]) => {
 		analysisReportPath: string;
 		analysisStorageDirectory: string;
 	} | null;
 	buildPrompt: (reportFilePath: string, userPrompt: string) => string;
+	selectChatModels: () => Promise<readonly vscode.LanguageModelChat[]>;
 	getCommands: () => Promise<readonly string[]>;
-	pickTarget: (agentSessionAvailable: boolean) => Promise<ImplementationHandoffTarget | undefined>;
-	openChat: (prompt: string) => Promise<void>;
-	openAgentSession: (commandId: string) => Promise<void>;
-	writeClipboard: (text: string) => Promise<void>;
+	pickProvider: (
+		models: readonly vscode.LanguageModelChat[],
+		agentProviders: readonly AnalysisAgentProviderId[],
+		fallbackModel?: vscode.LanguageModelChat,
+	) => Promise<AnalysisProviderSelection | undefined>;
+	fallbackModel?: vscode.LanguageModelChat;
+	dispatchHandoff: (
+		prompt: string,
+		target: HandoffSelectionId,
+	) => Promise<HandoffDispatchResult>;
 	streamMarkdown: (markdown: string) => void;
 }
 
@@ -400,6 +414,88 @@ async function promptDateRangeAnalysisMode(): Promise<boolean | undefined> {
 	return pick?.onlyUnanalyzed;
 }
 
+export type AnalysisAgentProviderId = HandoffAgentProviderId;
+
+export type AnalysisProviderSelection =
+	| { kind: 'model'; model: vscode.LanguageModelChat }
+	| { kind: 'agent'; provider: AnalysisAgentProviderId };
+
+export type ProviderSelectionPurpose = 'analysis' | 'implementation';
+
+interface AnalysisModelPickItem extends vscode.QuickPickItem {
+	model: vscode.LanguageModelChat;
+}
+
+interface AnalysisProviderPickItem extends vscode.QuickPickItem {
+	selection: AnalysisProviderSelection;
+}
+
+export function createAnalysisModelPickItems(models: readonly vscode.LanguageModelChat[]): AnalysisModelPickItem[] {
+	return models.map((model) => {
+		const modelName = model.name.trim() || model.id.trim() || 'Unnamed model';
+		const providerName = model.vendor.trim() || 'Unknown provider';
+		const detailParts = [model.family.trim(), model.id.trim()].filter((value) => value.length > 0);
+
+		return {
+			label: modelName,
+			description: `Provider: ${providerName}`,
+			...(detailParts.length > 0 ? { detail: detailParts.join(' · ') } : {}),
+			model,
+		};
+	});
+}
+
+export function createAnalysisProviderPickItems(
+	models: readonly vscode.LanguageModelChat[],
+	agentProviders: readonly AnalysisAgentProviderId[],
+	purpose: ProviderSelectionPurpose = 'analysis',
+): AnalysisProviderPickItem[] {
+	const modelItems: AnalysisProviderPickItem[] = createAnalysisModelPickItems(models).map((item) => ({
+		...item,
+		selection: { kind: 'model', model: item.model },
+	}));
+	const agentItems: AnalysisProviderPickItem[] = agentProviders.map((provider) => ({
+		label: provider === 'claude-code' ? 'Claude Code' : provider[0]?.toUpperCase() + provider.slice(1),
+		description: purpose === 'analysis'
+			? `Use the installed ${provider === 'claude-code' ? 'Claude Code' : provider} agent to analyze all saved sessions`
+			: `Use the installed ${provider === 'claude-code' ? 'Claude Code' : provider} agent to implement the saved analysis recommendations`,
+		selection: { kind: 'agent', provider },
+	}));
+
+	return [...modelItems, ...agentItems];
+}
+
+export function findAvailableAnalysisAgentProviders(commands: readonly string[]): AnalysisAgentProviderId[] {
+	return detectHandoffAgentProviders(commands);
+}
+
+export async function pickAnalysisProvider(
+	models: readonly vscode.LanguageModelChat[],
+	agentProviders: readonly AnalysisAgentProviderId[],
+	fallbackModel?: vscode.LanguageModelChat,
+	purpose: ProviderSelectionPurpose = 'analysis',
+): Promise<AnalysisProviderSelection | undefined> {
+	const availableModels = [...models];
+	if (
+		fallbackModel
+		&& !availableModels.some((model) => model.id === fallbackModel.id && model.vendor === fallbackModel.vendor)
+	) {
+		availableModels.push(fallbackModel);
+	}
+
+	const items = createAnalysisProviderPickItems(availableModels, agentProviders, purpose);
+	if (items.length === 0) {
+		return undefined;
+	}
+
+	const pick = await vscode.window.showQuickPick<AnalysisProviderPickItem>(
+		items,
+		{ title: `Choose the provider for ${purpose === 'analysis' ? 'chat analysis' : 'implementation'}` },
+	);
+
+	return pick?.selection;
+}
+
 export async function resolveAnalysisSelection(prompt: string): Promise<import('./types').AnalysisSelection | undefined> {
 	const parsed = parseAnalysisSelectionAlias(prompt);
 	if (parsed) {
@@ -525,6 +621,85 @@ async function loadAnalyzedFingerprintSet(candidates: AnalysisCandidateSession[]
 	return analyzed;
 }
 
+export async function buildAnalysisHandoffPrompt(
+	selection: import('./types').AnalysisSelection,
+	workspaceFolders: readonly vscode.WorkspaceFolder[],
+	workspaceSessions: WorkspaceSessionMeta[],
+): Promise<{ prompt?: string; infoMessage?: string }> {
+	const candidates = await createAnalysisCandidates(workspaceSessions);
+	if (!candidates.length) {
+		return { infoMessage: 'No usable saved sessions found. Some saved sessions could not be read.' };
+	}
+
+	const analyzedFingerprints = await loadAnalyzedFingerprintSet(candidates);
+	const filtered = filterCandidatesForAnalysis(candidates, selection, analyzedFingerprints);
+	if (!filtered.length) {
+		return {
+			infoMessage: selection.mode === 'needsAnalysis'
+				? 'No saved sessions currently need analysis.'
+				: `No saved sessions matched ${selection.label.toLowerCase()}.`,
+		};
+	}
+
+	const implicitWorkspace = pickWorkspaceFolder();
+	const ownerWorkspace = workspaceFolders.find((workspaceFolder) =>
+		implicitWorkspace && workspaceFolder.uri.fsPath === implicitWorkspace.uri.fsPath,
+	) ?? workspaceFolders[0];
+	if (!ownerWorkspace) {
+		return { infoMessage: 'Open a workspace folder before analyzing saved chats.' };
+	}
+
+	const ownerStorageDirectory = getStoragePath(ownerWorkspace);
+	const relativePath = (workspaceFolder: vscode.WorkspaceFolder, absolutePath: string): string =>
+		normalizeRelativePath(path.relative(workspaceFolder.uri.fsPath, absolutePath));
+	const workspaceByName = new Map(workspaceFolders.map((workspaceFolder) => [workspaceFolder.name, workspaceFolder]));
+	const formatCandidatePath = (candidate: AnalysisCandidateSession, absolutePath: string): string => {
+		const workspaceFolder = workspaceByName.get(candidate.workspaceName);
+		return workspaceFolder ? relativePath(workspaceFolder, absolutePath) : normalizeRelativePath(absolutePath);
+	};
+	const storageDirectories = [...new Map(
+		filtered.map((candidate) => [
+			`${candidate.workspaceName}::${candidate.storageDirectory}`,
+			`- [${candidate.workspaceName}] ${formatCandidatePath(candidate, candidate.storageDirectory)}`,
+		]),
+	).values()];
+	const sessionLines = filtered.slice(0, 30).map((candidate) => {
+		const sessionFilePath = path.join(candidate.storageDirectory, candidate.rootFileName);
+		return `- [${candidate.workspaceName}] ${formatCandidatePath(candidate, sessionFilePath)} | ${candidate.session.savedAt} | ${candidate.session.title}`;
+	});
+	const omittedCount = Math.max(0, filtered.length - sessionLines.length);
+	const ownerReportsDirectory = relativePath(ownerWorkspace, path.join(ownerStorageDirectory, 'analysis', 'reports'));
+	const ownerIndexPath = relativePath(ownerWorkspace, path.join(ownerStorageDirectory, 'analysis', 'index.json'));
+
+	return {
+		prompt: [
+			'Analyze saved chat sessions using full workspace access. The selected agent provider does not expose an extension-callable language model, so this is a handoff prompt.',
+			'This handoff runs inside the target repository workspace, not inside the Session Control source repository.',
+			'Start by reading AGENTS.md, .github/copilot-instructions.md, and any repository-local *.instructions.md, *.prompt.md, *.agent.md, or SKILL.md files only when they exist in the target repository.',
+			'Do not search the target repository for Session Control implementation files or Session Control-only instruction files. Use the persistence contract below instead.',
+			'Restrict all recommendations to repository-local AI control files and compare them against the existing AI instruction and skill files before recommending changes.',
+			'Analyze all eligible saved-session roots listed below; the selected timeframe and Needs Analysis rules are the only session filters.',
+			`Selection: ${selection.label}`,
+			`Selection mode: ${selection.mode}`,
+			`Only unanalyzed: ${selection.onlyUnanalyzed === true ? 'yes' : 'no'}`,
+			`Matching root sessions: ${filtered.length}`,
+			`Owner workspace for persisted output: ${ownerWorkspace.name}`,
+			`Write the markdown report using the existing Session Control format under "${ownerReportsDirectory}".`,
+			`Update the relevant analysis indexes using the existing Session Control schema, including "${ownerIndexPath}" for the owner workspace and any source storage indexes that need report references.`,
+			'',
+			buildAnalysisPersistenceContract(ANALYSIS_PROMPT_VERSION),
+			'Source storage directories:',
+			...storageDirectories,
+			'',
+			'Matching root session files:',
+			...sessionLines,
+			...(omittedCount > 0 ? [`- ... ${omittedCount} additional matching sessions omitted from this prompt. Use the listed storage directories and selection criteria to include them.`] : []),
+			'',
+			'If you cannot safely persist the report and analysis indexes from chat, return the completed report in chat and explain what blocked persistence.',
+		].join('\n'),
+	};
+}
+
 async function collectModelTextFromModel(
 	model: vscode.LanguageModelChat,
 	streamText: ((markdown: string) => void) | undefined,
@@ -551,13 +726,13 @@ async function collectModelTextFromModel(
 }
 
 async function collectModelText(
-	request: vscode.ChatRequest,
+	model: vscode.LanguageModelChat,
 	stream: vscode.ChatResponseStream | undefined,
 	token: vscode.CancellationToken,
 	prompt: string,
 ): Promise<string> {
 	return collectModelTextFromModel(
-		request.model,
+		model,
 		stream ? (markdown) => stream.markdown(markdown) : undefined,
 		token,
 		prompt,
@@ -636,40 +811,15 @@ export function createAnalyzeSessionsFlowDeps(overrides: AnalyzeSessionsFlowDeps
 }
 
 function createDefaultAnalyzeSessionsFlowDeps(
-	request: vscode.ChatRequest,
+	model: vscode.LanguageModelChat,
 	stream: vscode.ChatResponseStream,
 	token: vscode.CancellationToken,
+	selection: import('./types').AnalysisSelection,
 ): AnalyzeSessionsFlowDeps {
 	return createAnalyzeSessionsFlowDeps({
-		runModelPrompt: async (prompt: string, streamOutput: boolean) => collectModelText(request, streamOutput ? stream : undefined, token, prompt),
+		resolveSelection: async () => selection,
+		runModelPrompt: async (prompt: string, streamOutput: boolean) => collectModelText(model, streamOutput ? stream : undefined, token, prompt),
 		streamMarkdown: (markdown: string) => stream.markdown(markdown),
-	});
-}
-
-function findAgentSessionCommandId(commands: readonly string[]): string | undefined {
-	const preferred = [
-		'workbench.action.chat.openSessions',
-		'workbench.action.chat.openSessionsInNewWindow',
-		'workbench.action.chat.openAgentsWindow',
-		'workbench.action.chat.openAgents',
-		'github.copilot.cli.newSession',
-	];
-
-	for (const candidate of preferred) {
-		if (commands.includes(candidate)) {
-			return candidate;
-		}
-	}
-
-	return commands.find((command) => {
-		const normalized = command.toLowerCase();
-		if (normalized.includes('debug')) {
-			return false;
-		}
-
-		return normalized.startsWith('workbench.action.chat.')
-			&& normalized.includes('open')
-			&& (normalized.includes('agent') || normalized.includes('session'));
 	});
 }
 
@@ -711,17 +861,12 @@ function createDefaultResumeIntoOriginAgentDeps(
 	};
 }
 
-export async function runResumeIntoOriginAgent(
-	session: ChatSession,
-	userPrompt: string,
-	config: ResumeIntoOriginAgentConfig,
+async function runPromptIntoOriginAgent(
+	provider: AnalysisAgentProviderId,
+	prompt: string,
+	config: Pick<ResumeIntoOriginAgentConfig, 'providerCommands'>,
 	depsOverrides: Partial<ResumeIntoOriginAgentDeps> = {},
 ): Promise<boolean> {
-	const provider = session.provider;
-	if (!provider || provider === 'copilot') {
-		return false;
-	}
-
 	const deps: ResumeIntoOriginAgentDeps = {
 		getCommands: async () => [],
 		executeCommand: async () => undefined,
@@ -730,6 +875,7 @@ export async function runResumeIntoOriginAgent(
 		...depsOverrides,
 	};
 	const providerLabel = formatProviderLabel(provider);
+	const promptLabel = 'conversation context';
 	let target: ResumeTarget | undefined;
 
 	try {
@@ -740,22 +886,14 @@ export async function runResumeIntoOriginAgent(
 			return false;
 		}
 
-		const constrained = applyResumeOverflowStrategy(
-			session.turns,
-			config.maxTurns,
-			config.maxContextChars,
-			config.overflowStrategy,
-		);
-		const resumePrompt = composeResumePrompt(constrained.turns, userPrompt, constrained.note);
-
 		if (target.supportsQuery) {
-			await deps.executeCommand(target.commandId, { query: resumePrompt });
+			await deps.executeCommand(target.commandId, { query: prompt });
 			deps.streamMarkdown(`Opened ${providerLabel} chat with the resumed conversation context.`);
 			return true;
 		}
 
 		await deps.executeCommand(target.commandId);
-		await deps.writeClipboard(resumePrompt);
+		await deps.writeClipboard(prompt);
 		if (provider === 'claude-code') {
 			await prepareClaudeCodeConversationForResume(availableCommands, deps);
 		}
@@ -768,25 +906,25 @@ export async function runResumeIntoOriginAgent(
 					const tabLabel = providerLabel;
 					try {
 						await pasteClipboardIntoFocusedChat(provider, focusCommand, deps);
-						deps.streamMarkdown(`Opened the ${tabLabel} chat tab and pasted the conversation context.`);
+						deps.streamMarkdown(`Opened the ${tabLabel} chat tab and pasted the ${promptLabel}.`);
 						return true;
 					} catch (pasteError) {
 						const pasteMessage = pasteError instanceof Error ? pasteError.message : String(pasteError);
-						deps.streamMarkdown(`Opened the ${tabLabel} chat tab and copied the conversation context, but automatic paste failed (${pasteMessage}) - paste (Ctrl+V) to continue.`);
+						deps.streamMarkdown(`Opened the ${tabLabel} chat tab and copied the ${promptLabel}, but automatic paste failed (${pasteMessage}) - paste (Ctrl+V) to continue.`);
 						return true;
 					}
 				}
 
-				deps.streamMarkdown(`Opened ${providerLabel} chat, focused the panel, and copied the conversation context - paste (Ctrl+V) to continue.`);
+				deps.streamMarkdown(`Opened ${providerLabel} chat, focused the panel, and copied the ${promptLabel} - paste (Ctrl+V) to continue.`);
 				return true;
 			} catch (focusError) {
 				const focusMessage = focusError instanceof Error ? focusError.message : String(focusError);
-				deps.streamMarkdown(`Opened ${providerLabel} chat and copied the conversation context, but focusing the panel failed (${focusMessage}) - switch to the ${providerLabel} panel and paste to continue.`);
+				deps.streamMarkdown(`Opened ${providerLabel} chat and copied the ${promptLabel}, but focusing the panel failed (${focusMessage}) - switch to the ${providerLabel} panel and paste to continue.`);
 				return true;
 			}
 		}
 
-		deps.streamMarkdown(`Opened ${providerLabel} chat and copied the conversation context - paste to continue.`);
+		deps.streamMarkdown(`Opened ${providerLabel} chat and copied the ${promptLabel} - paste to continue.`);
 		return true;
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -795,44 +933,53 @@ export async function runResumeIntoOriginAgent(
 	}
 }
 
+export async function runResumeIntoOriginAgent(
+	session: ChatSession,
+	userPrompt: string,
+	config: ResumeIntoOriginAgentConfig,
+	depsOverrides: Partial<ResumeIntoOriginAgentDeps> = {},
+): Promise<boolean> {
+	const provider = session.provider;
+	if (!provider || provider === 'copilot') {
+		return false;
+	}
+
+	const constrained = applyResumeOverflowStrategy(
+		session.turns,
+		config.maxTurns,
+		config.maxContextChars,
+		config.overflowStrategy,
+	);
+	const resumePrompt = composeResumePrompt(constrained.turns, userPrompt, constrained.note);
+	return runPromptIntoOriginAgent(provider, resumePrompt, config, depsOverrides);
+}
+
 function createDefaultImplementationHandoffFlowDeps(
 	stream: vscode.ChatResponseStream,
+	fallbackModel: vscode.LanguageModelChat,
 ): ImplementationHandoffFlowDeps {
+	const handoffDispatcher = createVSCodeHandoffDispatcher();
 	return {
 		findAnalysisReportMeta: (history) => findLatestAnalysisReportMeta(history),
 		buildPrompt: (reportFilePath: string, userPrompt: string) => buildImplementationHandoffPrompt(reportFilePath, userPrompt),
+		selectChatModels: async () => vscode.lm.selectChatModels(),
 		getCommands: async () => vscode.commands.getCommands(true),
-		pickTarget: async (agentSessionAvailable: boolean) => {
-			if (!agentSessionAvailable) {
-				return 'chat';
-			}
-
-			const pick = await vscode.window.showQuickPick<
-				vscode.QuickPickItem & { target: ImplementationHandoffTarget }
-			>([
+		pickProvider: async (models, agentProviders, fallback) => pickAnalysisProvider(models, agentProviders, fallback, 'implementation'),
+		fallbackModel,
+		dispatchHandoff: async (prompt: string, target: HandoffSelectionId) => {
+			const workspaceFolder = pickWorkspaceFolder() ?? vscode.workspace.workspaceFolders?.[0];
+			const providerCommands = workspaceFolder
+				? vscode.workspace.getConfiguration('session-control', workspaceFolder.uri).get<ResumeProviderCommands>('resume.providerCommands', {})
+				: {};
+			return handoffDispatcher.dispatchSelection(
+				prompt,
+				target,
 				{
-					label: 'Chat',
-					description: 'Prefill a new chat with the generated implementation handoff prompt',
-					target: 'chat',
+					configuredProviderCommands: providerCommands,
+					promptLabel: 'implementation prompt',
 				},
-				{
-					label: 'Agent Session',
-					description: 'Open an agent session and copy the generated handoff prompt to the clipboard',
-					target: 'agentSession',
-				},
-			], {
-				title: 'Open implementation handoff in',
-			});
-
-			return pick?.target;
+			);
 		},
-		openChat: async (prompt: string) => {
-			await vscode.commands.executeCommand('workbench.action.chat.open', { query: prompt });
-		},
-		openAgentSession: async (commandId: string) => {
-			await vscode.commands.executeCommand(commandId);
-		},
-		writeClipboard: async (text: string) => vscode.env.clipboard.writeText(text),
 		streamMarkdown: (markdown: string) => stream.markdown(markdown),
 	};
 }
@@ -845,11 +992,16 @@ export async function runImplementationHandoffFlow(
 	const deps: ImplementationHandoffFlowDeps = {
 		findAnalysisReportMeta: () => null,
 		buildPrompt: (reportFilePath: string, userPrompt: string) => buildImplementationHandoffPrompt(reportFilePath, userPrompt),
+		selectChatModels: async () => [],
 		getCommands: async () => [],
-		pickTarget: async () => 'chat',
-		openChat: async () => undefined,
-		openAgentSession: async () => undefined,
-		writeClipboard: async () => undefined,
+		pickProvider: async () => undefined,
+		dispatchHandoff: async () => ({
+			selectedTarget: 'chat',
+			deliveredTo: null,
+			method: 'failed',
+			instruction: 'Could not deliver the implementation prompt.',
+			failures: [],
+		}),
 		streamMarkdown: () => undefined,
 		...depsOverrides,
 	};
@@ -862,29 +1014,50 @@ export async function runImplementationHandoffFlow(
 
 	const reportFilePath = path.join(analysisMeta.analysisStorageDirectory, analysisMeta.analysisReportPath);
 	const prompt = deps.buildPrompt(reportFilePath, requestPrompt);
-	const agentSessionCommandId = findAgentSessionCommandId(await deps.getCommands());
-	const target = await deps.pickTarget(agentSessionCommandId !== undefined);
-	if (!target) {
+	let models: readonly vscode.LanguageModelChat[] = [];
+	try {
+		models = await deps.selectChatModels();
+	} catch {
+		// Agent providers remain available when host model discovery fails.
+	}
+
+	let availableCommands: readonly string[] = [];
+	try {
+		availableCommands = await deps.getCommands();
+	} catch {
+		// Direct host chat remains available when command discovery fails.
+	}
+
+	const agentProviders = findAvailableAnalysisAgentProviders(availableCommands);
+	const providerSelection = await deps.pickProvider(models, agentProviders, deps.fallbackModel);
+	if (!providerSelection) {
+		if (models.length === 0 && agentProviders.length === 0) {
+			deps.streamMarkdown('No implementation provider is available. Sign in or install Codex, Claude Code, or Cursor, then try again.');
+		}
 		return;
 	}
 
-	if (target === 'agentSession' && agentSessionCommandId) {
-		try {
-			await deps.writeClipboard(prompt);
-			await deps.openAgentSession(agentSessionCommandId);
-			deps.streamMarkdown('Opened an agent session and copied the generated implementation handoff prompt to the clipboard. Paste it into the new session to continue.');
-			return;
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			deps.streamMarkdown(`Failed to open an agent session (${message}). Opening chat with the generated handoff prompt instead.\n\n`);
-		}
-	}
-
 	try {
-		await deps.openChat(prompt);
-		deps.streamMarkdown('Opened chat with a generated implementation handoff prompt.');
+		const target = providerSelection.kind === 'agent'
+			? providerSelection.provider
+			: 'chat';
+		const result = await deps.dispatchHandoff(prompt, target);
+		if (providerSelection.kind === 'model') {
+			const modelLabel = providerSelection.model.name.trim()
+				|| providerSelection.model.vendor.trim()
+				|| 'the selected model';
+			deps.streamMarkdown(`${result.instruction} Selected implementation provider: ${modelLabel}.`);
+			return;
+		}
+
+		deps.streamMarkdown(result.instruction);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
+		if (providerSelection.kind === 'agent') {
+			deps.streamMarkdown(`Could not open ${formatProviderLabel(providerSelection.provider)} for implementation (${message}).`);
+			return;
+		}
+
 		deps.streamMarkdown(`Failed to open chat with the generated handoff prompt: ${message}`);
 	}
 }
@@ -1288,6 +1461,7 @@ async function sendModelResponse(
 }
 
 export function registerChatParticipant(context: vscode.ExtensionContext): void {
+	const handoffDispatcher = createVSCodeHandoffDispatcher();
 	const participant = vscode.chat.createChatParticipant(CHAT_PARTICIPANT_ID, async (request, chatContext, stream, token) => {
 		const workspaceFolders = vscode.workspace.workspaceFolders;
 		if (!workspaceFolders?.length) {
@@ -1303,11 +1477,71 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 		}
 
 		if (request.command === 'analyze') {
+			const selection = await resolveAnalysisSelection(request.prompt);
+			if (!selection) {
+				return;
+			}
+
+			let availableModels: readonly vscode.LanguageModelChat[];
+			try {
+				availableModels = await vscode.lm.selectChatModels();
+			} catch {
+				availableModels = [request.model];
+			}
+
+			let availableCommands: readonly string[] = [];
+			try {
+				availableCommands = await vscode.commands.getCommands(true);
+			} catch {
+				// Keep the current model available even when command discovery is unavailable.
+			}
+
+			const providerSelection = await pickAnalysisProvider(
+				availableModels,
+				findAvailableAnalysisAgentProviders(availableCommands),
+				request.model,
+			);
+			if (!providerSelection) {
+				stream.markdown('No analysis provider was selected.');
+				return;
+			}
+
+			if (providerSelection.kind === 'agent') {
+				const handoff = await buildAnalysisHandoffPrompt(selection, workspaceFolders, workspaceSessions);
+				if (handoff.infoMessage) {
+					stream.markdown(handoff.infoMessage);
+					return;
+				}
+				if (!handoff.prompt) {
+					stream.markdown('Could not build an analysis handoff prompt.');
+					return;
+				}
+
+				const analysisWorkspaceFolder = workspaceFolder ?? workspaceFolders[0];
+				if (!analysisWorkspaceFolder) {
+					stream.markdown('Open a workspace folder before analyzing saved chats.');
+					return;
+				}
+				const providerCommands = vscode.workspace
+					.getConfiguration('session-control', analysisWorkspaceFolder.uri)
+					.get<ResumeProviderCommands>('resume.providerCommands', {});
+				const dispatchResult = await handoffDispatcher.dispatchSelection(
+					handoff.prompt,
+					providerSelection.provider,
+					{
+						configuredProviderCommands: providerCommands,
+						promptLabel: 'analysis handoff prompt',
+					},
+				);
+				stream.markdown(dispatchResult.instruction);
+				return;
+			}
+
 			return runAnalyzeSessionsFlow(
 				request.prompt,
 				workspaceFolders,
 				workspaceSessions,
-				createDefaultAnalyzeSessionsFlowDeps(request, stream, token),
+				createDefaultAnalyzeSessionsFlowDeps(providerSelection.model, stream, token, selection),
 			);
 		}
 
@@ -1315,7 +1549,7 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 			return runImplementationHandoffFlow(
 				request.prompt,
 				chatContext.history,
-				createDefaultImplementationHandoffFlowDeps(stream),
+				createDefaultImplementationHandoffFlowDeps(stream, request.model),
 			);
 		}
 

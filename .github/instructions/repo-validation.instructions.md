@@ -6,6 +6,7 @@ description: "Use when validating Session Control changes or deciding the smalle
 # Repo Validation
 
 - Start with touched-file diagnostics.
+- For plan- or documentation-only edits with no executable check, re-read the modified region and any adjacent section whose preservation or placement you claim before reporting `Unverified: none`; otherwise list that inspection as unverified.
 - On Windows PowerShell, do not use `&&` in `Shell` commands. For stop-on-failure sequences, either run separate `Shell` calls or use PowerShell-safe chaining such as `cmd1; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; cmd2`.
 - If test TypeScript changed, or if compiled tests may be stale, run `npm run compile-tests` before diagnosing behavior from `dist-test/`.
 - If source TypeScript changed, run `npm run compile` before broader test passes.

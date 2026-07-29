@@ -3,6 +3,9 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import {
 	buildParticipantFollowups,
+	createAnalysisModelPickItems,
+	createAnalysisProviderPickItems,
+	findAvailableAnalysisAgentProviders,
 	renderSessionListMarkdown,
 	resolveSummarizeNoteWithFallback,
 	runAnalyzeSessionsFlow,
@@ -16,6 +19,10 @@ import {
 	createPresetAnalysisSelection,
 	type AnalysisCandidateSession,
 } from '../../src/sessionAnalysis';
+import {
+	type HandoffDispatchResult,
+	type HandoffSelectionId,
+} from '../../src/handoffDispatcher';
 import { AnalysisIndex, AnalysisReportReference, ChatSession, SavedTurn, SessionMeta } from '../../src/types';
 
 function createMeta(overrides: Partial<SessionMeta> = {}): SessionMeta {
@@ -134,23 +141,86 @@ function createAnalyzeFlowDeps(overrides: Partial<Parameters<typeof runAnalyzeSe
 }
 
 function createHandoffFlowDeps(overrides: Partial<Parameters<typeof runImplementationHandoffFlow>[2]> = {}) {
+	const model = {
+		name: 'GPT-4.1',
+		vendor: 'copilot',
+		family: 'gpt-4.1',
+		id: 'copilot-gpt-4.1',
+	} as vscode.LanguageModelChat;
+
 	return {
 		findAnalysisReportMeta: () => ({
 			analysisReportPath: 'analysis/reports/report-1.md',
 			analysisStorageDirectory: 'e:/workspace/.chat',
 		}),
 		buildPrompt: (reportFilePath: string, userPrompt: string) => buildImplementationHandoffPrompt(reportFilePath, userPrompt),
+		selectChatModels: async () => [model],
 		getCommands: async () => [],
-		pickTarget: async (_agentSessionAvailable: boolean): Promise<'chat'> => 'chat',
-		openChat: async (_prompt: string) => undefined,
-		openAgentSession: async (_commandId: string) => undefined,
-		writeClipboard: async (_text: string) => undefined,
+		pickProvider: async (): Promise<{ kind: 'model'; model: vscode.LanguageModelChat }> => ({ kind: 'model', model }),
+		dispatchHandoff: async (_prompt: string, target: HandoffSelectionId): Promise<HandoffDispatchResult> => ({
+			selectedTarget: target === 'cursor' ? 'agentSession' : target,
+			deliveredTo: target === 'cursor' ? 'agentSession' : target,
+			method: 'prefill',
+			instruction: 'Opened Chat with the implementation prompt prefilled. Review it and send it when ready.',
+			failures: [],
+		}),
 		streamMarkdown: (_markdown: string) => undefined,
 		...overrides,
 	};
 }
 
 suite('chatParticipant selection', () => {
+	test('offers analysis models with their provider identity', () => {
+		const model = {
+			name: 'GPT-4.1',
+			vendor: 'copilot',
+			family: 'gpt-4.1',
+			id: 'copilot-gpt-4.1',
+		} as vscode.LanguageModelChat;
+
+		assert.deepEqual(
+			createAnalysisModelPickItems([model]).map((item) => ({
+				label: item.label,
+				description: item.description,
+				detail: item.detail,
+			})),
+			[{
+				label: 'GPT-4.1',
+				description: 'Provider: copilot',
+				detail: 'gpt-4.1 · copilot-gpt-4.1',
+			}],
+		);
+	});
+
+	test('adds installed Codex and Claude Code agents to the analysis provider picker', () => {
+		const model = {
+			name: 'GPT-4.1',
+			vendor: 'copilot',
+			family: 'gpt-4.1',
+			id: 'copilot-gpt-4.1',
+		} as vscode.LanguageModelChat;
+
+		const items = createAnalysisProviderPickItems([model], ['codex', 'claude-code']);
+		assert.deepEqual(items.map((item) => item.label), ['GPT-4.1', 'Codex', 'Claude Code']);
+		assert.deepEqual(items.slice(1).map((item) => item.selection), [
+			{ kind: 'agent', provider: 'codex' },
+			{ kind: 'agent', provider: 'claude-code' },
+		]);
+
+		const implementationItems = createAnalysisProviderPickItems([], ['codex'], 'implementation');
+		assert.equal(implementationItems[0]?.description, 'Use the installed codex agent to implement the saved analysis recommendations');
+	});
+
+	test('detects installed analysis agents from their contributed commands', () => {
+		assert.deepEqual(
+			findAvailableAnalysisAgentProviders([
+				'chatgpt.openSidebar',
+				'claude-vscode.sidebar.open',
+			]),
+			['codex', 'claude-code'],
+		);
+	});
+
 	test('auto-selects a single strong match', () => {
 		const sessions = [
 			createMeta({ id: '1', title: 'Fix auth bug', fileName: 'fix-auth-bug.json' }),
@@ -731,16 +801,25 @@ suite('chatParticipant implementation followups', () => {
 		assert.deepEqual(messages, ['Use @session-control /analyze first, then ask me to implement the recommendations.']);
 	});
 
-	test('opens chat with a generated implementation handoff prompt by default', async () => {
-		let openedPrompt: string | undefined;
+	test('routes a selected model provider through the shared dispatcher', async () => {
+		let dispatchedPrompt: string | undefined;
+		let dispatchedTarget: HandoffSelectionId | undefined;
 		const messages: string[] = [];
 
 		await runImplementationHandoffFlow(
 			'Implement the highest-priority recommendation.',
 			[],
 			createHandoffFlowDeps({
-				openChat: async (prompt: string) => {
-					openedPrompt = prompt;
+				dispatchHandoff: async (prompt, target) => {
+					dispatchedPrompt = prompt;
+					dispatchedTarget = target;
+					return {
+						selectedTarget: 'chat',
+						deliveredTo: 'chat',
+						method: 'prefill',
+						instruction: 'Opened Chat with the implementation prompt prefilled. Review it and send it when ready.',
+						failures: [],
+					};
 				},
 				streamMarkdown: (markdown: string) => {
 					messages.push(markdown);
@@ -749,14 +828,17 @@ suite('chatParticipant implementation followups', () => {
 		);
 
 		const expectedReportPath = path.join('e:/workspace/.chat', 'analysis/reports/report-1.md');
-		assert.equal(openedPrompt?.includes(expectedReportPath), true);
-		assert.equal(openedPrompt?.includes('User request: Implement the highest-priority recommendation.'), true);
-		assert.deepEqual(messages, ['Opened chat with a generated implementation handoff prompt.']);
+		assert.equal(dispatchedTarget, 'chat');
+		assert.equal(dispatchedPrompt?.includes(expectedReportPath), true);
+		assert.equal(dispatchedPrompt?.includes('User request: Implement the highest-priority recommendation.'), true);
+		assert.deepEqual(messages, [
+			'Opened Chat with the implementation prompt prefilled. Review it and send it when ready. Selected implementation provider: GPT-4.1.',
+		]);
 	});
 
-	test('opens an agent session and copies the handoff prompt when available', async () => {
-		let openedCommand: string | undefined;
-		let clipboardText: string | undefined;
+	test('routes the selected agent provider through the shared dispatcher', async () => {
+		let dispatchedTarget: HandoffSelectionId | undefined;
+		let dispatchedPrompt: string | undefined;
 		const messages: string[] = [];
 
 		await runImplementationHandoffFlow(
@@ -764,12 +846,17 @@ suite('chatParticipant implementation followups', () => {
 			[],
 			createHandoffFlowDeps({
 				getCommands: async () => ['github.copilot.cli.newSession'],
-				pickTarget: async (_agentSessionAvailable: boolean): Promise<'agentSession'> => 'agentSession',
-				openAgentSession: async (commandId: string) => {
-					openedCommand = commandId;
-				},
-				writeClipboard: async (text: string) => {
-					clipboardText = text;
+				pickProvider: async (): Promise<{ kind: 'agent'; provider: 'codex' }> => ({ kind: 'agent', provider: 'codex' }),
+				dispatchHandoff: async (prompt, target) => {
+					dispatchedTarget = target;
+					dispatchedPrompt = prompt;
+					return {
+						selectedTarget: 'codex',
+						deliveredTo: 'codex',
+						method: 'paste',
+						instruction: 'Opened Codex and pasted the implementation prompt. Review it and send it when ready.',
+						failures: [],
+					};
 				},
 				streamMarkdown: (markdown: string) => {
 					messages.push(markdown);
@@ -777,9 +864,10 @@ suite('chatParticipant implementation followups', () => {
 			}),
 		);
 
-		assert.equal(openedCommand, 'github.copilot.cli.newSession');
-		assert.equal(clipboardText?.includes('AGENTS.md'), true);
-		assert.equal(messages.length, 1);
-		assert.equal(messages[0]?.includes('Opened an agent session'), true);
+		assert.equal(dispatchedTarget, 'codex');
+		assert.equal(dispatchedPrompt?.includes('AGENTS.md'), true);
+		assert.deepEqual(messages, [
+			'Opened Codex and pasted the implementation prompt. Review it and send it when ready.',
+		]);
 	});
 });

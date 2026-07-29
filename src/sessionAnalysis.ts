@@ -305,6 +305,15 @@ export function createNeedsAnalysisSelection(): AnalysisSelection {
 	};
 }
 
+export function createSingleSessionSelection(session: { id: string; title: string }): AnalysisSelection {
+	return {
+		mode: 'singleSession',
+		label: `Session: ${session.title}`,
+		range: null,
+		sessionId: session.id,
+	};
+}
+
 export function createCustomRangeSelection(startInput: string, endInput: string, onlyUnanalyzed = false): AnalysisSelection {
 	const start = new Date(startInput);
 	const end = new Date(endInput);
@@ -356,6 +365,16 @@ export function filterCandidatesForAnalysis(
 	selection: AnalysisSelection,
 	analyzedFingerprints: ReadonlySet<string>,
 ): AnalysisCandidateSession[] {
+	// A single-session selection targets exactly the session the user clicked,
+	// so it bypasses the range filter and the analyze-chat exclusion applied to
+	// bulk selections.
+	if (selection.mode === 'singleSession') {
+		const matched = candidates.filter((candidate) => candidate.session.id === selection.sessionId);
+		return selection.onlyUnanalyzed
+			? matched.filter((candidate) => !analyzedFingerprints.has(candidate.fingerprint))
+			: matched;
+	}
+
 	const eligibleCandidates = candidates.filter((candidate) => !isSessionControlAnalyzeSession(candidate.session));
 	const range = selection.range;
 	const rangeFiltered = !range

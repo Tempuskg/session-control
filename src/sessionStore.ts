@@ -16,6 +16,15 @@ interface SessionStoreDeps {
 
 export type SessionPruneAction = 'archive' | 'delete';
 
+export interface OrphanedPartFile {
+	fileName: string;
+	sessionId: string;
+	title: string;
+	savedAt: string;
+	danglingLink: string;
+	superseded: boolean;
+}
+
 export interface SessionFileNameOptions {
 	includeTimestampInFileName: boolean;
 }
@@ -258,6 +267,63 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 			.sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt));
 	}
 
+	async function findOrphanedPartFiles(storageDirectory: string): Promise<OrphanedPartFile[]> {
+		let files: string[];
+		try {
+			files = await deps.readdir(storageDirectory);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			if (/no such file|cannot find|enoent/i.test(message)) {
+				return [];
+			}
+
+			throw error;
+		}
+
+		const jsonFiles = files.filter((file) => file.toLowerCase().endsWith('.json'));
+		const onDisk = new Set(jsonFiles.map((file) => file.toLowerCase()));
+		const parsed: Array<{ fileName: string; session: ChatSession }> = [];
+		for (const fileName of jsonFiles) {
+			try {
+				parsed.push({ fileName, session: await readSession(storageDirectory, fileName) });
+			} catch {
+				// Unreadable files are reported by listSessions; they cannot be
+				// classified as orphaned parts without valid link metadata.
+			}
+		}
+
+		const broken = parsed.filter(({ session }) => {
+			const links = [session.previousPartFile, session.nextPartFile];
+			return links.some((link) => link && !onDisk.has(link.toLowerCase()));
+		});
+		if (broken.length === 0) {
+			return [];
+		}
+
+		const brokenFileNames = new Set(broken.map(({ fileName }) => fileName));
+		return broken.map(({ fileName, session }) => {
+			const danglingLink = [session.previousPartFile, session.nextPartFile]
+				.find((link) => link && !onDisk.has(link.toLowerCase())) ?? '';
+
+			// Stale auto-save iterations are superseded by a newer, intact copy
+			// of the same session; a broken file without one may hold the only
+			// remaining turns and must not be removed automatically.
+			const superseded = parsed.some((candidate) => candidate.fileName !== fileName
+				&& candidate.session.id === session.id
+				&& !brokenFileNames.has(candidate.fileName)
+				&& Date.parse(candidate.session.savedAt) >= Date.parse(session.savedAt));
+
+			return {
+				fileName,
+				sessionId: session.id,
+				title: session.title,
+				savedAt: session.savedAt,
+				danglingLink,
+				superseded,
+			};
+		});
+	}
+
 	async function deleteSession(storageDirectory: string, fileName: string): Promise<boolean> {
 		const filePath = path.join(storageDirectory, fileName);
 		try {
@@ -283,11 +349,24 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 		}
 
 		const sessions = await listSessions(storageDirectory);
-		if (sessions.length <= maxSavedSessions) {
-			return { archived: 0, deleted: 0 };
+
+		// Part files of a split session share one session id and reference each
+		// other by file name, so pruning must keep or remove them as a unit —
+		// a per-file cutoff can land mid-chain and orphan the surviving parts.
+		const groupsById = new Map<string, SessionMeta[]>();
+		for (const session of sessions) {
+			const group = groupsById.get(session.id) ?? [];
+			group.push(session);
+			groupsById.set(session.id, group);
 		}
 
-		const toPrune = sessions.slice(maxSavedSessions);
+		const groups = [...groupsById.values()].sort((a, b) => {
+			const newestA = Math.max(...a.map((session) => Date.parse(session.savedAt)));
+			const newestB = Math.max(...b.map((session) => Date.parse(session.savedAt)));
+			return newestB - newestA;
+		});
+
+		const toPrune = groups.slice(maxSavedSessions).flat();
 		if (!toPrune.length) {
 			return { archived: 0, deleted: 0 };
 		}
@@ -319,6 +398,7 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 		writeSessions,
 		readSession,
 		listSessions,
+		findOrphanedPartFiles,
 		deleteSession,
 		pruneSessions,
 	};

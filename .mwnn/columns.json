@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "columns": [
+    {
+      "id": "col-mqycuy1w-1",
+      "title": "Backlog",
+      "role": "backlog",
+      "wipLimit": null,
+      "reverseWip": null
+    },
+    {
+      "id": "col-mqycuy1w-2",
+      "title": "Ready",
+      "role": "ready",
+      "wipLimit": null,
+      "reverseWip": 3
+    },
+    {
+      "id": "col-mqycuy1w-3",
+      "title": "In Progress",
+      "role": "in-progress",
+      "wipLimit": null,
+      "reverseWip": null
+    },
+    {
+      "id": "col-mr0qf1g9-1",
+      "title": "Verify",
+      "role": "custom",
+      "wipLimit": null,
+      "reverseWip": null
+    },
+    {
+      "id": "col-mqycuy1w-4",
+      "title": "Done",
+      "role": "done",
+      "wipLimit": null,
+      "reverseWip": null
+    }
+  ]
+}

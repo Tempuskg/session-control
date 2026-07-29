@@ -1,6 +1,6 @@
 # Session Control
 
-[![VS Code Marketplace](https://img.shields.io/badge/VS%20Marketplace-v1.3.4-blue)](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Marketplace-v1.3.5-blue)](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
 [![Open VSX](https://img.shields.io/open-vsx/v/darrenjmcleod/session-control)](https://open-vsx.org/extension/darrenjmcleod/session-control)
 [![CI](https://github.com/tempuskg/session-control/actions/workflows/ci.yml/badge.svg)](https://github.com/tempuskg/session-control/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -163,11 +163,13 @@ You can either choose a timeframe interactively or use a quick alias such as `24
 
 When you pick a date-based range interactively, Session Control now asks whether it should analyze only chats in that range that have not been analyzed yet, or re-analyze everything in that range.
 
+After choosing the analysis scope, Session Control asks which available provider should perform the analysis. Direct language-model providers run inside Session Control; installed Codex, Claude Code, or Cursor agent providers open their chat and receive a workspace-aware analysis handoff. The analysis itself includes all eligible saved sessions from every provider in the workspace's `.chat` folder; the provider choice only selects who generates the report.
+
 The participant reviews saved sessions from the configured storage folder, streams a report back into chat, and writes a markdown report under `.chat/analysis/reports/`. It also keeps an analysis index in `.chat/analysis/index.json` so the **Needs Analysis** mode only selects chats that have not been analyzed yet or whose content has changed since the last analysis. The report compares candidate recommendations against the current `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and existing repository-local instruction or skill files before listing recommendations. The report is intended to list only gaps that are not already covered there, unless it is proposing a concrete improvement, consolidation, or removal. When repeated workflows suggest a better reusable setup, the report can also recommend creating new AI skill files such as `SKILL.md`, `*.instructions.md`, `*.prompt.md`, or `*.agent.md`.
 
 After the report is generated, Session Control suggests an **Implement Recommendations** follow-up in chat.
 
-`@session-control /implement` generates a compact implementation prompt that points a coding agent at the saved analysis report file and keeps the next step focused on those AI control files. When the report recommends a new reusable AI skill, the generated prompt tells the next coding-agent step to create that skill file and any supporting instruction assets. It opens a new chat with that prompt prefilled by default, and when a supported agent-session opener is available it can open that surface and copy the prompt to the clipboard.
+`@session-control /implement` generates a compact implementation prompt that points a coding agent at the saved analysis report file and keeps the next step focused on those AI control files. When the report recommends a new reusable AI skill, the generated prompt tells the next coding-agent step to create that skill file and any supporting instruction assets. It then uses the same provider selector as analysis: choose an available VS Code language model, Codex, Claude Code, or Cursor. External providers receive the handoff directly; a VS Code language-model choice opens the prompt in VS Code Chat for review and sending.
 
 ### Implement the latest saved analysis from the command palette
 
@@ -177,7 +179,7 @@ Run:
 Session Control: Implement Latest Analysis
 ```
 
-This command looks across the open workspace folders, finds the newest saved analysis report that still exists on disk, and opens the same lightweight implementation flow used by `@session-control /implement`. If an agent-session opener is available, you can send the generated prompt there; otherwise it opens a new chat with the prompt prefilled. Internally this command is registered as `session-control.implementLatestAnalysis`.
+This command looks across the open workspace folders, finds the newest saved analysis report that still exists on disk, and opens the same provider-selection flow used by `@session-control /implement`. Choose an available VS Code language model, Codex, Claude Code, or Cursor. Internally this command is registered as `session-control.implementLatestAnalysis`.
 
 ### Import Copilot guidance as Cursor, Codex, or Claude Code skills
 
