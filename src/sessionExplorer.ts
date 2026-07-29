@@ -16,6 +16,83 @@ const sessionStore = createSessionStore();
 
 export const ANALYZE_SESSION_FROM_EXPLORER_COMMAND = 'session-control.analyzeSessionFromExplorer';
 export const REANALYZE_SESSION_FROM_EXPLORER_COMMAND = 'session-control.reanalyzeSessionFromExplorer';
+export const SORT_SESSION_EXPLORER_COMMAND = 'session-control.sortSessionExplorer';
+export const SESSION_EXPLORER_SORT_ORDER_STATE_KEY = 'session-control.sessionExplorer.sortOrder';
+
+export type SessionExplorerSortOrder = 'saved-desc' | 'saved-asc' | 'name-asc' | 'name-desc';
+
+export const DEFAULT_SESSION_EXPLORER_SORT_ORDER: SessionExplorerSortOrder = 'saved-desc';
+
+export interface SessionExplorerSortQuickPickItem extends vscode.QuickPickItem {
+	sortOrder: SessionExplorerSortOrder;
+}
+
+export function isSessionExplorerSortOrder(value: unknown): value is SessionExplorerSortOrder {
+	return value === 'saved-desc'
+		|| value === 'saved-asc'
+		|| value === 'name-asc'
+		|| value === 'name-desc';
+}
+
+export function createSessionExplorerSortQuickPickItems(
+	currentSortOrder: SessionExplorerSortOrder,
+): SessionExplorerSortQuickPickItem[] {
+	const options: SessionExplorerSortQuickPickItem[] = [
+		{ label: 'Date: Newest First', sortOrder: 'saved-desc' },
+		{ label: 'Date: Oldest First', sortOrder: 'saved-asc' },
+		{ label: 'Session Name: A to Z', sortOrder: 'name-asc' },
+		{ label: 'Session Name: Z to A', sortOrder: 'name-desc' },
+	];
+
+	return options.map((option) => option.sortOrder === currentSortOrder
+		? { ...option, description: 'Current' }
+		: option);
+}
+
+export function sortSessionExplorerSessions(
+	sessions: readonly SessionMeta[],
+	sortOrder: SessionExplorerSortOrder,
+): SessionMeta[] {
+	return [...sessions].sort((left, right) => {
+		if (sortOrder === 'saved-desc') {
+			return Date.parse(right.savedAt) - Date.parse(left.savedAt);
+		}
+		if (sortOrder === 'saved-asc') {
+			return Date.parse(left.savedAt) - Date.parse(right.savedAt);
+		}
+
+		const byName = left.title.localeCompare(right.title, undefined, {
+			numeric: true,
+			sensitivity: 'base',
+		});
+		return sortOrder === 'name-asc' ? byName : -byName;
+	});
+}
+
+interface SessionExplorerSortCommandDeps {
+	getSortOrder: () => SessionExplorerSortOrder;
+	showQuickPick: (
+		items: readonly SessionExplorerSortQuickPickItem[],
+		options: vscode.QuickPickOptions,
+	) => Promise<SessionExplorerSortQuickPickItem | undefined>;
+	setSortOrder: (sortOrder: SessionExplorerSortOrder) => void;
+	persistSortOrder: (sortOrder: SessionExplorerSortOrder) => Thenable<void>;
+}
+
+export async function runSortSessionExplorerCommand(
+	deps: SessionExplorerSortCommandDeps,
+): Promise<void> {
+	const selected = await deps.showQuickPick(
+		createSessionExplorerSortQuickPickItems(deps.getSortOrder()),
+		{ placeHolder: 'Sort saved sessions by' },
+	);
+	if (!selected) {
+		return;
+	}
+
+	deps.setSortOrder(selected.sortOrder);
+	await deps.persistSortOrder(selected.sortOrder);
+}
 
 function formatSavedAt(savedAt: string): string {
 	const date = new Date(savedAt);
@@ -288,10 +365,26 @@ export class SessionExplorerProvider implements vscode.TreeDataProvider<SessionE
 	private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<SessionExplorerNode | undefined>();
 	readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
 
-	constructor(private readonly depsOverrides: Partial<SessionExplorerDeps> = {}) {}
+	constructor(
+		private readonly depsOverrides: Partial<SessionExplorerDeps> = {},
+		private sortOrder: SessionExplorerSortOrder = DEFAULT_SESSION_EXPLORER_SORT_ORDER,
+	) {}
+
+	get currentSortOrder(): SessionExplorerSortOrder {
+		return this.sortOrder;
+	}
 
 	refresh(): void {
 		this.onDidChangeTreeDataEmitter.fire(undefined);
+	}
+
+	setSortOrder(sortOrder: SessionExplorerSortOrder): void {
+		if (sortOrder === this.sortOrder) {
+			return;
+		}
+
+		this.sortOrder = sortOrder;
+		this.refresh();
 	}
 
 	getTreeItem(element: SessionExplorerNode): vscode.TreeItem {
@@ -305,7 +398,8 @@ export class SessionExplorerProvider implements vscode.TreeDataProvider<SessionE
 		}
 
 		if (element instanceof SessionExplorerWorkspaceItem) {
-			return element.group.sessions.map((session) => new SessionExplorerSessionItem(element.group, session));
+			return sortSessionExplorerSessions(element.group.sessions, this.sortOrder)
+				.map((session) => new SessionExplorerSessionItem(element.group, session));
 		}
 
 		return [];

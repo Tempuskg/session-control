@@ -18,10 +18,15 @@ import {
 import { CopilotSession, deriveChatSessionsPath, readCopilotSessions } from './sessionReader';
 import { buildImplementationHandoffPrompt, createSingleSessionSelection } from './sessionAnalysis';
 import {
+	DEFAULT_SESSION_EXPLORER_SORT_ORDER,
+	SESSION_EXPLORER_SORT_ORDER_STATE_KEY,
+	SORT_SESSION_EXPLORER_COMMAND,
 	SessionExplorerProvider,
 	SessionExplorerSessionItem,
+	isSessionExplorerSortOrder,
 	registerSessionExplorerAnalysisCommands,
 	registerSessionExplorerVisibilityRefresh,
+	runSortSessionExplorerCommand,
 } from './sessionExplorer';
 import { ResumeProviderCommands } from './resumeTarget';
 import { SessionViewerPanel } from './sessionViewer';
@@ -2045,9 +2050,14 @@ export function activate(context: vscode.ExtensionContext): void {
 	const explorerSessionStore = createSessionStore({
 		logWarning: (message) => output.appendLine(`[session-explorer] ${message}`),
 	});
+	const storedSessionExplorerSortOrder = context.workspaceState.get<unknown>(
+		SESSION_EXPLORER_SORT_ORDER_STATE_KEY,
+	);
 	const sessionExplorerProvider = new SessionExplorerProvider({
 		listSessions: (storageDirectory) => explorerSessionStore.listSessions(storageDirectory),
-	});
+	}, isSessionExplorerSortOrder(storedSessionExplorerSortOrder)
+		? storedSessionExplorerSortOrder
+		: DEFAULT_SESSION_EXPLORER_SORT_ORDER);
 	const sessionExplorerView = vscode.window.createTreeView('session-control.sessionExplorer', {
 		treeDataProvider: sessionExplorerProvider,
 		showCollapseAll: true,
@@ -2104,6 +2114,15 @@ export function activate(context: vscode.ExtensionContext): void {
 			});
 		}),
 		vscode.commands.registerCommand('session-control.refreshSessionExplorer', () => sessionExplorerProvider.refresh()),
+		vscode.commands.registerCommand(SORT_SESSION_EXPLORER_COMMAND, () => runSortSessionExplorerCommand({
+			getSortOrder: () => sessionExplorerProvider.currentSortOrder,
+			showQuickPick: async (items, options) => vscode.window.showQuickPick(items, options),
+			setSortOrder: (sortOrder) => sessionExplorerProvider.setSortOrder(sortOrder),
+			persistSortOrder: (sortOrder) => context.workspaceState.update(
+				SESSION_EXPLORER_SORT_ORDER_STATE_KEY,
+				sortOrder,
+			),
+		})),
 		vscode.commands.registerCommand('session-control.openSessionFromExplorer', async (item: SessionExplorerSessionItem | undefined) => {
 			try {
 				await runOpenSavedSessionCommand(context, item);

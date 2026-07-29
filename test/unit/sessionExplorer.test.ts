@@ -5,14 +5,20 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import {
 	ANALYZE_SESSION_FROM_EXPLORER_COMMAND,
+	DEFAULT_SESSION_EXPLORER_SORT_ORDER,
 	REANALYZE_SESSION_FROM_EXPLORER_COMMAND,
+	SORT_SESSION_EXPLORER_COMMAND,
+	createSessionExplorerSortQuickPickItems,
 	findAnalyzedEntry,
 	findHarvestedEntry,
+	isSessionExplorerSortOrder,
 	listSessionExplorerGroups,
 	readAnalysisIndexForExplorer,
 	readHarvestIndexForExplorer,
 	registerSessionExplorerAnalysisCommands,
 	registerSessionExplorerVisibilityRefresh,
+	runSortSessionExplorerCommand,
+	sortSessionExplorerSessions,
 	SessionExplorerGroup,
 	SessionExplorerProvider,
 	SessionExplorerSessionItem,
@@ -37,6 +43,7 @@ interface PackageManifest {
 		commands: CommandContribution[];
 		menus: {
 			commandPalette?: MenuContribution[];
+			'view/title'?: MenuContribution[];
 			'view/item/context'?: MenuContribution[];
 		};
 	};
@@ -174,6 +181,133 @@ suite('session explorer', () => {
 		assert.equal(childNodes[0]?.label, 'Alpha Session');
 	});
 
+	test('sortSessionExplorerSessions supports date and name directions without mutating sessions', () => {
+		const sessions = [
+			createSession('Zulu', 'zulu.json', '2026-04-12T10:00:00.000Z'),
+			createSession('Alpha 10', 'alpha-10.json', '2026-04-12T12:00:00.000Z'),
+			createSession('Alpha 2', 'alpha-2.json', '2026-04-12T11:00:00.000Z'),
+		];
+		const originalFileNames = sessions.map((session) => session.fileName);
+
+		assert.deepEqual(
+			sortSessionExplorerSessions(sessions, 'saved-desc').map((session) => session.fileName),
+			['alpha-10.json', 'alpha-2.json', 'zulu.json'],
+		);
+		assert.deepEqual(
+			sortSessionExplorerSessions(sessions, 'saved-asc').map((session) => session.fileName),
+			['zulu.json', 'alpha-2.json', 'alpha-10.json'],
+		);
+		assert.deepEqual(
+			sortSessionExplorerSessions(sessions, 'name-asc').map((session) => session.fileName),
+			['alpha-2.json', 'alpha-10.json', 'zulu.json'],
+		);
+		assert.deepEqual(
+			sortSessionExplorerSessions(sessions, 'name-desc').map((session) => session.fileName),
+			['zulu.json', 'alpha-10.json', 'alpha-2.json'],
+		);
+		assert.deepEqual(sessions.map((session) => session.fileName), originalFileNames);
+	});
+
+	test('SessionExplorerProvider sorts within each workspace and refreshes only when the order changes', async () => {
+		const alpha = createWorkspaceFolder('C:/alpha', 'alpha', 0);
+		const beta = createWorkspaceFolder('C:/beta', 'beta', 1);
+		const provider = new SessionExplorerProvider({
+			getWorkspaceFolders: () => [alpha, beta],
+			getStoragePath: (workspaceFolder) => `${workspaceFolder.uri.fsPath}/.chat`,
+			listSessions: async (storageDirectory) => storageDirectory.includes('alpha')
+				? [
+					createSession('Zulu', 'alpha-zulu.json', '2026-04-12T10:00:00.000Z'),
+					createSession('Alpha', 'alpha-alpha.json', '2026-04-12T11:00:00.000Z'),
+				]
+				: [
+					createSession('Delta', 'beta-delta.json', '2026-04-12T12:00:00.000Z'),
+					createSession('Bravo', 'beta-bravo.json', '2026-04-12T09:00:00.000Z'),
+				],
+		});
+		let refreshCount = 0;
+		const subscription = provider.onDidChangeTreeData(() => {
+			refreshCount += 1;
+		});
+
+		const roots = await provider.getChildren();
+		assert.deepEqual(roots.map((root) => root.label), ['alpha', 'beta']);
+		assert.equal(provider.currentSortOrder, DEFAULT_SESSION_EXPLORER_SORT_ORDER);
+		assert.deepEqual(
+			(await provider.getChildren(roots[0])).map((item) => item.label),
+			['Alpha', 'Zulu'],
+		);
+		assert.deepEqual(
+			(await provider.getChildren(roots[1])).map((item) => item.label),
+			['Delta', 'Bravo'],
+		);
+
+		provider.setSortOrder('name-asc');
+		provider.setSortOrder('name-asc');
+		assert.equal(refreshCount, 1);
+		assert.equal(provider.currentSortOrder, 'name-asc');
+		assert.deepEqual(
+			(await provider.getChildren(roots[0])).map((item) => item.label),
+			['Alpha', 'Zulu'],
+		);
+		assert.deepEqual(
+			(await provider.getChildren(roots[1])).map((item) => item.label),
+			['Bravo', 'Delta'],
+		);
+		subscription.dispose();
+	});
+
+	test('sort picker marks the current order and the command applies and persists a selection', async () => {
+		const items = createSessionExplorerSortQuickPickItems('name-desc');
+		assert.deepEqual(items.map((item) => item.label), [
+			'Date: Newest First',
+			'Date: Oldest First',
+			'Session Name: A to Z',
+			'Session Name: Z to A',
+		]);
+		assert.deepEqual(
+			items.filter((item) => item.description === 'Current').map((item) => item.sortOrder),
+			['name-desc'],
+		);
+
+		let sortOrder = DEFAULT_SESSION_EXPLORER_SORT_ORDER;
+		let persistedSortOrder: string | undefined;
+		await runSortSessionExplorerCommand({
+			getSortOrder: () => sortOrder,
+			showQuickPick: async (quickPickItems, options) => {
+				assert.equal(options.placeHolder, 'Sort saved sessions by');
+				assert.equal(quickPickItems[0]?.description, 'Current');
+				return quickPickItems.find((item) => item.sortOrder === 'name-asc');
+			},
+			setSortOrder: (selectedSortOrder) => {
+				sortOrder = selectedSortOrder;
+			},
+			persistSortOrder: async (selectedSortOrder) => {
+				persistedSortOrder = selectedSortOrder;
+			},
+		});
+
+		assert.equal(sortOrder, 'name-asc');
+		assert.equal(persistedSortOrder, 'name-asc');
+	});
+
+	test('sort command leaves the current order unchanged when the picker is cancelled', async () => {
+		let changed = false;
+		await runSortSessionExplorerCommand({
+			getSortOrder: () => 'saved-desc',
+			showQuickPick: async () => undefined,
+			setSortOrder: () => {
+				changed = true;
+			},
+			persistSortOrder: async () => {
+				changed = true;
+			},
+		});
+
+		assert.equal(changed, false);
+		assert.equal(isSessionExplorerSortOrder('saved-asc'), true);
+		assert.equal(isSessionExplorerSortOrder('invalid'), false);
+	});
+
 	test('registerSessionExplorerVisibilityRefresh refreshes when the view becomes visible', () => {
 		let listener: ((event: { visible: boolean }) => void) | undefined;
 		let disposed = false;
@@ -258,6 +392,26 @@ suite('session explorer', () => {
 			commandPalette.find((contribution) => contribution.command === REANALYZE_SESSION_FROM_EXPLORER_COMMAND)?.when,
 			'false',
 		);
+	});
+
+	test('sort action is contributed to the Saved Sessions toolbar', async () => {
+		const manifest = await readPackageManifest();
+		const sortCommand = manifest.contributes.commands.find(
+			(contribution) => contribution.command === SORT_SESSION_EXPLORER_COMMAND,
+		);
+		assert.equal(sortCommand?.title, 'Sort Saved Sessions...');
+		assert.equal(sortCommand?.icon, '$(list-ordered)');
+
+		const titleActions = manifest.contributes.menus['view/title'] ?? [];
+		const refreshAction = titleActions.find(
+			(contribution) => contribution.command === 'session-control.refreshSessionExplorer',
+		);
+		const sortAction = titleActions.find(
+			(contribution) => contribution.command === SORT_SESSION_EXPLORER_COMMAND,
+		);
+		assert.equal(refreshAction?.group, 'navigation@1');
+		assert.equal(sortAction?.when, 'view == session-control.sessionExplorer');
+		assert.equal(sortAction?.group, 'navigation@2');
 	});
 
 	test('inline session actions use compact icons and keep delete rightmost', async () => {

@@ -70,6 +70,12 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "session-control.sortSessionExplorer",
+        "title": "Sort Saved Sessions...",
+        "category": "Session Control",
+        "icon": "$(list-ordered)"
+      },
+      {
         "command": "session-control.openSessionFromExplorer",
         "title": "Open Saved Session",
         "category": "Session Control",
@@ -476,7 +482,12 @@
         {
           "command": "session-control.refreshSessionExplorer",
           "when": "view == session-control.sessionExplorer",
-          "group": "navigation"
+          "group": "navigation@1"
+        },
+        {
+          "command": "session-control.sortSessionExplorer",
+          "when": "view == session-control.sessionExplorer",
+          "group": "navigation@2"
         }
       ],
       "editor/title": [
