@@ -8,7 +8,7 @@ import {
 	createStorageGitignoreEntry,
 	ensureStoragePathInGitignore,
 	listSessionsAcrossWorkspaceFolders,
-	resolveAutoSaveProvidersForHost,
+	resolveAutoSaveProviders,
 	resolveImplicitSaveProviderForHost,
 	resolveSaveProviderForHost,
 	runAnalyzeSavedChatsCommand,
@@ -141,14 +141,71 @@ suite('extension phase 10', () => {
 		assert.equal(resolveSaveProviderForHost(undefined, 'Visual Studio Code'), 'copilot');
 	});
 
-	test('resolveAutoSaveProvidersForHost watches Copilot, Codex, and Claude Code unless explicitly overridden', () => {
-		assert.deepEqual(resolveAutoSaveProvidersForHost('copilot', 'Visual Studio Code'), ['copilot']);
-		assert.deepEqual(resolveAutoSaveProvidersForHost('codex', 'Visual Studio Code'), ['codex']);
-		assert.deepEqual(resolveAutoSaveProvidersForHost('claude-code', 'Visual Studio Code'), ['claude-code']);
-		assert.deepEqual(resolveAutoSaveProvidersForHost(undefined, 'Visual Studio Code'), ['copilot', 'codex', 'claude-code']);
-		assert.deepEqual(resolveAutoSaveProvidersForHost(undefined, 'OpenAI Codex'), ['copilot', 'codex', 'claude-code']);
-		assert.deepEqual(resolveAutoSaveProvidersForHost(undefined, 'Claude Code'), ['copilot', 'codex', 'claude-code']);
-		assert.deepEqual(resolveAutoSaveProvidersForHost(undefined, 'Cursor'), ['cursor']);
+	test('resolveAutoSaveProviders defaults to all saved providers and honors only its own setting', () => {
+		assert.deepEqual(
+			resolveAutoSaveProviders(undefined),
+			['copilot', 'codex', 'claude-code', 'cursor'],
+		);
+		assert.deepEqual(
+			resolveAutoSaveProviders(['cursor', 'codex']),
+			['cursor', 'codex'],
+		);
+		assert.deepEqual(
+			resolveAutoSaveProviders(['codex', 'invalid', 'codex']),
+			['codex'],
+		);
+	});
+
+	test('contributes auto-save settings and the diagnostic command', async () => {
+		const packageJsonPath = path.resolve(__dirname, '..', '..', '..', 'package.json');
+		const manifest = JSON.parse(await fs.readFile(packageJsonPath, 'utf8')) as {
+			contributes?: {
+				commands?: Array<{
+					command: string;
+					title: string;
+					category: string;
+				}>;
+				configuration?: {
+					properties?: Record<string, {
+						default?: unknown;
+						description?: string;
+						scope?: string;
+					}>;
+				};
+				menus?: {
+					commandPalette?: Array<{ command: string }>;
+				};
+			};
+		};
+		const properties = manifest.contributes?.configuration?.properties;
+		const autoSaveProviders = properties?.['session-control.autoSave.providers'];
+		const copilotHomePath = properties?.['session-control.copilot.homePath'];
+		const manualProvider = properties?.['session-control.save.provider'];
+
+		assert.deepEqual(
+			autoSaveProviders?.default,
+			['copilot', 'codex', 'claude-code', 'cursor'],
+		);
+		assert.equal(autoSaveProviders?.scope, 'resource');
+		assert.equal(copilotHomePath?.default, '');
+		assert.equal(copilotHomePath?.scope, 'resource');
+		assert.match(manualProvider?.description ?? '', /does not control auto-save/);
+		assert.deepEqual(
+			manifest.contributes?.commands?.find(
+				(command) => command.command === 'session-control.diagnoseAutoSave',
+			),
+			{
+				command: 'session-control.diagnoseAutoSave',
+				title: 'Diagnose Auto-Save',
+				category: 'Session Control',
+			},
+		);
+		assert.equal(
+			manifest.contributes?.menus?.commandPalette?.some(
+				(item) => item.command === 'session-control.diagnoseAutoSave',
+			),
+			true,
+		);
 	});
 
 	test('validateStoragePath accepts in-workspace relative paths and rejects invalid ones', () => {

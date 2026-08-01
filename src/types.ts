@@ -38,7 +38,17 @@ export interface SourceChatSession {
 	lastMessageDate: string;
 	turns: SavedTurn[];
 	sourceFile: string;
+	sourceRevision?: string;
 	cwd?: string;
+}
+
+export type SessionSaveKind = 'manual' | 'auto';
+
+export interface SessionOrigin {
+	saveKind: SessionSaveKind;
+	sourceId: string;
+	sourceSessionId: string;
+	sourceRevision: string;
 }
 
 export interface ChatSession {
@@ -47,6 +57,7 @@ export interface ChatSession {
 	title: string;
 	savedAt: string;
 	provider?: SessionProviderId;
+	origin?: SessionOrigin;
 	git: GitContext | null;
 	vscodeVersion: string;
 	totalTurns: number;
@@ -252,6 +263,17 @@ export function isSavedTurn(value: unknown): value is SavedTurn {
 	return isRequestTurn(value) || isResponseTurn(value);
 }
 
+export function isSessionOrigin(value: unknown): value is SessionOrigin {
+	if (!isRecord(value)) {
+		return false;
+	}
+
+	return (value.saveKind === 'manual' || value.saveKind === 'auto')
+		&& typeof value.sourceId === 'string'
+		&& typeof value.sourceSessionId === 'string'
+		&& typeof value.sourceRevision === 'string';
+}
+
 function isAnalysisSelectionMode(value: unknown): value is AnalysisSelectionMode {
 	return value === 'last24Hours'
 		|| value === 'last7Days'
@@ -398,6 +420,7 @@ export function isChatSession(value: unknown): value is ChatSession {
 		|| typeof value.title !== 'string'
 		|| !isIsoTimestamp(value.savedAt)
 		|| (value.provider !== undefined && !isSessionProviderId(value.provider))
+		|| (value.origin !== undefined && !isSessionOrigin(value.origin))
 		|| typeof value.vscodeVersion !== 'string'
 		|| typeof value.totalTurns !== 'number'
 		|| !Array.isArray(value.turns)

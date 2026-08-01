@@ -2,7 +2,7 @@
 title: "Architecture"
 type: entity
 created: 2026-04-12
-updated: 2026-04-13
+updated: 2026-07-30
 sources:
   - raw/plan.md
 tags:
@@ -12,28 +12,31 @@ related:
   - wiki/save-system.md
   - wiki/resume-system.md
   - wiki/session-format.md
+  - wiki/configuration.md
   - wiki/file-manifest.md
 ---
 
 # Architecture
 
-Session Control is structured around two independent subsystems connected by a shared storage layer.
+Session Control is structured around save, resume/analysis, and viewing subsystems connected by a shared saved-session store. Manual import and project-scoped auto-save share provider readers, normalization, bloat controls, and persistence while keeping different selection and ownership rules.
 
 ## System Diagram
 
 ```mermaid
 graph TB
-    subgraph "VS Code"
-        CopilotStorage["Copilot Internal Storage<br/>(chatSessions/*.json)"]
-        ChatUI["VS Code Chat UI"]
+    subgraph "Read-only provider stores"
+        CopilotStorage["VS Code Copilot<br/>workspace chatSessions"]
+        CliStores["Copilot / Codex / Claude Code / Cursor<br/>local transcripts"]
     end
 
     subgraph "Session Control Extension"
-        SaveSystem["Save System<br/>(sessionReader → sessionWriter)"]
+        Adapters["Source adapters<br/>normalize + prove project ownership"]
+        Controllers["Per-workspace auto-save controllers<br/>reconcile + settle + checkpoint"]
+        SaveSystem["Writer + store<br/>normalize + staged upsert"]
         ResumeSystem["Resume System<br/>(@session-control participant)"]
         SessionViewer["Session Viewer<br/>(webview panel)"]
-        GitIntegration["Git Integration<br/>(branch, SHA, commit hooks)"]
-        SessionStore["Session Store<br/>(CRUD on .chat/)"]
+        GitIntegration["Git Integration<br/>(branch, SHA, dirty state)"]
+        Diagnostics["Source diagnostics<br/>report + status tooltip"]
     end
 
     subgraph "Repository"
@@ -41,20 +44,22 @@ graph TB
         GitRepo["Git History"]
     end
 
-    CopilotStorage -->|read| SaveSystem
+    CopilotStorage -->|read| Adapters
+    CliStores -->|read| Adapters
+    Adapters --> Controllers
+    Controllers --> SaveSystem
     GitIntegration -->|metadata| SaveSystem
-    SaveSystem -->|write| SessionStore
-    SessionStore -->|read/write| ChatFolder
+    Controllers --> Diagnostics
+    SaveSystem -->|write/upsert| ChatFolder
     ChatFolder -->|tracked in| GitRepo
-    ResumeSystem -->|read| SessionStore
-    SessionViewer -->|read| SessionStore
-    ChatUI <-->|interact| ResumeSystem
+    ResumeSystem -->|read| ChatFolder
+    SessionViewer -->|read| ChatFolder
 ```
 
 ## Subsystems
 
 ### Save System
-Reads Copilot's internal session storage files, transforms them into the [Session Format](session-format.md), enriches with git metadata via [Git Integration](git-integration.md), and writes to `.chat/`. Applies bloat controls (size limits, splitting, stripping) before writing. See [Save System](save-system.md).
+Reads supported local provider stores, transforms them into the [Session Format](session-format.md), enriches with git metadata via [Git Integration](git-integration.md), and writes to the configured storage directory. Manual saves use explicit user selection. Auto-save requires positive workspace ownership and adds automatic origin metadata before an ownership-scoped upsert. Both paths apply bloat controls. See [Save System](save-system.md).
 
 ### Resume System
 A registered VS Code chat participant (`@session-control`) that reads saved sessions from `.chat/`, applies context limits (max turns, max chars), and injects prior conversation as LLM context. See [Resume System](resume-system.md) and [Chat Participant](chat-participant.md).
@@ -66,19 +71,27 @@ CRUD layer for saved session files in `.chat/`. Handles file naming, searching, 
 An HTML webview panel (`SessionViewerPanel`) that renders saved sessions as a formatted conversation view. Accessible from the Session Explorer sidebar (click a session) or from the editor title bar when a recognized session JSON file is open. Tracks session metadata (title, filename) and exposes it via public getters. Uses `buildPageHtml()` to generate a self-contained HTML page with CSP nonce, markdown rendering via `marked`, and XSS-safe escaping. When the viewer is active, a resume icon (▶ debug-start) appears in the editor title bar; clicking it opens the chat panel with a pre-filled `@session-control /resume` command. See `src/sessionViewer.ts`.
 
 ### Git Integration
-Wraps the VS Code Git extension API. Provides branch name, commit SHA, dirty state. Optionally listens for commit events to trigger auto-save. See [Git Integration](git-integration.md).
+Wraps the VS Code Git extension API and provides branch name, commit SHA, and dirty state for saved-session metadata. Chat-response auto-save does not depend on commit events. See [Git Integration](git-integration.md).
 
 ### Auto-Save on Chat Response
-A file-system watcher on the Copilot `chatSessions/` directory that triggers automatic saves when new chat responses arrive. Debounced (5 seconds), tracks turn counts per session ID, and cleans up previous auto-save files to prevent accumulation. Uses dependency injection (`AutoSaveOnChatResponseDeps`) for testability. See [Save System](save-system.md#auto-save-on-chat-response).
+`autoSaveWorkspaceManager` maintains one controller per enabled folder. Configured source adapters reconcile at startup, on source create/change events, after relevant settings/folder changes, during missing-directory recovery, and on a fallback interval. Controllers settle streaming files, compare semantic revisions, persist/rebuild checkpoints, isolate source failures, and invoke the store's staged upsert. Diagnostics and the status tooltip remain per source/workspace. See [Save System](save-system.md#auto-save-on-chat-response) and [Configuration](configuration.md#auto-save-selection-and-migration).
 
 ## Data Flow
 
 ### Save Flow
-1. User triggers "Save Current Chat Session" command
-2. `sessionReader` accesses Copilot internal storage at `workspaceStorage/{workspaceId}/chatSessions/`
-3. User selects which session to save via QuickPick
+1. User triggers `Session Control: Save Session...`
+2. The provider picker selects the relevant provider reader
+3. User selects which normalized session to save via QuickPick
 4. `sessionWriter` transforms to [Session Format](session-format.md), applies bloat controls
-5. `sessionStore` writes JSON file to `.chat/` with git metadata from `gitIntegration`
+5. `sessionStore` writes JSON to the configured storage directory with git metadata from `gitIntegration`
+
+### Auto-Save Flow
+1. Each enabled workspace controller resolves every source selected by `autoSave.providers`
+2. A startup/event/maintenance reconciliation reads only positively matched candidates
+3. The controller waits for stable semantic content and skips an unchanged revision
+4. Writer attaches automatic source/session/revision ownership
+5. Store publishes the new single/split set, then retires only the previous matching automatic set
+6. Controller records the checkpoint/success and refreshes Session Explorer once
 
 ### View Flow
 1. User opens a session JSON file in the editor (or clicks a session in Session Explorer)
@@ -113,3 +126,5 @@ See [Session Format](session-format.md) for the full schema.
 - **TypeScript** — Extension language
 - **Webpack** — Bundling
 - **VS Code Git Extension API** — For git metadata (not shelling out to git CLI)
+- **Local-store visibility** — Provider transcripts must be visible to the running extension host; cross-host/profile/container/WSL inference is intentionally unsupported
+- **Provider format stability** — Local transcript formats are adapter-isolated and fixture-tested but are not stable cross-provider APIs

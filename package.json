@@ -144,6 +144,11 @@
         "category": "Session Control"
       },
       {
+        "command": "session-control.diagnoseAutoSave",
+        "title": "Diagnose Auto-Save",
+        "category": "Session Control"
+      },
+      {
         "command": "session-control.cleanupOrphanedParts",
         "title": "Clean Up Orphaned Session Part Files",
         "category": "Session Control"
@@ -193,13 +198,19 @@
             "claude-code"
           ],
           "enumDescriptions": [
-            "Override host detection and save from VS Code Copilot chat storage.",
-            "Override host detection and import from local Codex session transcripts under CODEX_HOME or the configured Codex home path.",
-            "Override host detection and import from Cursor Agent transcript JSONL files.",
-            "Override host detection and import from local Claude Code JSONL transcripts under CLAUDE_CONFIG_DIR or the configured Claude Code home path."
+            "Prefer VS Code Copilot chat storage for manual provider flows.",
+            "Prefer local Codex session transcripts for manual provider flows.",
+            "Prefer Cursor Agent transcript JSONL files for manual provider flows.",
+            "Prefer local Claude Code JSONL transcripts for manual provider flows."
           ],
           "default": "copilot",
-          "description": "Explicit provider override used by auto-save. (Session Control: Save Session... always prompts for the provider.) When unset, Session Control auto-detects Cursor, Codex, or Claude Code based on the host app, and otherwise defaults to Copilot.",
+          "description": "Provider preference for manual flows that do not prompt. This setting does not control auto-save; use session-control.autoSave.providers to choose auto-save providers.",
+          "scope": "resource"
+        },
+        "session-control.copilot.homePath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional GitHub Copilot CLI home directory. When empty, Session Control uses COPILOT_HOME or ~/.copilot.",
           "scope": "resource"
         },
         "session-control.codex.homePath": {
@@ -229,7 +240,28 @@
         "session-control.autoSaveOnChatResponse": {
           "type": "boolean",
           "default": false,
-          "description": "Automatically save after each detected response or transcript update. When no provider override is set, Session Control watches Copilot, Codex, and Claude Code sources outside Cursor.",
+          "description": "Enable workspace-scoped auto-save after each detected response or transcript update. Providers are selected by session-control.autoSave.providers.",
+          "scope": "resource"
+        },
+        "session-control.autoSave.providers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "copilot",
+              "codex",
+              "claude-code",
+              "cursor"
+            ]
+          },
+          "default": [
+            "copilot",
+            "codex",
+            "claude-code",
+            "cursor"
+          ],
+          "uniqueItems": true,
+          "description": "Providers monitored while workspace-scoped auto-save is enabled. Defaults to all supported saved-session providers.",
           "scope": "resource"
         },
         "session-control.includeInGitignore": {
@@ -451,6 +483,9 @@
           "command": "session-control.toggleAutoSave"
         },
         {
+          "command": "session-control.diagnoseAutoSave"
+        },
+        {
           "command": "session-control.cleanupOrphanedParts"
         },
         {
@@ -568,7 +603,7 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
-    "@tempuskg/session-control-pro": "^0.1.0",
+    "@tempuskg/session-control-pro": "^0.2.0",
     "marked": "^4.3.0"
   }
 }

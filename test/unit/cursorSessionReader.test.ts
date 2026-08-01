@@ -103,7 +103,7 @@ suite('cursorSessionReader', () => {
 		}
 	});
 
-	test('reads Cursor JSONL sessions, sorts by recency, and skips corrupt files', async () => {
+	test('reads legacy Cursor IDE JSONL sessions, sorts by recency, and skips corrupt files', async () => {
 		const warnings: string[] = [];
 		const infoMessages: string[] = [];
 		const repoPath = path.join(os.tmpdir(), `session-control-cursor-read-${Date.now()}`);
@@ -125,9 +125,9 @@ suite('cursorSessionReader', () => {
 				vscodeVersion: '1.115.0',
 			});
 
-			const sessions = await reader.readCursorSessions(
+			const sessions = await reader.readCursorIdeLegacySessions(
 				createWorkspaceFolder(repoPath),
-				createReaderOptions(setup),
+				setup.cursorUserDataPath,
 			);
 
 			assert.equal(sessions.length, 2);

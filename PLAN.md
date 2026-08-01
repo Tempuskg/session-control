@@ -1,9 +1,9 @@
 # Plan: Session Control — VS Code Extension
 
 ## TL;DR
-An **open source** VS Code extension that saves GitHub Copilot Chat sessions as structured JSON files into a configurable `.chat/` folder in the repo, linked to git commits/branches. Users resume saved chats via a `@session-control` chat participant that loads prior conversation as LLM context. Manual save + optional auto-save on commit. Licensed under MIT and published to the VS Code Marketplace and Open VSX Registry.
+An **open source** VS Code extension that saves project-owned sessions from VS Code Copilot Chat, GitHub Copilot CLI, Codex CLI, Claude Code, and Cursor CLI as structured JSON files in each workspace folder's configurable `.chat/` directory, linked to git commits/branches. Users resume saved chats via a `@session-control` chat participant or the originating local agent. Manual save is available alongside opt-in, workspace-scoped auto-save after settled response or transcript updates; enabled auto-save monitors every configured supported provider concurrently and defaults to all four provider groups. The product ships as one customer-facing `session-control` extension install, with private Pro or license-layer capabilities loading through that extension. Licensed under MIT and published to the VS Code Marketplace and Open VSX Registry.
 
-## Implementation Progress (Updated: 2026-04-12)
+## Implementation Progress (Updated: 2026-07-30)
 
 - [x] **Phase 1 — Project Scaffolding**
   - Completed: extension manifest/config scaffolding, webpack + TypeScript + ESLint setup, extension/test launch config, baseline `src/extension.ts`, open source docs/templates, CI/release workflows
@@ -40,13 +40,14 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
   - Completed: expanded integration assertions in `test/unit/chatParticipant.integration.test.ts` and `test/unit/extensionSaveFlow.test.ts` (split save + reassembled resume)
   - Validation completed: `npm run lint`, `npm test` (44 passing)
 - [x] **Phase 9 — Auto-Save & Session Pruning**
-  - Completed: auto-save-on-commit listener in `src/extension.ts` using git repository `state.onDidChange` + commit SHA change detection + per-repo debounce
-  - Completed: auto-save command path reuses `runSaveSessionFlow` with non-interactive session/title selection and listener error fail-safe disablement
+  - Completed: one auto-save controller per enabled workspace folder, with immediate reconciliation and file create/change monitoring for VS Code Copilot Chat, GitHub Copilot CLI, Codex CLI, Claude Code, and Cursor CLI sources
+  - Completed: `session-control.autoSave.providers` defaults to all supported provider groups and is independent of the manual `session-control.save.provider` preference and host application
+  - Completed: project ownership is matched fail-closed, source reads settle before saving, source failures are isolated with retry, and durable origin/checkpoint metadata upserts one current auto-save per logical provider session
   - Completed: session pruning in `src/sessionStore.ts` via `pruneSessions(..., action)` with `archive` and `delete` strategies
   - Completed: save flow applies `save.maxSavedSessions` and `save.pruneAction` post-write with user notifications
-  - Completed: integration-style listener coverage in `test/unit/extensionAutoSave.test.ts` for commit-triggered save and listener disable on error
+  - Completed: integration-style coverage in `test/unit/extensionAutoSave.test.ts`, `test/unit/autoSaveController.test.ts`, and `test/unit/autoSaveWorkspaceManager.test.ts` for all-source monitoring, project scoping, durable upserts, and source-failure isolation
   - Completed: pruning coverage in `test/unit/sessionStore.test.ts` and save-flow prune assertions in `test/unit/extensionSaveFlow.test.ts`
-  - Validation completed: `npm run lint`, `npm test` (49 passing)
+  - Validation completed: `npm test` (365 passing on 2026-07-30, including all-source and workspace-manager auto-save cases)
 - [x] **Phase 10 — Polish & Multi-Root**
   - Completed: configuration validation helpers in `src/extension.ts` and `src/chatParticipant.ts` for safe relative `storagePath` resolution and bounded resume settings
   - Completed: multi-root manual save/list/delete handling in `src/extension.ts` with active-editor workspace preference, QuickPick folder selection, and cross-workspace session browsing
@@ -64,7 +65,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 ## Architecture Overview
 
 **Two main subsystems:**
-1. **Save System** — Reads Copilot's internal session storage files and copies/transforms them into the repo's `.chat/` folder with git metadata.
+1. **Save System** — Reads project-owned session storage or transcript files from VS Code Copilot Chat, GitHub Copilot CLI, Codex CLI, Claude Code, and Cursor CLI, then copies/transforms them into the workspace folder's configured `.chat/` directory with git metadata.
 2. **Resume System** — A registered VS Code Chat Participant (`@session-control`) that loads a saved session and injects its history as context into a new conversation.
 
 **Storage format:** JSON (primary, machine-parseable for resume) with a rendered Markdown summary embedded in the JSON for human review in diffs/PRs.
@@ -100,7 +101,9 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
   - `session-control.deleteSession` — "Session Control: Delete Saved Session"
 - **Configuration settings:**
   - `session-control.storagePath` (string, default: `.chat`) — folder relative to workspace root
-  - `session-control.autoSaveOnCommit` (boolean, default: false) — auto-save active session on git commit
+  - `session-control.autoSaveOnChatResponse` (boolean, default: false) — enable workspace-scoped auto-save after detected response or transcript updates
+  - `session-control.autoSave.providers` (array, default: `copilot`, `codex`, `claude-code`, `cursor`) — provider groups monitored concurrently while auto-save is enabled
+  - `session-control.save.provider` (string, default: `copilot`) — manual/non-interactive provider preference; does not narrow auto-save sources
   - `session-control.includeInGitignore` (boolean, default: false) — optionally gitignore the .chat folder
   - **Resume context settings:**
     - `session-control.resume.maxTurns` (number, default: 50) — max turns to inject when resuming
@@ -121,7 +124,7 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 - Activate lazily via `onCommand` for each command
 - The chat participant (`session-control.resume`) automatically activates the extension when invoked — no explicit event needed in VS Code ≥1.93
 - **No `*` activation** — the extension has no reason to run until the user interacts with it
-- Add `onStartupFinished` for `autoSaveOnCommit` — in `activate()`, check the setting and only register the git listener if enabled; otherwise return immediately
+- Add `onStartupFinished` for project auto-save — on activation, create controllers only for workspace folders where `autoSaveOnChatResponse` is enabled, then reconcile and monitor every provider selected by that folder's `autoSave.providers` setting
 
 ### Step 1.5 — Entry point stub
 - Create `src/extension.ts` with empty `activate()` / `deactivate()` functions
@@ -370,27 +373,36 @@ An **open source** VS Code extension that saves GitHub Copilot Chat sessions as 
 
 ---
 
-## Phase 9: Auto-Save & Session Pruning
+## Phase 9: Project Auto-Save & Session Pruning
 
-> **Goal:** Automatic save triggers and storage housekeeping.
+> **Goal:** Reliable all-source, project-scoped automatic saving and storage housekeeping.
 
-### Step 9.1 — Auto-save on commit
-- When `autoSaveOnCommit` is enabled, watch `git.repositories[*].state.onDidChange` for HEAD changes
-- Debounce to avoid saving on micro-state changes (staging, etc.)
-- Only save if new turns exist since last save (tracked via turn count or content hash)
-- On listener error: log to output channel, disable auto-save for the session with a warning
+### Step 9.1 — Auto-save on response or transcript update
+- Treat `autoSaveOnChatResponse` as an opt-in, resource-scoped setting and create one controller per enabled workspace folder
+- Monitor the provider groups selected by `autoSave.providers`, defaulting to `copilot`, `codex`, `claude-code`, and `cursor`; the Copilot group covers both the validated VS Code workspace store and project-owned Copilot CLI transcripts when available
+- Keep auto-save provider selection independent of the host application and the manual `save.provider` preference
+- Require positive project ownership for unattended candidates and skip ambiguous global sessions
+- Reconcile on activation/configuration changes and monitor source-file create/change events with debounce, bounded settle reads, incomplete-file retry, and a low-frequency fallback scan
+- On a persistent source error, log and warn once, pause and retry only that source, and keep the other configured sources active
 
-### Step 9.2 — Session pruning
+### Step 9.2 — Durable auto-save upserts
+- Store auto-save origin metadata and workspace checkpoint state keyed by source and logical provider session
+- Skip timestamp-only touches, but replace the existing auto-saved file set when semantic content changes
+- Publish a new single or split file set before retiring the previous matching auto-save; never replace manual snapshots
+
+### Step 9.3 — Session pruning
 - After each save, check `save.maxSavedSessions`
 - When exceeded, apply `save.pruneAction`:
   - **`archive`**: move oldest sessions to `.chat/.archive/`
   - **`delete`**: permanently remove oldest sessions
 
-### Step 9.3 — Integration tests
-- Enable `autoSaveOnCommit`, make a commit in test repo → verify session saved
+### Step 9.4 — Integration tests
+- Enable `autoSaveOnChatResponse` for a workspace, update each supported local source, and verify the matching project session is upserted in that folder's configured storage directory
+- Verify all configured providers are watched concurrently without host-based exclusion or narrowing by `save.provider`
+- Verify ambiguous or mismatched projects are rejected, one source failure does not stop the others, and extension reload continues the same logical auto-save without duplication
 - Set `maxSavedSessions=2`, save 4 → verify 2 archived/deleted
 
-**Deliverable:** Sessions auto-save on commit. Old sessions automatically archived or deleted per config.
+**Deliverable:** Enabled workspaces auto-save project-owned sessions from every configured supported provider after settled source updates. Old sessions are automatically archived or deleted per config.
 
 ---
 
@@ -408,7 +420,7 @@ Status: Implemented for `storagePath`, bounded resume limits, and save-size pars
 
 ### Step 10.2 — Multi-root workspace support
 - **On manual save**: use workspace folder of active editor's file; if no file open, prompt via QuickPick
-- **On auto-save**: use workspace folder of the repository that committed
+- **On auto-save**: maintain one controller per enabled workspace folder, accept only positively project-owned source sessions, and write to that folder's configured storage directory
 - **On resume/list**: search `.chat/` across all workspace folders, prefix results with folder name for disambiguation (e.g., *"[backend] fix-auth-bug"*)
 - Settings can be configured per workspace folder via `.vscode/settings.json`
 - See **Multi-Root Workspace Handling** reference section for full details
@@ -458,7 +470,9 @@ Error handling strategy across all subsystems. The principle: never silently fai
 ### Git Integration Errors
 - **Git extension not available**: If `vscode.git` extension isn't installed/active, save sessions without git metadata (set `git` field to `null`). Show an info message on first occurrence: *"Git extension not available. Sessions will be saved without git metadata."*
 - **No repository**: If workspace has no git repo, same as above — save without git metadata.
-- **Auto-save listener failure**: If the `onDidChange` listener throws, log to output channel and disable auto-save for the session with a warning notification.
+
+### Auto-Save Source Errors
+- **Source watcher/read failure**: Log the error and source path, show one warning, pause and periodically retry only the affected source, and leave every other configured source and workspace controller active.
 
 ---
 
@@ -535,7 +549,7 @@ VS Code supports multi-root workspaces where multiple folders are open simultane
 
 ### Which workspace folder gets the `.chat/` directory?
 - **On manual save**: Use the workspace folder of the **active editor's file**. If no file is open, prompt the user to select a workspace folder via QuickPick.
-- **On auto-save (commit)**: Use the workspace folder of the **repository that just committed**. The git extension provides the repository object, which maps to a workspace folder.
+- **On auto-save**: Each enabled workspace folder owns its own controller and configured storage directory. A source session must positively match that folder through a validated workspace store, canonical working directory, or project-specific transcript directory; ambiguous global sessions are skipped.
 - **On resume/list**: Search `.chat/` folders across **all** workspace folders. Present results with the workspace folder name as a prefix for disambiguation (e.g., *"[backend] fix-auth-bug"*, *"[frontend] add-navbar"*).
 
 ### Settings scope
@@ -589,7 +603,7 @@ Run inside VS Code extension host via `@vscode/test-electron`.
 | Multi-part reassembly | Save a large session that splits → resume → verify all parts loaded and ordered |
 | Git metadata | With a real git repo in temp dir → save → verify branch/SHA/dirty captured |
 | Pruning | Set `maxSavedSessions=2`, save 4 → verify 2 archived/deleted |
-| Auto-save trigger | Enable `autoSaveOnCommit`, make a commit in test repo → verify session saved |
+| Project auto-save matrix | Enable `autoSaveOnChatResponse`; update VS Code Copilot/Copilot CLI, Codex CLI, Claude Code, and Cursor CLI project sessions → verify all configured providers upsert into the matching workspace storage without host-based exclusion |
 
 ### Mocking Copilot Internals
 - **Do not mock the actual Copilot session files in unit tests** — the format is undocumented and may change.
@@ -610,10 +624,13 @@ Run inside VS Code extension host via `@vscode/test-electron`.
 
 - `package.json` — Extension manifest with commands, settings, chat participant, menus
 - `src/extension.ts` — Entry point, registers commands and chat participant
-- `src/sessionReader.ts` — Reads Copilot internal session files, handles format versioning
+- `src/sessionReader.ts` — Reads VS Code Copilot internal session files, handles format versioning
+- `src/copilotCliSessionReader.ts`, `src/codexSessionReader.ts`, `src/claudeCodeSessionReader.ts`, `src/cursorCliSessionReader.ts` — Read project-owned local assistant transcripts
+- `src/autoSaveController.ts` — Reconciles source updates with settle/retry handling and durable auto-save upserts
+- `src/autoSaveWorkspaceManager.ts` — Owns one auto-save controller per enabled workspace folder
 - `src/sessionWriter.ts` — Transforms and writes sessions to `.chat/` folder
 - `src/chatParticipant.ts` — `@session-control` chat participant handler (resume logic)
-- `src/gitIntegration.ts` — Git extension API wrapper (branch, SHA, commit listener)
+- `src/gitIntegration.ts` — Git extension API wrapper (branch, SHA, workspace/repository matching)
 - `src/sessionStore.ts` — CRUD operations on saved session files in `.chat/`
 - `src/types.ts` — TypeScript interfaces for `ChatSession`, `SavedTurn`, etc.
 - `src/utils.ts` — Slugify, timestamp formatting, fuzzy matching
@@ -638,7 +655,7 @@ Run inside VS Code extension host via `@vscode/test-electron`.
 2. **Integration test** — Save a session, verify JSON structure, load it back, verify round-trip fidelity
 3. **Manual test: Save flow** — Open Copilot Chat, have a conversation, run "Session Control: Save Current Chat Session", verify `.chat/` folder contains valid JSON with correct git metadata
 4. **Manual test: Resume flow** — Type `@session-control /resume <saved-session>`, verify the conversation context is loaded, ask a follow-up question referencing earlier context, verify LLM responds coherently
-5. **Manual test: Auto-save** — Enable `session-control.autoSaveOnCommit`, make a commit, verify a new session JSON appears in `.chat/`
+5. **Manual test: Project auto-save** — Enable `session-control.autoSaveOnChatResponse`, keep all default `session-control.autoSave.providers`, update a project-owned session in each supported local source, and verify each logical session is upserted in the workspace's configured `.chat/` directory
 6. **Manual test: Git diff** — Save a session, `git diff` and verify the JSON/Markdown is readable
 7. **Snyk scan** — Run `snyk_code_scan` on all source files per project rules
 8. **Extension packaging** — `vsce package` succeeds, `.vsix` installs cleanly
@@ -653,15 +670,15 @@ Run inside VS Code extension host via `@vscode/test-electron`.
 - **Internal storage dependency:** Reading Copilot's internal session files is fragile — format may change across VS Code versions. Mitigated by version detection and graceful error handling. This is the only way to access full Copilot session history (public API only exposes history for your own participant).
 - **Resume via chat participant, not native restore:** No public API exists to restore a native Copilot session. The `@session-control` participant approach is stable and uses public APIs.
 - **JSON as primary format:** Chosen because the user wants resume capability. Markdown is embedded in the JSON for human readability in diffs.
-- **Open source (MIT):** The extension is developed and published as an open source project. Contributions welcome via GitHub PRs. Published to the VS Code Marketplace and Open VSX Registry.
+- **Open source (MIT), single customer install:** The extension is developed and published as an open source project. Contributions welcome via GitHub PRs. One customer-facing `session-control` extension is published to the VS Code Marketplace and Open VSX Registry; private Pro or license-layer capability loads through that install rather than shipping as a separate customer extension.
 - **Personal-use origin, community-maintained:** Started as a personal tool. No complex collaboration features like conflict resolution or merge strategies for `.chat/` files — sessions are append-only snapshots. Community contributions may expand scope over time.
-- **Scope boundary — excluded:** No support for non-Copilot chats, no web UI, no cross-repo session syncing, no chat search/indexing.
+- **Scope boundary:** Supported local sources are VS Code Copilot Chat, GitHub Copilot CLI, Codex CLI, Claude Code, and Cursor CLI. Excluded are web-only chat sources without a supported project-owned transcript, a standalone web UI, cross-repo session syncing, and chat search/indexing.
 
 ---
 
 ## Risks & Mitigations
 
-1. **Copilot internal format changes** — Implement a format version detector in `sessionReader.ts`. If unknown format, show a clear error message with the VS Code version and link to file an issue. Consider contributing a feature request to VS Code for a public chat export API.
+1. **Provider storage format changes** — Keep source-specific readers and format checks isolated. For VS Code Copilot, detect unknown formats and show a clear error with the VS Code version and an issue link; for CLI sources, fail closed on unreadable or ambiguous project metadata while other sources continue.
 2. **Large session files in repo** — Fully configurable via `save.maxFileSize` (split/truncate/warn), `save.stripToolOutput` (remove verbose tool output), and `save.maxSavedSessions` + `save.pruneAction` (archive/delete oldest). Defaults are conservative (1 MB max, no stripping, unlimited sessions).
 3. **Chat participant context window limits on resume** — Fully configurable via `resume.maxTurns`, `resume.maxContextChars`, and `resume.overflowStrategy` (summarize/truncate/recent-only). Defaults target ~80K chars / 50 turns with summarization as the fallback.
 4. **Open source maintenance burden** — Mitigated by clear contribution guidelines (`CONTRIBUTING.md`), issue templates, PR templates, and automated CI. Semantic versioning and a changelog keep releases predictable. The `CODEOWNERS` file can gate merges on maintainer review.

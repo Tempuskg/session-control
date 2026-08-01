@@ -24,7 +24,8 @@ import {
 	SessionExplorerSessionItem,
 	SessionExplorerWorkspaceItem,
 } from '../../src/sessionExplorer';
-import { AnalysisIndex, AnalysisIndexEntry, HarvestIndex, HarvestIndexEntry, SessionMeta } from '../../src/types';
+import { createSessionStore } from '../../src/sessionStore';
+import { AnalysisIndex, AnalysisIndexEntry, ChatSession, HarvestIndex, HarvestIndexEntry, SessionMeta } from '../../src/types';
 
 interface CommandContribution {
 	command: string;
@@ -109,6 +110,38 @@ function createHarvestIndex(sessions: HarvestIndexEntry[]): HarvestIndex {
 	};
 }
 
+function createStoredSession(title: string, savedAt: string): ChatSession {
+	return {
+		version: 1,
+		id: 'auto-save-session',
+		title,
+		savedAt,
+		git: null,
+		vscodeVersion: '1.115.0',
+		totalTurns: 1,
+		part: null,
+		totalParts: null,
+		previousPartFile: null,
+		nextPartFile: null,
+		turns: [
+			{
+				type: 'response',
+				participant: 'copilot',
+				content: 'Saved response',
+				toolCalls: [],
+				timestamp: savedAt,
+			},
+		],
+		markdownSummary: '# Chat: Auto-Saved Session',
+		origin: {
+			saveKind: 'auto',
+			sourceId: 'copilot-vscode',
+			sourceSessionId: 'source-session',
+			sourceRevision: 'revision-1',
+		},
+	};
+}
+
 function createGroup(
 	workspaceFolder: vscode.WorkspaceFolder,
 	sessions: SessionMeta[],
@@ -179,6 +212,43 @@ suite('session explorer', () => {
 		assert.equal(childNodes.length, 1);
 		assert.equal(childNodes[0] instanceof SessionExplorerSessionItem, true);
 		assert.equal(childNodes[0]?.label, 'Alpha Session');
+	});
+
+	test('refresh makes a newly auto-saved filesystem session visible', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-explorer-auto-save-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const workspaceFolder = createWorkspaceFolder(tempRoot, 'auto-save-workspace', 0);
+		const store = createSessionStore();
+		const provider = new SessionExplorerProvider({
+			getWorkspaceFolders: () => [workspaceFolder],
+			getStoragePath: () => storageDirectory,
+			listSessions: (directory) => store.listSessions(directory),
+		});
+		let refreshCount = 0;
+		const subscription = provider.onDidChangeTreeData(() => {
+			refreshCount += 1;
+		});
+
+		try {
+			assert.deepEqual(await provider.getChildren(), []);
+
+			await store.writeSession(
+				storageDirectory,
+				createStoredSession('Visible Auto-Save', '2026-07-30T12:00:00.000Z'),
+				{ includeTimestampInFileName: false },
+			);
+			provider.refresh();
+
+			const rootNodes = await provider.getChildren();
+			assert.equal(refreshCount, 1);
+			assert.equal(rootNodes.length, 1);
+			const sessionNodes = await provider.getChildren(rootNodes[0] as SessionExplorerWorkspaceItem);
+			assert.equal(sessionNodes.length, 1);
+			assert.equal(sessionNodes[0]?.label, 'Visible Auto-Save');
+		} finally {
+			subscription.dispose();
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
 	});
 
 	test('sortSessionExplorerSessions supports date and name directions without mutating sessions', () => {

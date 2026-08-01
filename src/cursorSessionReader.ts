@@ -10,10 +10,12 @@ import {
 	UnknownFormatError,
 } from './sessionReader';
 import {
+	createCursorCliSessionReader,
 	getDefaultCursorProjectsPath,
-	readCursorAgentTranscriptSessions,
-} from './cursorAgentTranscriptReader';
+} from './cursorCliSessionReader';
 import { SourceChatSession } from './types';
+
+export const CURSOR_IDE_LEGACY_SOURCE_ID = 'cursor-vscode-legacy' as const;
 
 interface StorageUriLike {
 	fsPath: string;
@@ -80,7 +82,7 @@ export function getDefaultCursorUserDataPath(): string {
 	return path.join(os.homedir(), '.config', 'Cursor', 'User');
 }
 
-export { getDefaultCursorProjectsPath } from './cursorAgentTranscriptReader';
+export { getDefaultCursorProjectsPath } from './cursorCliSessionReader';
 
 export function deriveCursorWorkspaceStorageRoot(cursorUserDataPath: string): string {
 	return path.join(cursorUserDataPath, 'workspaceStorage');
@@ -256,37 +258,55 @@ export function createCursorSessionReader(overrides: Partial<CursorSessionReader
 		options: CursorSessionReaderOptions,
 		context?: ExtensionContextLike,
 	): Promise<CursorSession[]>;
+	readCursorIdeLegacySessions(
+		workspaceFolder: vscode.WorkspaceFolder,
+		cursorUserDataPath: string,
+		context?: ExtensionContextLike,
+	): Promise<CursorSession[]>;
 } {
 	const deps = {
 		...createDefaultDeps(),
 		...overrides,
 	};
+	const cursorCliSessionReader = createCursorCliSessionReader({
+		readFile: deps.readFile,
+		logWarning: deps.logWarning,
+	});
+
+	const readCursorIdeLegacySessions = async (
+		workspaceFolder: vscode.WorkspaceFolder,
+		cursorUserDataPath: string,
+		context?: ExtensionContextLike,
+	): Promise<CursorSession[]> => {
+		const sessionsDirectory = await resolveCursorChatSessionsDirectory(
+			workspaceFolder.uri.fsPath,
+			cursorUserDataPath,
+			context,
+			deps,
+		);
+
+		return sessionsDirectory
+			? readWorkspaceChatSessions(sessionsDirectory, deps)
+			: [];
+	};
 
 	return {
+		readCursorIdeLegacySessions,
 		async readCursorSessions(
 			workspaceFolder: vscode.WorkspaceFolder,
 			options: CursorSessionReaderOptions,
 			context?: ExtensionContextLike,
 		): Promise<CursorSession[]> {
-			const agentSessions = await readCursorAgentTranscriptSessions(
+			const cursorCliSessions = await cursorCliSessionReader.readCursorCliSessions(
 				workspaceFolder.uri.fsPath,
 				options.cursorProjectsPath,
-				deps.readFile,
-				deps.logWarning,
 			);
-
-			const sessionsDirectory = await resolveCursorChatSessionsDirectory(
-				workspaceFolder.uri.fsPath,
+			const cursorIdeLegacySessions = await readCursorIdeLegacySessions(
+				workspaceFolder,
 				options.cursorUserDataPath,
 				context,
-				deps,
 			);
-
-			const workspaceChatSessions = sessionsDirectory
-				? await readWorkspaceChatSessions(sessionsDirectory, deps)
-				: [];
-
-			const sessions = [...agentSessions, ...workspaceChatSessions];
+			const sessions = [...cursorCliSessions, ...cursorIdeLegacySessions];
 
 			if (!sessions.length) {
 				await deps.showInformationMessage(

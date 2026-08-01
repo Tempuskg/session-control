@@ -1,5 +1,12 @@
 import * as crypto from 'node:crypto';
-import { ChatSession, GitContext, SavedTurn, SourceChatSession, ToolCall } from './types';
+import {
+	ChatSession,
+	GitContext,
+	SavedTurn,
+	SessionOrigin,
+	SourceChatSession,
+	ToolCall,
+} from './types';
 import { formatTimestamp, slugify } from './utils';
 
 const DEFAULT_SUMMARY_MAX_TURNS = 50;
@@ -10,6 +17,7 @@ export interface SessionWriterOptions {
 	git?: GitContext | null;
 	savedAt?: string;
 	vscodeVersion?: string;
+	origin?: SessionOrigin;
 	summaryMaxTurns?: number;
 	summaryMaxChars?: number;
 }
@@ -348,6 +356,10 @@ export function createChatSession(
 		turns: source.turns,
 		markdownSummary: '',
 	};
+
+	if (options.origin !== undefined) {
+		chatSession.origin = options.origin;
+	}
 
 	chatSession.markdownSummary = createMarkdownSummary(chatSession, options);
 	return chatSession;

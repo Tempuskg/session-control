@@ -1,11 +1,11 @@
 ---
 id: card-mr8ca4z8-1
 title: add a datetime column to sidebar saved sessions
-column: col-mr0qf1g9-1
-position: 1000
+column: col-mqycuy1w-4
+position: -5000
 assignee: { kind: human }
 createdAt: 1783289090996
-updatedAt: 1785324768208
+updatedAt: 1785379084959
 ---
 
 ## Description

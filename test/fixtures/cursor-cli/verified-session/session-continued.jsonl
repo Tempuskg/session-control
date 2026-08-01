@@ -1,0 +1,5 @@
+{"role":"user","message":{"content":[{"type":"text","text":"<user_query>\n<sanitized initial request>\n</user_query>"}]}}
+{"role":"assistant","message":{"content":[{"type":"tool_use","name":"ReadFile","input":{"path":"<sanitized-project>/README.md"},"bubbleId":"bubble-0001"}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"<sanitized initial response>","bubbleId":"bubble-0002"}]}}
+{"role":"user","message":{"content":[{"type":"text","text":"<user_query>\n<sanitized follow-up request>\n</user_query>"}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"<sanitized continued response>","bubbleId":"bubble-0003"}]}}

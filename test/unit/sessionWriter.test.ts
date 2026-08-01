@@ -59,6 +59,30 @@ suite('sessionWriter', () => {
 		assert.equal(result.markdownSummary.includes('# Chat: Fix login null pointer issue now please'), true);
 	});
 
+	test('records origin metadata only when it is supplied', () => {
+		const source = createSourceSession(1);
+		const legacyResult = createChatSession(source, {
+			savedAt: '2026-04-12T12:00:00.000Z',
+		});
+		const autoSaveResult = createChatSession(source, {
+			savedAt: '2026-04-12T12:00:00.000Z',
+			origin: {
+				saveKind: 'auto',
+				sourceId: 'copilot-vscode',
+				sourceSessionId: source.id,
+				sourceRevision: 'sha256:abc123',
+			},
+		});
+
+		assert.equal('origin' in legacyResult, false);
+		assert.deepEqual(autoSaveResult.origin, {
+			saveKind: 'auto',
+			sourceId: 'copilot-vscode',
+			sourceSessionId: 'session-source',
+			sourceRevision: 'sha256:abc123',
+		});
+	});
+
 	test('uses explicit title override when provided', () => {
 		const source = createSourceSession(1);
 		const result = createChatSession(source, {
@@ -244,7 +268,7 @@ suite('sessionWriter', () => {
 		assert.equal(Boolean(result.warning), true);
 	});
 
-	test('save bloat controls split strategy creates linked parts', () => {
+	test('save bloat controls split strategy creates linked auto-owned parts', () => {
 		const source = createSourceSession(12);
 		for (const turn of source.turns) {
 			if (turn.type === 'request') {
@@ -254,9 +278,16 @@ suite('sessionWriter', () => {
 			}
 		}
 
+		const origin = {
+			saveKind: 'auto' as const,
+			sourceId: 'copilot-vscode',
+			sourceSessionId: source.id,
+			sourceRevision: 'sha256:split-revision',
+		};
 		const session = createChatSession(source, {
 			title: 'Large Session',
 			savedAt: '2026-04-12T12:00:00.000Z',
+			origin,
 		});
 		const result = applySaveBloatControls(session, {
 			maxFileSizeBytes: 1500,
@@ -268,6 +299,9 @@ suite('sessionWriter', () => {
 		assert.equal(result.sessions.every((part) => part.totalParts === result.sessions.length), true);
 		assert.equal(result.sessions[0]?.nextPartFile !== null, true);
 		assert.equal(result.sessions[result.sessions.length - 1]?.previousPartFile !== null, true);
+		for (const part of result.sessions) {
+			assert.deepEqual(part.origin, origin);
+		}
 		assert.equal(result.warning?.includes('split into'), true);
 	});
 });

@@ -34,6 +34,22 @@ export interface SessionPruneResult {
 	deleted: number;
 }
 
+export interface AutoSaveSessionFile {
+	fileName: string;
+	savedAt: string;
+	sourceRevision: string;
+}
+
+export interface AutoSaveSessionIdentity {
+	sourceId: string;
+	sourceSessionId: string;
+}
+
+interface SessionWritePlanEntry {
+	fileName: string;
+	session: ChatSession;
+}
+
 function createDefaultDeps(): SessionStoreDeps {
 	return {
 		mkdir: async (directoryPath: string) => {
@@ -79,7 +95,9 @@ function toSessionMeta(fileName: string, session: ChatSession): SessionMeta {
 }
 
 export function createSessionFileName(session: Pick<ChatSession, 'savedAt' | 'title'>): string {
-	return createSessionFileNameWithOptions(session, { includeTimestampInFileName: true });
+	return createSessionFileNameWithOptions(session, {
+		includeTimestampInFileName: true,
+	});
 }
 
 function createSessionFileNameWithOptions(
@@ -142,6 +160,31 @@ function resolveUniqueSessionFileName(
 	}
 }
 
+function createSessionWritePlan(
+	sessions: readonly ChatSession[],
+	options: SessionFileNameOptions,
+	existingFiles: readonly string[],
+): SessionWritePlanEntry[] {
+	const reservedFileNames = new Set(existingFiles.map((fileName) => fileName.toLowerCase()));
+	const fileNames = sessions.map((session) => {
+		const fileName = resolveUniqueSessionFileName(session, options, reservedFileNames);
+		reservedFileNames.add(fileName.toLowerCase());
+		return fileName;
+	});
+
+	return sessions.map((session, index) => ({
+		fileName: fileNames[index] as string,
+		session:
+			sessions.length > 1
+				? {
+						...session,
+						previousPartFile: index > 0 ? (fileNames[index - 1] ?? null) : null,
+						nextPartFile: index + 1 < fileNames.length ? (fileNames[index + 1] ?? null) : null,
+					}
+				: session,
+	}));
+}
+
 export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 	const deps = {
 		...createDefaultDeps(),
@@ -195,32 +238,91 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 
 			throw error;
 		});
-		const reservedFileNames = new Set(existingFiles.map((fileName) => fileName.toLowerCase()));
-		const fileNames = sessions.map((session) => {
-			const fileName = resolveUniqueSessionFileName(session, options, reservedFileNames);
-			reservedFileNames.add(fileName.toLowerCase());
-			return fileName;
-		});
+		const writePlan = createSessionWritePlan(sessions, options, existingFiles);
+		for (const entry of writePlan) {
+			await writeSessionToFile(storageDirectory, entry.fileName, entry.session);
+		}
 
-		const sessionsToWrite = sessions.length > 1
-			? sessions.map((session, index) => ({
-				...session,
-				previousPartFile: index > 0 ? (fileNames[index - 1] ?? null) : null,
-				nextPartFile: index + 1 < fileNames.length ? (fileNames[index + 1] ?? null) : null,
-			}))
-			: [...sessions];
+		return writePlan.map((entry) => entry.fileName);
+	}
 
-		for (let index = 0; index < sessionsToWrite.length; index += 1) {
-			const session = sessionsToWrite[index];
-			const fileName = fileNames[index];
-			if (!session || !fileName) {
+	async function upsertAutoSaveSessions(
+		storageDirectory: string,
+		sessions: readonly ChatSession[],
+		identity: AutoSaveSessionIdentity,
+		options: SessionFileNameOptions = { includeTimestampInFileName: true },
+	): Promise<string[]> {
+		if (sessions.length === 0) {
+			return [];
+		}
+
+		const ownsSession = (session: ChatSession): boolean =>
+			session.origin?.saveKind === 'auto' &&
+			session.origin.sourceId === identity.sourceId &&
+			session.origin.sourceSessionId === identity.sourceSessionId;
+		if (sessions.some((session) => !ownsSession(session))) {
+			throw new Error('Auto-save upsert requires every new part to have the matching automatic-save origin.');
+		}
+
+		const previousFiles = await findAutoSaveSessionFiles(storageDirectory, identity.sourceId, identity.sourceSessionId);
+		await ensureStorageDirectory(storageDirectory);
+		const existingFiles = await deps.readdir(storageDirectory);
+		const writePlan = createSessionWritePlan(sessions, options, existingFiles);
+		const stagedWrites = writePlan.map((entry) => ({
+			...entry,
+			filePath: path.join(storageDirectory, entry.fileName),
+			tempPath: path.join(storageDirectory, createTempName(entry.fileName)),
+		}));
+		const publishedPaths: string[] = [];
+
+		try {
+			for (const entry of stagedWrites) {
+				await deps.writeFile(entry.tempPath, JSON.stringify(entry.session, null, 2));
+			}
+
+			for (const entry of stagedWrites) {
+				await deps.rename(entry.tempPath, entry.filePath);
+				publishedPaths.push(entry.filePath);
+			}
+		} catch (error) {
+			for (const entry of stagedWrites) {
+				await deps.unlink(entry.tempPath).catch(() => undefined);
+			}
+			for (const publishedPath of publishedPaths) {
+				await deps.unlink(publishedPath).catch((cleanupError: unknown) => {
+					const reason = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+					deps.logWarning(`Could not roll back staged auto-save file ${publishedPath}: ${reason}`);
+				});
+			}
+			throw error;
+		}
+
+		const newFileNames = new Set(writePlan.map((entry) => entry.fileName.toLowerCase()));
+		for (const previousFile of previousFiles) {
+			if (newFileNames.has(previousFile.fileName.toLowerCase())) {
 				continue;
 			}
 
-			await writeSessionToFile(storageDirectory, fileName, session);
+			let previousSession: ChatSession;
+			try {
+				previousSession = await readSession(storageDirectory, previousFile.fileName);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				if (/no such file|cannot find|enoent/i.test(message)) {
+					continue;
+				}
+
+				throw error;
+			}
+
+			if (!ownsSession(previousSession)) {
+				continue;
+			}
+
+			await deps.unlink(path.join(storageDirectory, previousFile.fileName));
 		}
 
-		return fileNames;
+		return writePlan.map((entry) => entry.fileName);
 	}
 
 	async function readSession(storageDirectory: string, fileName: string): Promise<ChatSession> {
@@ -267,6 +369,49 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 			.sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt));
 	}
 
+	async function findAutoSaveSessionFiles(
+		storageDirectory: string,
+		sourceId: string,
+		sourceSessionId: string,
+	): Promise<AutoSaveSessionFile[]> {
+		let files: string[];
+		try {
+			files = await deps.readdir(storageDirectory);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			if (/no such file|cannot find|enoent/i.test(message)) {
+				return [];
+			}
+
+			throw error;
+		}
+
+		const matches: AutoSaveSessionFile[] = [];
+		for (const fileName of files.filter((file) => file.toLowerCase().endsWith('.json'))) {
+			try {
+				const session = await readSession(storageDirectory, fileName);
+				const origin = session.origin;
+				if (origin?.saveKind !== 'auto' || origin.sourceId !== sourceId || origin.sourceSessionId !== sourceSessionId) {
+					continue;
+				}
+
+				matches.push({
+					fileName,
+					savedAt: session.savedAt,
+					sourceRevision: origin.sourceRevision,
+				});
+			} catch (error) {
+				const reason = error instanceof Error ? error.message : String(error);
+				deps.logWarning(`Skipped session file ${fileName}: ${reason}`);
+			}
+		}
+
+		return matches.sort((left, right) => {
+			const savedAtDifference = Date.parse(right.savedAt) - Date.parse(left.savedAt);
+			return savedAtDifference || left.fileName.localeCompare(right.fileName);
+		});
+	}
+
 	async function findOrphanedPartFiles(storageDirectory: string): Promise<OrphanedPartFile[]> {
 		let files: string[];
 		try {
@@ -285,7 +430,10 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 		const parsed: Array<{ fileName: string; session: ChatSession }> = [];
 		for (const fileName of jsonFiles) {
 			try {
-				parsed.push({ fileName, session: await readSession(storageDirectory, fileName) });
+				parsed.push({
+					fileName,
+					session: await readSession(storageDirectory, fileName),
+				});
 			} catch {
 				// Unreadable files are reported by listSessions; they cannot be
 				// classified as orphaned parts without valid link metadata.
@@ -302,16 +450,19 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 
 		const brokenFileNames = new Set(broken.map(({ fileName }) => fileName));
 		return broken.map(({ fileName, session }) => {
-			const danglingLink = [session.previousPartFile, session.nextPartFile]
-				.find((link) => link && !onDisk.has(link.toLowerCase())) ?? '';
+			const danglingLink =
+				[session.previousPartFile, session.nextPartFile].find((link) => link && !onDisk.has(link.toLowerCase())) ?? '';
 
 			// Stale auto-save iterations are superseded by a newer, intact copy
 			// of the same session; a broken file without one may hold the only
 			// remaining turns and must not be removed automatically.
-			const superseded = parsed.some((candidate) => candidate.fileName !== fileName
-				&& candidate.session.id === session.id
-				&& !brokenFileNames.has(candidate.fileName)
-				&& Date.parse(candidate.session.savedAt) >= Date.parse(session.savedAt));
+			const superseded = parsed.some(
+				(candidate) =>
+					candidate.fileName !== fileName &&
+					candidate.session.id === session.id &&
+					!brokenFileNames.has(candidate.fileName) &&
+					Date.parse(candidate.session.savedAt) >= Date.parse(session.savedAt),
+			);
 
 			return {
 				fileName,
@@ -376,10 +527,7 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 			await deps.mkdir(archiveDirectory);
 
 			for (const session of toPrune) {
-				await deps.rename(
-					path.join(storageDirectory, session.fileName),
-					path.join(archiveDirectory, session.fileName),
-				);
+				await deps.rename(path.join(storageDirectory, session.fileName), path.join(archiveDirectory, session.fileName));
 			}
 
 			return { archived: toPrune.length, deleted: 0 };
@@ -396,8 +544,10 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 		ensureStorageDirectory,
 		writeSession,
 		writeSessions,
+		upsertAutoSaveSessions,
 		readSession,
 		listSessions,
+		findAutoSaveSessionFiles,
 		findOrphanedPartFiles,
 		deleteSession,
 		pruneSessions,

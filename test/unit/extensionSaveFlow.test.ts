@@ -180,6 +180,68 @@ suite('extension save flow', () => {
 		}
 	});
 
+	test('runSaveSourceSessionFlow prunes only after the upsert write succeeds', async () => {
+		const workspaceFolder = {
+			uri: vscode.Uri.file('E:/chat-commit'),
+			name: 'chat-commit',
+			index: 0,
+		} as vscode.WorkspaceFolder;
+		const successfulEvents: string[] = [];
+
+		const saved = await runSaveSourceSessionFlow(
+			'copilot',
+			[createCopilotSession()],
+			workspaceFolder,
+			'E:/chat-commit/.chat',
+			{
+				selectSession: async (sessions) => sessions[0],
+				promptTitle: async (title) => title,
+				getGitContext: async () => null,
+				getIncludeInGitignore: () => false,
+				getPruneConfiguration: () => ({
+					maxSavedSessions: 1,
+					pruneAction: 'delete',
+				}),
+				writeSession: async () => {
+					successfulEvents.push('upsert');
+					return ['current-auto-save.json'];
+				},
+				pruneSessions: async () => {
+					successfulEvents.push('prune');
+					return { archived: 0, deleted: 0 };
+				},
+				showInformationMessage: async () => undefined,
+			},
+		);
+
+		assert.deepEqual(saved, ['current-auto-save.json']);
+		assert.deepEqual(successfulEvents, ['upsert', 'prune']);
+
+		let pruneCalledAfterFailure = false;
+		await assert.rejects(
+			runSaveSourceSessionFlow('copilot', [createCopilotSession()], workspaceFolder, 'E:/chat-commit/.chat', {
+				selectSession: async (sessions) => sessions[0],
+				promptTitle: async (title) => title,
+				getGitContext: async () => null,
+				getIncludeInGitignore: () => false,
+				getPruneConfiguration: () => ({
+					maxSavedSessions: 1,
+					pruneAction: 'delete',
+				}),
+				writeSession: async () => {
+					throw new Error('simulated upsert failure');
+				},
+				pruneSessions: async () => {
+					pruneCalledAfterFailure = true;
+					return { archived: 0, deleted: 0 };
+				},
+				showInformationMessage: async () => undefined,
+			}),
+			/simulated upsert failure/,
+		);
+		assert.equal(pruneCalledAfterFailure, false);
+	});
+
 	test('runSaveSessionFlow completes save and pruning without waiting on notification dismissal', async () => {
 		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-extension-save-flow-notify-'));
 		const workspaceRoot = path.join(tempRoot, 'workspace');

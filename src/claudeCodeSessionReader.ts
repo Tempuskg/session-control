@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
@@ -6,12 +7,14 @@ import { SourceChatSession, SavedTurn, ToolCall } from './types';
 interface ClaudeCodeSessionReaderDeps {
 	listFiles(directoryPath: string): Promise<string[]>;
 	readFile(filePath: string): Promise<string>;
+	hash(value: string): string;
 	showInformationMessage(message: string): Thenable<unknown>;
 	logWarning(message: string): void;
 }
 
 export interface ClaudeCodeSession extends SourceChatSession {
 	provider: 'claude-code';
+	sourceRevision: string;
 }
 
 interface PendingToolCall extends ToolCall {
@@ -153,7 +156,11 @@ function attachToolResult(pendingToolCalls: PendingToolCall[], block: Record<str
 	pendingToolCalls.push(toolCall);
 }
 
-function normalizeClaudeCodeRecords(records: unknown[], sourceFile: string): ClaudeCodeSession | null {
+function normalizeClaudeCodeRecords(
+	records: unknown[],
+	sourceFile: string,
+	sourceRevision: string,
+): ClaudeCodeSession | null {
 	const turns: SavedTurn[] = [];
 	const pendingToolCalls: PendingToolCall[] = [];
 	let sessionId = sourceFile;
@@ -268,11 +275,24 @@ function normalizeClaudeCodeRecords(records: unknown[], sourceFile: string): Cla
 		lastMessageDate: lastTurn ? lastTurn.timestamp : toIsoTimestamp(sessionTimestamp),
 		turns,
 		sourceFile,
+		sourceRevision,
 		...(sessionWorkingDirectory ? { cwd: sessionWorkingDirectory } : {}),
 	};
 }
 
-function normalizeClaudeCodeJsonl(content: string, sourceFile: string): ClaudeCodeSession | null {
+function createRevisionInput(content: string): string {
+	return content
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.join('\n');
+}
+
+function normalizeClaudeCodeJsonl(
+	content: string,
+	sourceFile: string,
+	hash: (value: string) => string,
+): ClaudeCodeSession | null {
 	const lines = content
 		.split(/\r?\n/)
 		.map((line) => line.trim())
@@ -290,7 +310,11 @@ function normalizeClaudeCodeJsonl(content: string, sourceFile: string): ClaudeCo
 		}
 	});
 
-	return normalizeClaudeCodeRecords(records, sourceFile);
+	return normalizeClaudeCodeRecords(
+		records,
+		sourceFile,
+		`sha256:${hash(createRevisionInput(content))}`,
+	);
 }
 
 async function listFilesDirect(directoryPath: string): Promise<string[]> {
@@ -308,6 +332,7 @@ function createDefaultDeps(): ClaudeCodeSessionReaderDeps {
 	return {
 		listFiles: listFilesDirect,
 		readFile: async (filePath: string) => fs.readFile(filePath, 'utf8'),
+		hash: (value) => createHash('sha256').update(value).digest('hex'),
 		showInformationMessage: async (message: string) => vscode.window.showInformationMessage(message),
 		logWarning: (message: string) => {
 			console.warn(message);
@@ -367,7 +392,7 @@ export function createClaudeCodeSessionReader(overrides: Partial<ClaudeCodeSessi
 						continue;
 					}
 
-					const session = normalizeClaudeCodeJsonl(content, sourceFile);
+					const session = normalizeClaudeCodeJsonl(content, sourceFile, deps.hash);
 					if (!session) {
 						deps.logWarning(`Skipped unreadable Claude Code session file: ${path.basename(filePath)}`);
 						continue;

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
@@ -6,12 +7,14 @@ import { SourceChatSession, SavedTurn, ToolCall } from './types';
 interface CodexSessionReaderDeps {
 	listFiles(directoryPath: string): Promise<string[]>;
 	readFile(filePath: string): Promise<string>;
+	hash(value: string): string;
 	showInformationMessage(message: string): Thenable<unknown>;
 	logWarning(message: string): void;
 }
 
 export interface CodexSession extends SourceChatSession {
 	provider: 'codex';
+	sourceRevision: string;
 }
 
 interface PendingToolCall extends ToolCall {
@@ -129,7 +132,11 @@ function flushPendingToolCalls(pendingToolCalls: PendingToolCall[]): ToolCall[] 
 	return toolCalls;
 }
 
-function normalizeCodexRecords(records: unknown[], sourceFile: string): CodexSession | null {
+function normalizeCodexRecords(
+	records: unknown[],
+	sourceFile: string,
+	sourceRevision: string,
+): CodexSession | null {
 	const turns: SavedTurn[] = [];
 	const pendingToolCalls: PendingToolCall[] = [];
 	let sessionId = sourceFile;
@@ -264,11 +271,24 @@ function normalizeCodexRecords(records: unknown[], sourceFile: string): CodexSes
 		lastMessageDate: lastTurn ? lastTurn.timestamp : toIsoTimestamp(sessionTimestamp),
 		turns,
 		sourceFile,
+		sourceRevision,
 		...(sessionWorkingDirectory ? { cwd: sessionWorkingDirectory } : {}),
 	};
 }
 
-function normalizeCodexJsonl(content: string, sourceFile: string): CodexSession | null {
+function createRevisionInput(content: string): string {
+	return content
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.join('\n');
+}
+
+function normalizeCodexJsonl(
+	content: string,
+	sourceFile: string,
+	hash: (value: string) => string,
+): CodexSession | null {
 	const lines = content
 		.split(/\r?\n/)
 		.map((line) => line.trim())
@@ -286,10 +306,18 @@ function normalizeCodexJsonl(content: string, sourceFile: string): CodexSession 
 		}
 	});
 
-	return normalizeCodexRecords(records, sourceFile);
+	return normalizeCodexRecords(
+		records,
+		sourceFile,
+		`sha256:${hash(createRevisionInput(content))}`,
+	);
 }
 
-function normalizeCodexJson(content: string, sourceFile: string): CodexSession | null {
+function normalizeCodexJson(
+	content: string,
+	sourceFile: string,
+	hash: (value: string) => string,
+): CodexSession | null {
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(content);
@@ -298,7 +326,11 @@ function normalizeCodexJson(content: string, sourceFile: string): CodexSession |
 	}
 
 	const records = Array.isArray(parsed) ? parsed : [parsed];
-	return normalizeCodexRecords(records, sourceFile);
+	return normalizeCodexRecords(
+		records,
+		sourceFile,
+		`sha256:${hash(createRevisionInput(content))}`,
+	);
 }
 
 async function listFilesRecursive(directoryPath: string): Promise<string[]> {
@@ -324,6 +356,7 @@ function createDefaultDeps(): CodexSessionReaderDeps {
 	return {
 		listFiles: listFilesRecursive,
 		readFile: async (filePath: string) => fs.readFile(filePath, 'utf8'),
+		hash: (value) => createHash('sha256').update(value).digest('hex'),
 		showInformationMessage: async (message: string) => vscode.window.showInformationMessage(message),
 		logWarning: (message: string) => {
 			console.warn(message);
@@ -372,8 +405,8 @@ export function createCodexSessionReader(overrides: Partial<CodexSessionReaderDe
 					}
 
 					const session = filePath.toLowerCase().endsWith('.jsonl')
-						? normalizeCodexJsonl(content, sourceFile)
-						: normalizeCodexJson(content, sourceFile);
+						? normalizeCodexJsonl(content, sourceFile, deps.hash)
+						: normalizeCodexJson(content, sourceFile, deps.hash);
 					if (!session) {
 						deps.logWarning(`Skipped unreadable Codex session file: ${path.basename(filePath)}`);
 						continue;

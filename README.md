@@ -63,22 +63,26 @@ VS-Code-compatible editors via the Open VSX Registry.
   palette.
 - **Resume from viewer** — When viewing a saved session, click the Resume icon in the editor
   title bar to resume it directly in chat.
-- **Auto-save on chat response** — Optionally auto-save Copilot chat responses, Cursor Agent
-  transcript updates, Codex transcript updates, or Claude Code transcript updates after every
-  response.
+- **Auto-save project chats** — Optionally monitor project-matched VS Code Copilot Chat,
+  GitHub Copilot CLI, Cursor, Codex, or Claude Code transcript updates and save settled
+  responses to the workspace that owns them.
 - **Lives in source control** — Sessions are plain JSON files tracked alongside your code,
   reviewable in diffs and PRs.
 - **Bloat controls** — Configurable file size limits, session splitting, tool output
   stripping, and automatic pruning of old sessions.
 
-Session Control can save Copilot, Cursor, Codex, and Claude Code sessions. When the save
-provider setting is unset, it auto-detects Cursor, Codex, and Claude Code from the current host
-app. Outside Cursor, auto-save watches Copilot, Codex, and Claude Code sources by default.
+Session Control can save Copilot, Cursor, Codex, and Claude Code sessions. Manual save flows
+prompt for a provider or use `session-control.save.provider` where a prompt is unavailable.
+Auto-save has its own `session-control.autoSave.providers` setting and watches all supported
+providers by default once it is enabled.
 
 ## Requirements
 
 - VS Code `^1.93.0`
-- GitHub Copilot extension installed and signed in if you want to save Copilot sessions
+- GitHub Copilot extension installed and signed in if you want to save VS Code Copilot Chat
+  sessions
+- GitHub Copilot CLI installed and signed in if you want to auto-save its local session event
+  logs
 - Cursor installed locally if you want to import or auto-save Cursor Agent transcript sessions
 - Codex installed locally if you want to import or auto-save Codex sessions, or create repo-scoped Codex skills
 - Claude Code installed locally if you want to import or auto-save Claude Code sessions, or create repo-scoped Claude Code skills
@@ -104,7 +108,9 @@ Session Control: Save Session...
 
 Session Control prompts for the provider so what gets saved is always your explicit choice rather than a guess from the active window. Choose **Copilot** to read VS Code chat storage, **Codex** to import local transcripts from `CODEX_HOME` or `~/.codex`, or **Claude Code** to import JSONL transcripts from `CLAUDE_CONFIG_DIR` or `~/.claude`. After picking a provider, choose the session to save. The JSON file is written to `.chat/` in your workspace root.
 
-Cursor support is automatic when the extension is running inside Cursor. In that case, Session Control reads Agent transcript JSONL files from `~/.cursor/projects/<project-slug>/agent-transcripts` and falls back to legacy Cursor workspace `chatSessions` JSONL files when possible.
+Cursor support is automatic when the extension is running inside Cursor. Session Control keeps
+the experimental Cursor CLI project transcripts and legacy Cursor IDE workspace `chatSessions`
+input as separate sources; the CLI contract and its verified versions are documented below.
 
 Claude Code transcripts are read from:
 
@@ -114,20 +120,152 @@ Claude Code transcripts are read from:
 
 Set `session-control.claudeCode.homePath` if your Claude Code config directory lives somewhere else. Session Control derives `<encoded-workspace-path>` the same way Claude Code does by replacing `:`, `\`, and `/` in the absolute workspace path with `-`; for example, `E:\chat-commit` becomes `E--chat-commit`. Main session files are normalized into the shared saved-session format, while nested `subagents/` transcripts and Claude sidechain records are ignored.
 
-### Auto-save on chat response
+### Auto-save project chats
 
-Enable:
+Auto-save is off by default and is enabled independently for each workspace folder. Use
+**Session Control: Toggle Auto-Save on Chat Response**, or add this to the folder's workspace
+settings:
 
 ```json
-"session-control.autoSaveOnChatResponse": true
+{
+  "session-control.autoSaveOnChatResponse": true,
+  "session-control.autoSave.providers": ["copilot"]
+}
 ```
 
-Auto-save follows the effective save provider:
+The example monitors Copilot only. If `session-control.autoSave.providers` is omitted, enabling
+auto-save monitors `copilot`, `codex`, `claude-code`, and `cursor`. The manual
+`session-control.save.provider` preference does not narrow auto-save.
 
-- `copilot` watches VS Code chat storage and saves the latest Copilot session after each response.
-- `cursor` is selected automatically when the extension is running in Cursor and no explicit provider override is set. It watches Cursor Agent transcript JSONL files under `~/.cursor/projects/<project-slug>/agent-transcripts` and auto-saves the latest Agent chat.
-- `codex` is selected automatically when the extension is running in Codex and no explicit provider override is set. It watches local Codex session transcripts under `CODEX_HOME/sessions` or `~/.codex/sessions`, filters them to the current workspace by session `cwd`, and auto-saves the latest matching Codex chat.
-- `claude-code` watches local Claude Code transcripts under `CLAUDE_CONFIG_DIR/projects/<project-slug>` or `~/.claude/projects/<project-slug>`, filters them to the current workspace by session `cwd`, and auto-saves the latest matching Claude Code chat.
+Each enabled folder gets its own controller and writes to that folder's configured
+`session-control.storagePath` (normally `.chat`). A source must positively match that folder;
+Session Control does not assign an ambiguous global chat to whichever editor happens to be
+active. Selecting `copilot` enables two independent, read-only acquisition sources. Both
+produce saved sessions with `provider: "copilot"`; use diagnostics to distinguish their
+internal source IDs.
+
+#### VS Code Copilot Chat (`copilot-vscode`)
+
+- **Setup:** Install and sign in to GitHub Copilot, open one local workspace folder in VS
+  Code, and enable the `copilot` auto-save provider. There is no Copilot Chat source-path
+  setting.
+- **Source:** Session Control derives the active profile's
+  `workspaceStorage/<workspace-id>/chatSessions` directory from VS Code's
+  `ExtensionContext.storageUri` and reads supported `.json` and `.jsonl` snapshots. It does
+  not use the Chat Participant API as a general Copilot-history feed.
+- **Project match:** The validated VS Code workspace-store identity owns the chat. This is a
+  positive match only for a single local file-backed workspace folder.
+- **Limits:** VS Code's workspace store belongs to the whole window, so this source is skipped
+  in a multi-root workspace instead of guessing a folder. Remote extension hosts and non-file
+  workspaces are unsupported for this source, and only the active VS Code profile is checked.
+  An unavailable VS Code source does not stop the Copilot CLI source.
+
+#### GitHub Copilot CLI (`copilot-cli`)
+
+- **Setup:** Start or continue Copilot CLI from the project directory and enable the `copilot`
+  auto-save provider. The CLI must write a complete local event log visible to the extension
+  host.
+- **Source:** Session Control reads
+  `~/.copilot/session-state/<session-id>/events.jsonl`. Resolution order is
+  `session-control.copilot.homePath`, then `COPILOT_HOME`, then `~/.copilot`. The setting and
+  environment variable name the Copilot home directory, not its `session-state` child.
+- **Project match:** The event log must contain an absolute working directory that overlaps
+  the workspace path (the same path, an ancestor, or a descendant). Missing, relative, or
+  mismatched working directories are skipped; there is no fallback to the newest global CLI
+  session.
+- **Limits:** The adapter reads event logs only. It neither reads nor changes
+  `session-store.db`, provider hooks, Copilot settings, or retention state. Cloud, background,
+  or synced chats without a complete local event log are not captured.
+
+#### Cursor CLI (`cursor-cli`, experimental)
+
+- **Verified builds:** The sanitized real-session fixture records Cursor CLI
+  `2026.06.19-653a7fb`; the same location contract was reverified from the
+  `2026.07.23-e383d2b` Linux x64 package. These are the only builds claimed by the fixture.
+  Session Control does not detect or certify the installed Cursor CLI version.
+- **Source:** The verified default location is
+  `~/.cursor/projects/<project-slug>/agent-transcripts/<session-id>/<session-id>.jsonl`.
+  `session-control.cursor.projectsPath` can replace the `~/.cursor/projects` root, but the
+  project, `agent-transcripts`, session-directory, and UUID-named JSONL layout remain the
+  expected contract.
+- **Project match:** `<project-slug>` is derived from the absolute workspace path, and only
+  transcripts below that project directory are considered. A transcript from a second
+  project's directory is not used as a fallback.
+- **Persistence contract:** The verified transcript is JSONL containing
+  Anthropic-style `role` and `message.content` records. Its session UUID names both the
+  directory and file. In the continuation fixture,
+  `cursor-agent --resume=<session-id>` retains that UUID and appends records to the same file,
+  so Session Control treats it as the same logical source session. Native per-turn timestamps
+  are not part of the verified records; the adapter derives normalized turn times from file
+  modification time.
+- **Boundary:** Cursor does not document this on-disk layout as a stable public API. Support is
+  therefore experimental and fixture-backed, not a promise for other Cursor CLI builds,
+  platforms, record shapes, cloud sessions, or background sessions without a complete local
+  transcript. A changed or unreadable contract is skipped and surfaced through source
+  diagnostics rather than being reinterpreted as Cursor IDE history.
+
+Cursor IDE compatibility remains a separately identified `cursor-vscode-legacy` source. It
+resolves a workspace-specific `workspaceStorage/<workspace-id>/chatSessions` directory and
+validates its `workspace.json`; Cursor IDE SQLite history is not read as Cursor CLI history.
+
+File events are debounced for five seconds and read repeatedly until their semantic content
+settles. A normally completed local response should be saved within 15 seconds. Session
+Control also reconciles when auto-save starts, checks for a newly created source directory
+every 30 seconds, and runs a five-minute fallback scan for missed file events. A timestamp-only
+touch does not write a new snapshot; a same-turn content change does.
+
+Within one extension-host run, continuing the same source session replaces the file set that
+controller previously auto-saved, while manual snapshots remain independent. Current
+limitation: that replacement checkpoint is not yet persisted or rebuilt from `.chat`, so
+reloading the extension and then continuing a session can create another timestamped snapshot.
+Cross-file replacement is also not advertised as atomic.
+
+#### Profiles and remote workspaces
+
+Session Control can read only files visible to the VS Code extension host that is running the
+extension. Its home directory, environment variables, path syntax, and active VS Code profile
+may belong to a different machine or environment than the editor UI or provider process:
+
+- **VS Code profiles:** `copilot-vscode` derives `workspaceStorage` from
+  `ExtensionContext.storageUri` for the active profile only. Default-profile storage and other
+  profiles are not scanned. CLI homes are resolved from the extension-host environment and do
+  not move merely because the VS Code profile changes.
+- **Remote SSH:** A remote extension host sees the remote home and workspace, not provider
+  storage on the local UI machine. CLI acquisition can work when the CLI and its complete
+  local store are on that same remote host. The `copilot-vscode` workspace-store source is
+  explicitly unsupported on remote hosts because its current reader and watcher require local
+  file-backed extension storage.
+- **Dev containers:** The container home and filesystem are distinct from the host home. A CLI
+  store created on the host is unavailable unless it is deliberately exposed to the container
+  and configured as the source root; running the provider inside the container keeps its store
+  on the extension-host side.
+- **WSL:** Windows `%USERPROFILE%` stores and WSL `$HOME` stores are different, and Windows
+  drive paths do not identify the same source directory as WSL paths. Session Control does not
+  infer or translate a provider store across that boundary.
+
+These mixed-host cases are diagnostic limitations, not path-fallback rules. **Session Control:
+Diagnose Auto-Save** reports the extension host, active-profile validation, resolved path,
+path existence, and project-match strategy. If the required store is on another machine,
+profile, container boundary, or WSL side, the source is reported as unsupported or needing
+attention and is skipped; Session Control does not silently substitute another profile's
+`workspaceStorage`, another user's home, or a same-looking unrelated provider path.
+
+#### Diagnose auto-save
+
+Run **Session Control: Diagnose Auto-Save** and select the workspace folder when prompted. The
+command copies a metadata-only report to the clipboard and writes it to the **Session Control**
+output channel. Check the independent source entries, including `copilot-vscode`,
+`copilot-cli`, `cursor-cli`, and `cursor-vscode-legacy`, for:
+
+- resolved source path and path existence;
+- workspace-match strategy and watcher state;
+- VS Code workspace, host, and profile validation;
+- last event, scan, candidate count, successful save, skip, retry, or error state.
+
+The copyable report omits prompt and response text, session titles, detailed skip/error text,
+and saved filenames. Use **View > Output > Session Control** for the detailed runtime reason
+when the report says a source needs attention. The status-bar tooltip summarizes healthy
+sources and the latest successful provider and time.
 
 ### Resume a session
 
@@ -226,12 +364,14 @@ This command opens the web viewer for the active JSON file when it matches Sessi
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `session-control.storagePath` | `.chat` | Folder (relative to workspace root) where sessions are saved |
-| `session-control.save.provider` | `copilot` | Explicit provider override for auto-save (`Session Control: Save Session...` always prompts for the provider); when unset, Session Control auto-detects Cursor, Codex, or Claude Code based on the host app and otherwise defaults to Copilot |
+| `session-control.save.provider` | `copilot` | Provider preference for manual flows that do not prompt; this setting does not control auto-save |
+| `session-control.copilot.homePath` | `""` | Optional GitHub Copilot CLI home directory override; when empty, Session Control uses `COPILOT_HOME` or `~/.copilot` |
 | `session-control.codex.homePath` | `""` | Optional Codex home directory override; when empty, Session Control uses `CODEX_HOME` or `~/.codex` |
 | `session-control.claudeCode.homePath` | `""` | Optional Claude Code home directory override; when empty, Session Control uses `CLAUDE_CONFIG_DIR` or `~/.claude` |
 | `session-control.cursor.userDataPath` | `""` | Optional Cursor user data directory for legacy workspace `chatSessions` JSONL fallback; when empty, Session Control uses the default Cursor user data location for this OS |
 | `session-control.cursor.projectsPath` | `""` | Optional Cursor projects directory for Agent transcript import; when empty, Session Control uses `~/.cursor/projects` |
-| `session-control.autoSaveOnChatResponse` | `false` | Auto-save after each detected provider update when the selected or auto-detected provider is `copilot`, `cursor`, `codex`, or `claude-code` |
+| `session-control.autoSaveOnChatResponse` | `false` | Enable project-scoped auto-save for this workspace folder after each detected response or transcript update |
+| `session-control.autoSave.providers` | `["copilot", "codex", "claude-code", "cursor"]` | Providers monitored while workspace-scoped auto-save is enabled; `copilot` includes both VS Code Copilot Chat and GitHub Copilot CLI sources |
 | `session-control.includeInGitignore` | `false` | Add storage folder to `.gitignore` |
 | `session-control.resume.maxTurns` | `50` | Max turns injected when resuming |
 | `session-control.resume.overflowStrategy` | `summarize` | `summarize`, `truncate`, or `recent-only` |

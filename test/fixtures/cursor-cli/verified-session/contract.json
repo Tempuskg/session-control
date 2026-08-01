@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "provider": "cursor-cli",
+  "observedRealSessionCliVersion": "2026.06.19-653a7fb",
+  "contractReverifiedCliVersion": "2026.07.23-e383d2b",
+  "verifiedAt": "2026-07-30",
+  "location": "${HOME}/.cursor/projects/e-sanitized-cursor-cli-project/agent-transcripts/11111111-2222-4333-8444-555555555555/11111111-2222-4333-8444-555555555555.jsonl",
+  "sessionIdentity": "11111111-2222-4333-8444-555555555555",
+  "workingDirectory": "E:\\sanitized\\cursor-cli-project",
+  "projectSlug": "e-sanitized-cursor-cli-project",
+  "format": {
+    "kind": "jsonl",
+    "records": "Anthropic-style role/message.content records",
+    "nativeTurnTimestamps": false
+  },
+  "turns": {
+    "initialFixture": "session-initial.jsonl",
+    "initialNormalizedRecords": 3,
+    "continuedFixture": "session-continued.jsonl",
+    "continuedNormalizedRecords": 5
+  },
+  "continuation": {
+    "command": "cursor-agent --resume=11111111-2222-4333-8444-555555555555",
+    "behavior": "The resumed conversation retains the session UUID and appends records to the same UUID-named JSONL transcript.",
+    "syntheticFollowUp": true
+  },
+  "provenance": {
+    "sanitizedObservedFixture": "https://github.com/tony/agentgrep/blob/be5958f7f6fa32c6e9554d65eb7c951444b90cc6/tests/samples/cursor-cli/cursor-cli.transcripts/example.jsonl",
+    "observedContract": "https://github.com/tony/agentgrep/blob/be5958f7f6fa32c6e9554d65eb7c951444b90cc6/src/agentgrep/store_catalog/cursor_cli.py",
+    "currentInstaller": "https://cursor.com/install",
+    "currentPackage": "https://downloads.cursor.com/lab/2026.07.23-e383d2b/linux/x64/agent-cli-package.tar.gz",
+    "currentBundleEvidence": "workspace-paths defines .cursor/projects and agent-transcripts; RequestContextEnv passes the derived agentTranscriptsFolder to the current agent service."
+  },
+  "separateCompatibilitySource": {
+    "sourceId": "cursor-vscode-legacy",
+    "description": "Cursor IDE workspaceStorage/chatSessions input; it is not part of this Cursor CLI fixture or locator contract."
+  }
+}

@@ -180,6 +180,37 @@ suite('codexSessionReader', () => {
 		}
 	});
 
+	test('emits a stable content revision that changes when transcript content changes', async () => {
+		let transcriptContent = createCodexSessionJsonl(
+			'codex-revision-session',
+			'Keep this request stable',
+			'Initial response content',
+			'2026-06-13T10:00',
+		);
+		const reader = createCodexSessionReader({
+			listFiles: async () => [path.join('sessions', 'codex-revision-session.jsonl')],
+			readFile: async () => transcriptContent,
+			showInformationMessage: async () => undefined,
+			logWarning: () => undefined,
+		});
+
+		const firstSession = (await reader.readCodexSessions('codex-home'))[0];
+		assert.ok(firstSession);
+		assert.match(firstSession.sourceRevision, /^sha256:[a-f0-9]{64}$/);
+
+		transcriptContent = `${transcriptContent.replace(/\n/g, '\r\n')}\r\n`;
+		const lineEndingOnlySession = (await reader.readCodexSessions('codex-home'))[0];
+		assert.equal(lineEndingOnlySession?.sourceRevision, firstSession.sourceRevision);
+
+		transcriptContent = transcriptContent.replaceAll(
+			'Initial response content',
+			'Updated response content',
+		);
+		const changedSession = (await reader.readCodexSessions('codex-home'))[0];
+		assert.equal(changedSession?.turns.length, firstSession.turns.length);
+		assert.notEqual(changedSession?.sourceRevision, firstSession.sourceRevision);
+	});
+
 	test('reads user request turns from Codex response item messages', async () => {
 		const setup = await setupCodexHome();
 

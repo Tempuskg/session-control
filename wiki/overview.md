@@ -2,7 +2,7 @@
 title: "Project Overview"
 type: overview
 created: 2026-04-12
-updated: 2026-05-17
+updated: 2026-07-30
 sources:
   - raw/plan.md
 tags:
@@ -16,11 +16,11 @@ related:
 
 # Project Overview
 
-**Session Control** is an open source (MIT-licensed) VS Code extension that saves GitHub Copilot Chat sessions as structured JSON files into a configurable `.chat/` folder in the repo, linked to git commits and branches. Users can resume saved chats via a `@session-control` chat participant that loads prior conversation as LLM context, and can now analyze saved chats to extract recurring workflow problems and coding-agent insights. Published to the VS Code Marketplace and Open VSX Registry.
+**Session Control** is an open source (MIT-licensed) VS Code extension that saves supported Copilot, Cursor, Codex, and Claude Code sessions as structured JSON files in a configurable repository folder, linked to git commits and branches. Users can save explicitly or opt into project-scoped automatic snapshots, resume saved chats via the `@session-control` participant, and analyze saved history for recurring workflow and coding-agent insights. It is published to the VS Code Marketplace and Open VSX Registry.
 
 ## Core Value Proposition
 
-Chat sessions with Copilot are ephemeral — they disappear when VS Code is closed or when context is lost. Session Control bridges this gap by:
+Assistant chat history is fragmented across editors and local CLI stores and can be lost or separated from the code it affected. Session Control bridges this gap by:
 
 1. **Persisting conversations** — Saving chat sessions as JSON files alongside the code they relate to.
 2. **Linking to git context** — Each saved session captures the branch, commit SHA, and dirty state, tying the conversation to a point in the codebase's history.
@@ -28,11 +28,11 @@ Chat sessions with Copilot are ephemeral — they disappear when VS Code is clos
 4. **Analyzing workflow patterns** — Saved sessions can be re-read by the chat participant to identify repeated tool misuse, inefficiencies, and coding-agent preload insights across repositories, with persisted owner-workspace, repository, and source-session provenance for later follow-up or coding-agent handoff.
 5. **Living in source control** — Sessions and analysis artifacts are stored as files in the repo (`.chat/`), meaning they can be reviewed in PRs, shared with teammates, and versioned alongside code.
 
-## Two Subsystems
+## Main Subsystems
 
-The extension has two main subsystems:
+The extension has three main user-facing subsystems:
 
-- **[Save System](save-system.md)** — Reads Copilot's internal session storage, transforms it, and writes structured JSON to `.chat/`.
+- **[Save System](save-system.md)** — Reads provider-specific local stores, normalizes sessions, and writes manual snapshots or ownership-scoped automatic upserts.
 - **[Resume System](resume-system.md)** — A registered [Chat Participant](chat-participant.md) (`@session-control`) that loads saved sessions, injects them as LLM context, and analyzes saved chat history.
 - **Session Viewer** — An HTML webview panel that renders saved sessions as formatted conversations. Accessible from the Session Explorer sidebar or by opening a session JSON file and clicking the editor title preview button.
 
@@ -57,11 +57,13 @@ The plan is organized into ten incremental phases, each delivering a testable mi
 
 - **JSON as primary format** — Machine-parseable for resume; markdown summary embedded for human review.
 - **Minimum VS Code `^1.93.0`** — Chat participant API stabilized at this version.
-- **Manual save + optional auto-save** — Auto-save on chat response is opt-in; manual save is the primary workflow. The auto-save feature watches the Copilot storage directory for new turns and saves automatically with old-file cleanup.
+- **Manual save + optional project auto-save** — Manual selection remains explicit. Auto-save is off by default, scoped per workspace folder, and monitors all selected provider groups concurrently after positive project matching.
+- **Auto-save is an upsert** — Semantic revisions and durable checkpoints maintain one current automatic file set per source session; manual snapshots are never replacement candidates.
+- **Read-only provider adapters** — Provider stores, hooks, settings, indexes, and retention state are not modified. Unclear ownership fails closed and remains diagnosable.
 - **Analysis artifacts stay separate and auditable** — Markdown reports and fingerprint indexes live under `.chat/analysis/`, with repository-context and source-session provenance stored outside the saved chat JSON schema.
-- **Relies on internal Copilot storage format** — A version-detection layer handles format changes gracefully.
+- **Local transcript contracts have limits** — Provider formats and paths can change, and only stores visible to the running extension host and active VS Code profile can be monitored.
 - **Open source (MIT)** — Developed publicly on GitHub with contribution guidelines, issue templates, CI/CD pipelines, and automated publishing.
 
 ## Open Questions
 
-> ⚠️ Note: The approach of reading Copilot's internal session files is fragile — the format could change without notice between VS Code versions. The plan acknowledges this and calls for a version-detection layer, but this remains the primary risk.
+> ⚠️ Note: Provider transcript formats and locations are not stable public APIs. The adapters are isolated, fixture-backed, and diagnosable, but remote/profile boundaries, missing local transcripts, or provider format changes can make an individual source unavailable without stopping the others.

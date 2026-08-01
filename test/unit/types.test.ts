@@ -5,6 +5,7 @@ import {
 	isRequestTurn,
 	isResponseTurn,
 	isSessionProviderId,
+	isSessionOrigin,
 	isToolCall,
 } from '../../src/types';
 
@@ -70,7 +71,36 @@ suite('types guards', () => {
 		);
 	});
 
-	test('isChatSession validates required schema', () => {
+	test('isSessionOrigin validates save identity metadata', () => {
+		assert.equal(
+			isSessionOrigin({
+				saveKind: 'auto',
+				sourceId: 'codex-cli',
+				sourceSessionId: 'session-1',
+				sourceRevision: 'sha256:abc123',
+			}),
+			true,
+		);
+		assert.equal(
+			isSessionOrigin({
+				saveKind: 'scheduled',
+				sourceId: 'codex-cli',
+				sourceSessionId: 'session-1',
+				sourceRevision: 'sha256:abc123',
+			}),
+			false,
+		);
+		assert.equal(
+			isSessionOrigin({
+				saveKind: 'manual',
+				sourceId: 'copilot-vscode',
+				sourceSessionId: 'session-2',
+			}),
+			false,
+		);
+	});
+
+	test('isChatSession accepts legacy sessions and validates optional origin metadata', () => {
 		const valid = {
 			version: 1,
 			id: 'session-1',
@@ -107,5 +137,28 @@ suite('types guards', () => {
 		assert.equal(isChatSession({ ...valid, turns: [{ type: 'bad' }] }), false);
 		assert.equal(isChatSession({ ...valid, provider: 'cursor' }), true);
 		assert.equal(isChatSession({ ...valid, provider: 'invalid-provider' }), false);
+		assert.equal(
+			isChatSession({
+				...valid,
+				origin: {
+					saveKind: 'auto',
+					sourceId: 'cursor-cli',
+					sourceSessionId: 'cursor-session-1',
+					sourceRevision: 'sha256:def456',
+				},
+			}),
+			true,
+		);
+		assert.equal(
+			isChatSession({
+				...valid,
+				origin: {
+					saveKind: 'auto',
+					sourceId: 'cursor-cli',
+					sourceSessionId: 'cursor-session-1',
+				},
+			}),
+			false,
+		);
 	});
 });

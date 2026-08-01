@@ -191,4 +191,45 @@ suite('claudeCodeSessionReader', () => {
 			await fs.rm(setup.root, { recursive: true, force: true });
 		}
 	});
+
+	test('emits a stable content revision that changes when transcript content changes', async () => {
+		const setup = await setupClaudeCodeHome();
+		let transcriptContent = createClaudeCodeSessionJsonl(
+			'claude-revision-session',
+			'2026-06-21T10:00',
+		);
+
+		try {
+			const reader = createClaudeCodeSessionReader({
+				listFiles: async () => [path.join(setup.projectDirectory, 'claude-revision-session.jsonl')],
+				readFile: async () => transcriptContent,
+				showInformationMessage: async () => undefined,
+				logWarning: () => undefined,
+			});
+
+			const firstSession = (
+				await reader.readClaudeCodeSessions(setup.claudeCodeHomePath, setup.workspacePath)
+			)[0];
+			assert.ok(firstSession);
+			assert.match(firstSession.sourceRevision, /^sha256:[a-f0-9]{64}$/);
+
+			transcriptContent = `${transcriptContent.replace(/\n/g, '\r\n')}\r\n`;
+			const lineEndingOnlySession = (
+				await reader.readClaudeCodeSessions(setup.claudeCodeHomePath, setup.workspacePath)
+			)[0];
+			assert.equal(lineEndingOnlySession?.sourceRevision, firstSession.sourceRevision);
+
+			transcriptContent = transcriptContent.replace(
+				'Claude Code sessions now normalize cleanly.',
+				'Claude Code sessions now include strict revisions.',
+			);
+			const changedSession = (
+				await reader.readClaudeCodeSessions(setup.claudeCodeHomePath, setup.workspacePath)
+			)[0];
+			assert.equal(changedSession?.turns.length, firstSession.turns.length);
+			assert.notEqual(changedSession?.sourceRevision, firstSession.sourceRevision);
+		} finally {
+			await fs.rm(setup.root, { recursive: true, force: true });
+		}
+	});
 });

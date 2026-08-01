@@ -175,3 +175,7 @@ Pages touched: file-manifest.md, log.md
 ## [2026-07-04] update | Screenshots Live + v1.3.4 Release
 Committed the five captured listing assets (demo.gif, save-session.png, resume-session.png, session-explorer.png, provider-picker.png) under media/screenshots/, removed the screenshots:pending comment markers so the README Screenshots section renders on the Open VSX and VS Marketplace listings, bumped to 1.3.4, and signed off the Step 2 rows in the open-vsx-listing approval checklist. Release tag v1.3.4 triggers release.yml to publish the same VSIX to both registries.
 Pages touched: README.md, CHANGELOG.md, package.json, media/screenshots/README.md, open-vsx-listing.md, log.md
+
+## [2026-07-30] update | Project Auto-Save Architecture and Operations
+Synchronized the wiki with the implemented project auto-save system: source adapters and positive project matching, per-workspace reconciliation and isolated retries, semantic revisions and durable checkpoints, ownership-scoped staged upserts that preserve manual snapshots, provider settings and migration, metadata-only diagnostics, status/Explorer integration, and profile/remote/local-transcript limitations.
+Pages touched: save-system.md, configuration.md, file-manifest.md, architecture.md, overview.md, index.md, log.md

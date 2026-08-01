@@ -1,5 +1,6 @@
 {
     "snyk.advanced.autoSelectOrganization": false,
+    "snyk.advanced.additionalParameters": "--all-projects --exclude=.vscode-test,dist,dist-test,node_modules",
     "session-control.autoSaveOnChatResponse": true,
     "cSpell.words": [
         "checkpointing",
