@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.6] - 2026-08-01
+
 ### Added
 - Workspace-scoped auto-save now watches all selected, positively matched local sources concurrently: VS Code Copilot Chat, GitHub Copilot CLI, Codex CLI, Claude Code, and the verified Cursor CLI project transcript layout. Cursor IDE SQLite and cloud history are not read; VS Code Copilot workspace-store capture rejects remote extension hosts and validates only the active profile's workspace store.
 - Auto-save now reconciles on activation or enablement, after source changes, when missing source directories appear, and on a periodic fallback scan. Stable semantic revisions detect same-turn content changes, incomplete provider writes settle and retry with bounded backoff, and a persistent source failure no longer stops unrelated providers or workspaces.
