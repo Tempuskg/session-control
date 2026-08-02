@@ -2,12 +2,18 @@ import * as assert from 'node:assert';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { createAutoSaveDiagnosticState } from '../../src/autoSaveDiagnostics';
+import { deriveClaudeCodeProjectSlug } from '../../src/claudeCodeSessionReader';
+import { deriveCursorProjectSlug } from '../../src/cursorAgentTranscriptReader';
 import { registerAutoSaveOnChatResponseListener } from '../../src/extension';
 import { type SessionOrigin, type SessionProviderId, type SourceChatSession } from '../../src/types';
 
 /** Yield to the event loop so that void async IIFEs inside schedule callbacks complete. */
 function drainAsyncWork(): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function createTestWorkspacePath(): string {
+	return path.join(path.parse(process.cwd()).root, 'chat-commit');
 }
 
 interface FakeWatcher {
@@ -814,6 +820,7 @@ suite('extension auto-save on chat response', () => {
 	});
 
 	test('triggers save when Cursor agent transcript changes', async () => {
+		const workspacePath = createTestWorkspacePath();
 		const watcher = createFakeWatcher();
 		const scheduledCallbacks: Array<() => void> = [];
 		const saveCalls: Array<{
@@ -836,7 +843,7 @@ suite('extension auto-save on chat response', () => {
 					return watcher;
 				},
 				getImplicitWorkspaceFolder: () => ({
-					uri: vscode.Uri.file('e:/chat-commit'),
+					uri: vscode.Uri.file(workspacePath),
 					name: 'chat-commit',
 					index: 0,
 				}),
@@ -882,7 +889,10 @@ suite('extension auto-save on chat response', () => {
 		);
 
 		assert.equal(watchedTargets.length, 1);
-		assert.equal(watchedTargets[0]?.directory.replace(/\\/g, '/'), 'C:/Users/test/.cursor/projects/e-chat-commit');
+		assert.equal(
+			watchedTargets[0]?.directory.replace(/\\/g, '/'),
+			path.join('C:/Users/test/.cursor/projects', deriveCursorProjectSlug(workspacePath)).replace(/\\/g, '/'),
+		);
 		assert.equal(watchedTargets[0]?.glob, 'agent-transcripts/**/*.jsonl');
 
 		watcher.emitCreate();
@@ -899,6 +909,7 @@ suite('extension auto-save on chat response', () => {
 	});
 
 	test('triggers save when Codex session transcript changes', async () => {
+		const workspacePath = createTestWorkspacePath();
 		const watcher = createFakeWatcher();
 		const scheduledCallbacks: Array<() => void> = [];
 		const saveCalls: Array<{
@@ -921,7 +932,7 @@ suite('extension auto-save on chat response', () => {
 					return watcher;
 				},
 				getImplicitWorkspaceFolder: () => ({
-					uri: vscode.Uri.file('e:/chat-commit'),
+					uri: vscode.Uri.file(workspacePath),
 					name: 'chat-commit',
 					index: 0,
 				}),
@@ -952,7 +963,7 @@ suite('extension auto-save on chat response', () => {
 							},
 						],
 						sourceFile: 'codex-session-1',
-						cwd: 'E:/chat-commit',
+						cwd: workspacePath,
 					},
 				],
 				readCursorSessions: async () => [],
@@ -987,6 +998,7 @@ suite('extension auto-save on chat response', () => {
 	});
 
 	test('triggers save when Claude Code session transcript changes', async () => {
+		const workspacePath = createTestWorkspacePath();
 		const watcher = createFakeWatcher();
 		const scheduledCallbacks: Array<() => void> = [];
 		const saveCalls: Array<{
@@ -1009,7 +1021,7 @@ suite('extension auto-save on chat response', () => {
 					return watcher;
 				},
 				getImplicitWorkspaceFolder: () => ({
-					uri: vscode.Uri.file('e:/chat-commit'),
+					uri: vscode.Uri.file(workspacePath),
 					name: 'chat-commit',
 					index: 0,
 				}),
@@ -1042,7 +1054,7 @@ suite('extension auto-save on chat response', () => {
 							},
 						],
 						sourceFile: 'claude-session-1',
-						cwd: 'E:/chat-commit',
+						cwd: workspacePath,
 					},
 				],
 				readCursorSessions: async () => [],
@@ -1060,7 +1072,12 @@ suite('extension auto-save on chat response', () => {
 		);
 
 		assert.equal(watchedTargets.length, 1);
-		assert.equal(watchedTargets[0]?.directory.replace(/\\/g, '/'), 'C:/Users/test/.claude/projects/e--chat-commit');
+		assert.equal(
+			watchedTargets[0]?.directory.replace(/\\/g, '/'),
+			path
+				.join('C:/Users/test/.claude', 'projects', deriveClaudeCodeProjectSlug(workspacePath))
+				.replace(/\\/g, '/'),
+		);
 		assert.equal(watchedTargets[0]?.glob, '*.jsonl');
 
 		watcher.emitChange();
@@ -1206,6 +1223,7 @@ suite('extension auto-save on chat response', () => {
 	});
 
 	test('watches all four configured providers without host-based exclusion', async () => {
+		const workspacePath = createTestWorkspacePath();
 		const copilotWatcher = createFakeWatcher();
 		const copilotCliWatcher = createFakeWatcher();
 		const codexWatcher = createFakeWatcher();
@@ -1235,7 +1253,7 @@ suite('extension auto-save on chat response', () => {
 					return glob === '*.jsonl' ? claudeWatcher : cursorWatcher;
 				},
 				getImplicitWorkspaceFolder: () => ({
-					uri: vscode.Uri.file('e:/chat-commit'),
+					uri: vscode.Uri.file(workspacePath),
 					name: 'chat-commit',
 					index: 0,
 				}),
@@ -1293,7 +1311,7 @@ suite('extension auto-save on chat response', () => {
 							},
 						],
 						sourceFile: 'codex-session-1',
-						cwd: 'E:/chat-commit',
+						cwd: workspacePath,
 					},
 				],
 				readClaudeCodeSessions: async () => [
@@ -1319,7 +1337,7 @@ suite('extension auto-save on chat response', () => {
 							},
 						],
 						sourceFile: 'claude-session-1',
-						cwd: 'E:/chat-commit',
+						cwd: workspacePath,
 					},
 				],
 				readCursorSessions: async () => [
@@ -1345,7 +1363,7 @@ suite('extension auto-save on chat response', () => {
 							},
 						],
 						sourceFile: 'cursor-session-1',
-						cwd: 'E:/chat-commit',
+						cwd: workspacePath,
 					},
 				],
 				saveSessionSilently: async (_workspaceFolder, _storageDirectory, provider, sessions) => {
