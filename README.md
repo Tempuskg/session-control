@@ -13,7 +13,8 @@ Agent, Claude Code, Codex, or Copilot can be captured as a structured JSON file 
 linked to the branch and commit it belongs to, and resumed later as context in a new chat —
 through the `@session-control` chat participant.
 
-Your conversations never leave your machine. They live next to the code they produced, in
+Session Control has no cloud of its own — it reads your chats locally and never uploads them
+anywhere. Saved sessions are plain files in your repo, next to the code they produced, in
 source control you already trust. Works inside VS Code, Cursor, VSCodium, and other
 VS-Code-compatible editors via the Open VSX Registry.
 

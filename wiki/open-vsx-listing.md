@@ -111,8 +111,9 @@ providers in audience-priority order, and seeds the target keywords (`chat histo
 > Agent, Claude Code, Codex, or Copilot can be captured as a structured JSON file in your repo,
 > linked to the branch and commit it belongs to, and resumed later as context in a new chat.
 >
-> Your conversations never leave your machine — they live next to the code they produced, in
-> source control you already trust.
+> Session Control has no cloud of its own — it reads your chats locally and never uploads them
+> anywhere. Saved sessions live next to the code they produced, in source control you already
+> trust.
 
 Replaces the current "A VS Code extension that saves GitHub Copilot…" framing. The new hero:
 
