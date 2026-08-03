@@ -1,7 +1,8 @@
 # Session Control
 
-[![VS Code Marketplace](https://img.shields.io/badge/VS%20Marketplace-v1.3.6-blue)](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
-[![Open VSX](https://img.shields.io/open-vsx/v/darrenjmcleod/session-control)](https://open-vsx.org/extension/darrenjmcleod/session-control)
+[![Open VSX](https://img.shields.io/open-vsx/v/darrenjmcleod/session-control?label=Open%20VSX&color=blue)](https://open-vsx.org/extension/darrenjmcleod/session-control)
+[![Open VSX Downloads](https://img.shields.io/open-vsx/dt/darrenjmcleod/session-control?label=downloads&color=blue)](https://open-vsx.org/extension/darrenjmcleod/session-control)
+[![VS Marketplace](https://img.shields.io/badge/VS%20Marketplace-listing-blue)](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
 [![CI](https://github.com/tempuskg/session-control/actions/workflows/ci.yml/badge.svg)](https://github.com/tempuskg/session-control/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -16,6 +17,10 @@ Your conversations never leave your machine. They live next to the code they pro
 source control you already trust. Works inside VS Code, Cursor, VSCodium, and other
 VS-Code-compatible editors via the Open VSX Registry.
 
+![Animated demo: save a Copilot chat session, browse it in the Session Explorer, and resume it as context in a new chat.](https://raw.githubusercontent.com/tempuskg/session-control/main/media/screenshots/demo.gif)
+
+*Save a chat, browse saved sessions in the Session Explorer, and resume one as context in a new chat — all without leaving your editor.*
+
 ## Why Session Control
 
 - **Cross-IDE by design.** Save and import chats from Cursor Agent, Claude Code, Codex, and
@@ -28,11 +33,19 @@ VS-Code-compatible editors via the Open VSX Registry.
 - **Resume into a fresh chat.** `@session-control /resume <name>` reloads a saved conversation
   as LLM context. No copy-paste, no lost decisions.
 
+## Quick start
+
+1. **Save a chat.** Open the Command Palette (`Ctrl+Shift+P`) and run **Session Control: Save
+   Session...**. Pick the provider, pick the session. A JSON file appears in `.chat/`.
+2. **Browse it.** Open the **Session Control** view in the activity bar to see every saved
+   session, or click one to open it in the built-in session viewer.
+3. **Resume it.** In chat, type `@session-control /resume <session-name>`. The conversation is
+   injected as context and you carry on where you left off.
+
+Optional: turn on **Session Control: Toggle Auto-Save on Chat Response** and Session Control
+captures matching chats for the workspace automatically.
+
 ## Screenshots
-
-![Animated demo: save a Copilot chat session, browse it in the Session Explorer, and resume it as context in a new chat.](https://raw.githubusercontent.com/tempuskg/session-control/main/media/screenshots/demo.gif)
-
-*Save a chat, browse saved sessions in the Session Explorer, and resume one as context in a new chat — all without leaving your editor.*
 
 | Save any chat | Resume as context |
 | :--: | :--: |
@@ -49,82 +62,85 @@ VS-Code-compatible editors via the Open VSX Registry.
 - **Provider choice** — Keep Copilot as the default save source, switch to Codex or Claude Code
   for local transcript import, and let Session Control auto-detect Cursor, Codex, or Claude
   Code when running inside those hosts.
-- **Import AI skills** — Convert repository Copilot guidance into repo-scoped Cursor, Codex, or
-  Claude Code skills under `.cursor/skills/`, `.agents/skills/`, or `.claude/skills/`.
 - **Save sessions** — Capture Copilot, Cursor, Codex, or Claude Code chats as JSON files in
   `.chat/`, enriched with branch and commit metadata.
 - **Resume sessions** — Use `@session-control /resume <name>` to reload a saved conversation as
   LLM context in a new chat.
-- **Analyze saved chats** — Use `@session-control /analyze` to review a timeframe of saved
-  sessions or only chats that have not been analyzed yet.
-- **Implement recommendations** — Use `@session-control /implement` to open a generated
-  implementation prompt in chat or an agent session.
-- **Browse, preview, delete** — Manage saved sessions via the Session Explorer and command
-  palette.
-- **Resume from viewer** — When viewing a saved session, click the Resume icon in the editor
-  title bar to resume it directly in chat.
 - **Auto-save project chats** — Optionally monitor project-matched VS Code Copilot Chat,
   GitHub Copilot CLI, Cursor, Codex, or Claude Code transcript updates and save settled
   responses to the workspace that owns them.
+- **Analyze saved chats** — Use `@session-control /analyze` to review a timeframe of saved
+  sessions, or only chats that have not been analyzed yet.
+- **Implement recommendations** — Use `@session-control /implement` to open a generated
+  implementation prompt in chat or an agent session.
+- **Import AI skills** — Convert repository Copilot guidance into repo-scoped Cursor, Codex, or
+  Claude Code skills under `.cursor/skills/`, `.agents/skills/`, or `.claude/skills/`.
+- **Browse, preview, delete** — Manage saved sessions via the Session Explorer and command
+  palette, with a built-in session viewer and a one-click Resume from the editor title bar.
 - **Lives in source control** — Sessions are plain JSON files tracked alongside your code,
   reviewable in diffs and PRs.
 - **Bloat controls** — Configurable file size limits, session splitting, tool output
   stripping, and automatic pruning of old sessions.
 
-Session Control can save Copilot, Cursor, Codex, and Claude Code sessions. Manual save flows
-prompt for a provider or use `session-control.save.provider` where a prompt is unavailable.
-Auto-save has its own `session-control.autoSave.providers` setting and watches all supported
-providers by default once it is enabled.
+## Commands
 
-## Requirements
+All commands are available from the Command Palette under the **Session Control** category.
 
-- VS Code `^1.93.0`
-- GitHub Copilot extension installed and signed in if you want to save VS Code Copilot Chat
-  sessions
-- GitHub Copilot CLI installed and signed in if you want to auto-save its local session event
-  logs
-- Cursor installed locally if you want to import or auto-save Cursor Agent transcript sessions
-- Codex installed locally if you want to import or auto-save Codex sessions, or create repo-scoped Codex skills
-- Claude Code installed locally if you want to import or auto-save Claude Code sessions, or create repo-scoped Claude Code skills
+| Command | What it does |
+|---------|--------------|
+| Save Session... | Pick a provider and a chat, save it to `.chat/` |
+| Browse Saved Sessions | Quick pick over every saved session |
+| View Session | Open the active saved-session JSON in the web viewer |
+| Resume This Session in Chat | Resume the session open in the viewer |
+| Analyze Saved Chats | Generate an analysis report over a timeframe of saved sessions |
+| Implement Latest Analysis | Open the newest analysis report as an implementation prompt |
+| Toggle Auto-Save on Chat Response | Enable or disable auto-save for a workspace folder |
+| Diagnose Auto-Save | Copy a metadata-only auto-save health report |
+| Sort Saved Sessions... | Change Session Explorer sort order |
+| Delete Saved Session | Remove a saved session |
+| Clean Up Orphaned Session Part Files | Remove leftover split-session parts |
+| Import Copilot Guidance as Cursor / Codex / Claude Code Skills | Convert repo guidance into repo-scoped skills |
 
-## Installation
-
-Search for **Session Control** in your editor's extensions view, or install from:
-
-- [Open VSX Registry](https://open-vsx.org/extension/darrenjmcleod/session-control) — for
-  Cursor, Windsurf, VSCodium, Codium, Positron, Trae, and other VS-Code-compatible editors.
-- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
-  — for stock Visual Studio Code.
+In chat, the `@session-control` participant provides `/resume`, `/list`, `/analyze`, and
+`/implement`.
 
 ## Usage
 
 ### Save a session
 
-Open the Command Palette (`Ctrl+Shift+P`) and run:
-
-```
-Session Control: Save Session...
-```
-
-Session Control prompts for the provider so what gets saved is always your explicit choice rather than a guess from the active window. Choose **Copilot** to read VS Code chat storage, **Codex** to import local transcripts from `CODEX_HOME` or `~/.codex`, or **Claude Code** to import JSONL transcripts from `CLAUDE_CONFIG_DIR` or `~/.claude`. After picking a provider, choose the session to save. The JSON file is written to `.chat/` in your workspace root.
+Run **Session Control: Save Session...**. Session Control prompts for the provider so what gets
+saved is always your explicit choice rather than a guess from the active window. Choose
+**Copilot** to read VS Code chat storage, **Codex** to import local transcripts from
+`CODEX_HOME` or `~/.codex`, or **Claude Code** to import JSONL transcripts from
+`CLAUDE_CONFIG_DIR` or `~/.claude`. After picking a provider, choose the session to save. The
+JSON file is written to `.chat/` in your workspace root.
 
 Cursor support is automatic when the extension is running inside Cursor. Session Control keeps
 the experimental Cursor CLI project transcripts and legacy Cursor IDE workspace `chatSessions`
-input as separate sources; the CLI contract and its verified versions are documented below.
+input as separate sources — see the [auto-save reference](docs/auto-save.md) for the contract.
 
-Claude Code transcripts are read from:
+Claude Code transcripts are read from
+`~/.claude/projects/<encoded-workspace-path>/<session-id>.jsonl`. Set
+`session-control.claudeCode.homePath` if your Claude Code config directory lives somewhere
+else. Session Control derives `<encoded-workspace-path>` the same way Claude Code does by
+replacing `:`, `\`, and `/` in the absolute workspace path with `-`; for example,
+`E:\chat-commit` becomes `E--chat-commit`. Main session files are normalized into the shared
+saved-session format, while nested `subagents/` transcripts and Claude sidechain records are
+ignored.
 
-```text
-~/.claude/projects/<encoded-workspace-path>/<session-id>.jsonl
-```
+### Resume a session
 
-Set `session-control.claudeCode.homePath` if your Claude Code config directory lives somewhere else. Session Control derives `<encoded-workspace-path>` the same way Claude Code does by replacing `:`, `\`, and `/` in the absolute workspace path with `-`; for example, `E:\chat-commit` becomes `E--chat-commit`. Main session files are normalized into the shared saved-session format, while nested `subagents/` transcripts and Claude sidechain records are ignored.
+In chat, type `@session-control /resume <session-name>`. The extension does a fuzzy search on
+the session name; if multiple sessions match, you pick from the matches. The saved conversation
+is injected as context into the current chat.
+
+`@session-control /list` lists saved sessions, as does **Session Control: Browse Saved
+Sessions**.
 
 ### Auto-save project chats
 
 Auto-save is off by default and is enabled independently for each workspace folder. Use
-**Session Control: Toggle Auto-Save on Chat Response**, or add this to the folder's workspace
-settings:
+**Session Control: Toggle Auto-Save on Chat Response**, or set:
 
 ```json
 {
@@ -133,231 +149,74 @@ settings:
 }
 ```
 
-The example monitors Copilot only. If `session-control.autoSave.providers` is omitted, enabling
-auto-save monitors `copilot`, `codex`, `claude-code`, and `cursor`. The manual
-`session-control.save.provider` preference does not narrow auto-save.
+If `session-control.autoSave.providers` is omitted, enabling auto-save monitors `copilot`,
+`codex`, `claude-code`, and `cursor`. Each enabled folder writes to that folder's configured
+`session-control.storagePath`, and a source must positively match that folder — Session Control
+does not assign an ambiguous global chat to whichever editor happens to be active. A normally
+completed local response is saved within about 15 seconds.
 
-Each enabled folder gets its own controller and writes to that folder's configured
-`session-control.storagePath` (normally `.chat`). A source must positively match that folder;
-Session Control does not assign an ambiguous global chat to whichever editor happens to be
-active. Selecting `copilot` enables two independent, read-only acquisition sources. Both
-produce saved sessions with `provider: "copilot"`; use diagnostics to distinguish their
-internal source IDs.
+If a source is not picking up chats, run **Session Control: Diagnose Auto-Save**.
 
-#### VS Code Copilot Chat (`copilot-vscode`)
-
-- **Setup:** Install and sign in to GitHub Copilot, open one local workspace folder in VS
-  Code, and enable the `copilot` auto-save provider. There is no Copilot Chat source-path
-  setting.
-- **Source:** Session Control derives the active profile's
-  `workspaceStorage/<workspace-id>/chatSessions` directory from VS Code's
-  `ExtensionContext.storageUri` and reads supported `.json` and `.jsonl` snapshots. It does
-  not use the Chat Participant API as a general Copilot-history feed.
-- **Project match:** The validated VS Code workspace-store identity owns the chat. This is a
-  positive match only for a single local file-backed workspace folder.
-- **Limits:** VS Code's workspace store belongs to the whole window, so this source is skipped
-  in a multi-root workspace instead of guessing a folder. Remote extension hosts and non-file
-  workspaces are unsupported for this source, and only the active VS Code profile is checked.
-  An unavailable VS Code source does not stop the Copilot CLI source.
-
-#### GitHub Copilot CLI (`copilot-cli`)
-
-- **Setup:** Start or continue Copilot CLI from the project directory and enable the `copilot`
-  auto-save provider. The CLI must write a complete local event log visible to the extension
-  host.
-- **Source:** Session Control reads
-  `~/.copilot/session-state/<session-id>/events.jsonl`. Resolution order is
-  `session-control.copilot.homePath`, then `COPILOT_HOME`, then `~/.copilot`. The setting and
-  environment variable name the Copilot home directory, not its `session-state` child.
-- **Project match:** The event log must contain an absolute working directory that overlaps
-  the workspace path (the same path, an ancestor, or a descendant). Missing, relative, or
-  mismatched working directories are skipped; there is no fallback to the newest global CLI
-  session.
-- **Limits:** The adapter reads event logs only. It neither reads nor changes
-  `session-store.db`, provider hooks, Copilot settings, or retention state. Cloud, background,
-  or synced chats without a complete local event log are not captured.
-
-#### Cursor CLI (`cursor-cli`, experimental)
-
-- **Verified builds:** The sanitized real-session fixture records Cursor CLI
-  `2026.06.19-653a7fb`; the same location contract was reverified from the
-  `2026.07.23-e383d2b` Linux x64 package. These are the only builds claimed by the fixture.
-  Session Control does not detect or certify the installed Cursor CLI version.
-- **Source:** The verified default location is
-  `~/.cursor/projects/<project-slug>/agent-transcripts/<session-id>/<session-id>.jsonl`.
-  `session-control.cursor.projectsPath` can replace the `~/.cursor/projects` root, but the
-  project, `agent-transcripts`, session-directory, and UUID-named JSONL layout remain the
-  expected contract.
-- **Project match:** `<project-slug>` is derived from the absolute workspace path, and only
-  transcripts below that project directory are considered. A transcript from a second
-  project's directory is not used as a fallback.
-- **Persistence contract:** The verified transcript is JSONL containing
-  Anthropic-style `role` and `message.content` records. Its session UUID names both the
-  directory and file. In the continuation fixture,
-  `cursor-agent --resume=<session-id>` retains that UUID and appends records to the same file,
-  so Session Control treats it as the same logical source session. Native per-turn timestamps
-  are not part of the verified records; the adapter derives normalized turn times from file
-  modification time.
-- **Boundary:** Cursor does not document this on-disk layout as a stable public API. Support is
-  therefore experimental and fixture-backed, not a promise for other Cursor CLI builds,
-  platforms, record shapes, cloud sessions, or background sessions without a complete local
-  transcript. A changed or unreadable contract is skipped and surfaced through source
-  diagnostics rather than being reinterpreted as Cursor IDE history.
-
-Cursor IDE compatibility remains a separately identified `cursor-vscode-legacy` source. It
-resolves a workspace-specific `workspaceStorage/<workspace-id>/chatSessions` directory and
-validates its `workspace.json`; Cursor IDE SQLite history is not read as Cursor CLI history.
-
-File events are debounced for five seconds and read repeatedly until their semantic content
-settles. A normally completed local response should be saved within 15 seconds. Session
-Control also reconciles when auto-save starts, checks for a newly created source directory
-every 30 seconds, and runs a five-minute fallback scan for missed file events. A timestamp-only
-touch does not write a new snapshot; a same-turn content change does.
-
-Within one extension-host run, continuing the same source session replaces the file set that
-controller previously auto-saved, while manual snapshots remain independent. Current
-limitation: that replacement checkpoint is not yet persisted or rebuilt from `.chat`, so
-reloading the extension and then continuing a session can create another timestamped snapshot.
-Cross-file replacement is also not advertised as atomic.
-
-#### Profiles and remote workspaces
-
-Session Control can read only files visible to the VS Code extension host that is running the
-extension. Its home directory, environment variables, path syntax, and active VS Code profile
-may belong to a different machine or environment than the editor UI or provider process:
-
-- **VS Code profiles:** `copilot-vscode` derives `workspaceStorage` from
-  `ExtensionContext.storageUri` for the active profile only. Default-profile storage and other
-  profiles are not scanned. CLI homes are resolved from the extension-host environment and do
-  not move merely because the VS Code profile changes.
-- **Remote SSH:** A remote extension host sees the remote home and workspace, not provider
-  storage on the local UI machine. CLI acquisition can work when the CLI and its complete
-  local store are on that same remote host. The `copilot-vscode` workspace-store source is
-  explicitly unsupported on remote hosts because its current reader and watcher require local
-  file-backed extension storage.
-- **Dev containers:** The container home and filesystem are distinct from the host home. A CLI
-  store created on the host is unavailable unless it is deliberately exposed to the container
-  and configured as the source root; running the provider inside the container keeps its store
-  on the extension-host side.
-- **WSL:** Windows `%USERPROFILE%` stores and WSL `$HOME` stores are different, and Windows
-  drive paths do not identify the same source directory as WSL paths. Session Control does not
-  infer or translate a provider store across that boundary.
-
-These mixed-host cases are diagnostic limitations, not path-fallback rules. **Session Control:
-Diagnose Auto-Save** reports the extension host, active-profile validation, resolved path,
-path existence, and project-match strategy. If the required store is on another machine,
-profile, container boundary, or WSL side, the source is reported as unsupported or needing
-attention and is skipped; Session Control does not silently substitute another profile's
-`workspaceStorage`, another user's home, or a same-looking unrelated provider path.
-
-#### Diagnose auto-save
-
-Run **Session Control: Diagnose Auto-Save** and select the workspace folder when prompted. The
-command copies a metadata-only report to the clipboard and writes it to the **Session Control**
-output channel. Check the independent source entries, including `copilot-vscode`,
-`copilot-cli`, `cursor-cli`, and `cursor-vscode-legacy`, for:
-
-- resolved source path and path existence;
-- workspace-match strategy and watcher state;
-- VS Code workspace, host, and profile validation;
-- last event, scan, candidate count, successful save, skip, retry, or error state.
-
-The copyable report omits prompt and response text, session titles, detailed skip/error text,
-and saved filenames. Use **View > Output > Session Control** for the detailed runtime reason
-when the report says a source needs attention. The status-bar tooltip summarizes healthy
-sources and the latest successful provider and time.
-
-### Resume a session
-
-In VS Code Chat, type:
-
-```
-@session-control /resume <session-name>
-```
-
-The extension does a fuzzy search on the session name. If multiple sessions match, you'll be presented with options to choose from. The saved conversation is injected as context into the current chat.
-
-### List sessions
-
-```
-@session-control /list
-```
-
-or via the Command Palette:
-
-```
-Session Control: Browse Saved Sessions
-```
+**[→ Full auto-save reference](docs/auto-save.md)** — per-source contracts for VS Code Copilot
+Chat, Copilot CLI, Cursor CLI, and legacy Cursor IDE; project-match rules; behavior across VS
+Code profiles, Remote SSH, dev containers, and WSL; and how to read the diagnostics report.
 
 ### Analyze saved chats
 
-In VS Code Chat, type:
+In chat, type `@session-control /analyze`. Choose a timeframe interactively or use a quick alias
+such as `24h`, `7d`, `30d`, or `needs analysis`. For a date-based range, Session Control asks
+whether to analyze only chats in that range that have not been analyzed yet, or re-analyze
+everything in that range.
 
-```
-@session-control /analyze
-```
+Then pick which available provider performs the analysis. Direct language-model providers run
+inside Session Control; installed Codex, Claude Code, or Cursor agent providers open their chat
+and receive a workspace-aware analysis handoff. The analysis itself always includes all eligible
+saved sessions from every provider in the workspace's `.chat` folder — the provider choice only
+selects who generates the report.
 
-You can either choose a timeframe interactively or use a quick alias such as `24h`, `7d`, `30d`, or `needs analysis`.
+The participant streams a report back into chat and writes a markdown report under
+`.chat/analysis/reports/`, keeping an analysis index in `.chat/analysis/index.json` so **Needs
+Analysis** only selects chats that are new or changed since the last run. The report compares
+candidate recommendations against the current `AGENTS.md`, `.github/copilot-instructions.md`,
+`CLAUDE.md` when present, and existing repository-local instruction or skill files, so it lists
+gaps that are not already covered — unless it is proposing a concrete improvement,
+consolidation, or removal. When repeated workflows suggest a better reusable setup, it can also
+recommend creating new AI skill files such as `SKILL.md`, `*.instructions.md`, `*.prompt.md`, or
+`*.agent.md`.
 
-When you pick a date-based range interactively, Session Control now asks whether it should analyze only chats in that range that have not been analyzed yet, or re-analyze everything in that range.
+### Implement recommendations
 
-After choosing the analysis scope, Session Control asks which available provider should perform the analysis. Direct language-model providers run inside Session Control; installed Codex, Claude Code, or Cursor agent providers open their chat and receive a workspace-aware analysis handoff. The analysis itself includes all eligible saved sessions from every provider in the workspace's `.chat` folder; the provider choice only selects who generates the report.
+`@session-control /implement` generates a compact implementation prompt that points a coding
+agent at the saved analysis report and keeps the next step focused on those AI control files.
+When the report recommends a new reusable AI skill, the generated prompt tells the next step to
+create that skill file and any supporting instruction assets. It uses the same provider selector
+as analysis: an available VS Code language model, Codex, Claude Code, or Cursor. External
+providers receive the handoff directly; a VS Code language-model choice opens the prompt in chat
+for review and sending.
 
-The participant reviews saved sessions from the configured storage folder, streams a report back into chat, and writes a markdown report under `.chat/analysis/reports/`. It also keeps an analysis index in `.chat/analysis/index.json` so the **Needs Analysis** mode only selects chats that have not been analyzed yet or whose content has changed since the last analysis. The report compares candidate recommendations against the current `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` when present, and existing repository-local instruction or skill files before listing recommendations. The report is intended to list only gaps that are not already covered there, unless it is proposing a concrete improvement, consolidation, or removal. When repeated workflows suggest a better reusable setup, the report can also recommend creating new AI skill files such as `SKILL.md`, `*.instructions.md`, `*.prompt.md`, or `*.agent.md`.
-
-After the report is generated, Session Control suggests an **Implement Recommendations** follow-up in chat.
-
-`@session-control /implement` generates a compact implementation prompt that points a coding agent at the saved analysis report file and keeps the next step focused on those AI control files. When the report recommends a new reusable AI skill, the generated prompt tells the next coding-agent step to create that skill file and any supporting instruction assets. It then uses the same provider selector as analysis: choose an available VS Code language model, Codex, Claude Code, or Cursor. External providers receive the handoff directly; a VS Code language-model choice opens the prompt in VS Code Chat for review and sending.
-
-### Implement the latest saved analysis from the command palette
-
-Run:
-
-```
-Session Control: Implement Latest Analysis
-```
-
-This command looks across the open workspace folders, finds the newest saved analysis report that still exists on disk, and opens the same provider-selection flow used by `@session-control /implement`. Choose an available VS Code language model, Codex, Claude Code, or Cursor. Internally this command is registered as `session-control.implementLatestAnalysis`.
+**Session Control: Implement Latest Analysis** does the same from the Command Palette — it looks
+across the open workspace folders, finds the newest saved analysis report still on disk, and
+opens the same provider-selection flow.
 
 ### Import Copilot guidance as Cursor, Codex, or Claude Code skills
 
-Run:
+The three **Import Copilot Guidance as ... Skills** commands scan repository guidance such as
+`.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`,
+`.github/prompts/*.prompt.md`, and other repo-local `*.instructions.md`, `*.prompt.md`,
+`*.agent.md`, or `SKILL.md` files. Each source is imported into `.cursor/skills/<slug>/SKILL.md`,
+`.agents/skills/<slug>/SKILL.md`, or `.claude/skills/<slug>/SKILL.md`, without overwriting
+existing skills.
 
-```
-Session Control: Import Copilot Guidance as Cursor Skills
-Session Control: Import Copilot Guidance as Codex Skills
-Session Control: Import Copilot Guidance as Claude Code Skills
-```
+### View a saved session
 
-This scans repository guidance such as `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`, `.github/prompts/*.prompt.md`, and other repo-local `*.instructions.md`, `*.prompt.md`, `*.agent.md`, or `SKILL.md` files. Use the Cursor command to import each source into `.cursor/skills/<slug>/SKILL.md`, the Codex command to import into `.agents/skills/<slug>/SKILL.md`, or the Claude Code command to import into `.claude/skills/<slug>/SKILL.md`, without overwriting existing skills.
+Open the **Session Control** activity bar view and click a session under **Saved Sessions**, or
+open a saved session file and use the **View Session** preview icon in the editor title bar. The
+title action appears only when the active file is a valid Session Control session document; if
+your JSON does not match the schema, the viewer action is hidden and the command reports that the
+format is not recognized.
 
-### View a saved session in the web viewer
-
-You can open the HTML session viewer in two ways:
-
-1. **From Session Explorer**
-	- Open the **Session Control** activity bar view.
-	- Under **Saved Sessions**, click a session row (or use the inline open action).
-
-2. **From an open JSON file**
-	- Open a saved session file (for example in `.chat/`).
-	- Use the **View Session** preview icon in the editor title bar.
-
-The editor title action is shown only when the active file is a valid Session Control session document. If your JSON does not match the Session Control schema, the viewer action is hidden and the command reports that the format is not recognized.
-
-### Resume from the session viewer
-
-When a saved session is open in the web viewer, a ▶ **Resume** icon appears in the editor title bar. Click it to open the chat panel with `@session-control /resume <session-title>` pre-filled. Press **Enter** to load the session as context and continue the conversation.
-
-### Viewer command
-
-You can also run this from the command palette:
-
-```
-Session Control: View Session
-```
-
-This command opens the web viewer for the active JSON file when it matches Session Control's saved session format.
+When a session is open in the viewer, a ▶ **Resume** icon in the editor title bar opens the chat
+panel with `@session-control /resume <session-title>` pre-filled.
 
 ## Configuration
 
@@ -398,21 +257,35 @@ This command opens the web viewer for the active JSON file when it matches Sessi
 >
 > This automatically adds your storage folder to `.gitignore` so sessions are never staged. Alternatively, add `.chat/` (or your configured `storagePath`) to `.gitignore` manually.
 
-## Contributing
+## Requirements
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, testing instructions, and PR guidelines.
+- VS Code `^1.93.0`, or a VS-Code-compatible editor (Cursor, VSCodium, Windsurf, Positron, Trae)
+- GitHub Copilot extension installed and signed in to save VS Code Copilot Chat sessions
+- GitHub Copilot CLI installed and signed in to auto-save its local session event logs
+- Cursor installed locally to import or auto-save Cursor Agent transcript sessions
+- Codex installed locally to import or auto-save Codex sessions, or create repo-scoped Codex
+  skills
+- Claude Code installed locally to import or auto-save Claude Code sessions, or create
+  repo-scoped Claude Code skills
 
-## Release Checklist
+Each requirement applies only to the provider you want to use — none of them are needed to
+install Session Control.
 
-Before cutting a tagged release:
+## Installation
 
-1. Run `npm run lint`.
-2. Run `npm test`.
-3. Update `CHANGELOG.md` for the release.
-4. Bump the extension version in `package.json`.
-5. Push a `v*` tag to trigger the automated marketplace and Open VSX publish workflow.
+Search for **Session Control** in your editor's extensions view, or install from:
 
-The release workflow also supports manual dispatch from GitHub Actions, but it will only publish after lint, build, and test steps pass.
+- [Open VSX Registry](https://open-vsx.org/extension/darrenjmcleod/session-control) — for
+  Cursor, Windsurf, VSCodium, Codium, Positron, Trae, and other VS-Code-compatible editors.
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control)
+  — for stock Visual Studio Code.
+
+## Documentation
+
+- [Auto-save reference](docs/auto-save.md) — sources, project matching, profiles, remote and WSL
+  boundaries, diagnostics
+- [Changelog](CHANGELOG.md)
+- [Contributing](CONTRIBUTING.md) — dev setup, testing instructions, and PR guidelines
 
 ## License
 

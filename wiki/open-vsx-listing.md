@@ -2,8 +2,8 @@
 title: "Open VSX Listing — Audit & Rewrite"
 type: reference
 created: 2026-06-28
-updated: 2026-07-04
-status: shipped (Step 1 + Step 2 bundled in v1.3.4; post-release spot-checks pending)
+updated: 2026-08-02
+status: Step 1 + Step 2 shipped in v1.3.4; Step 3 (overview restructure) drafted 2026-08-02, awaiting release
 ---
 
 # Open VSX Listing — Audit & Rewrite
@@ -198,6 +198,51 @@ the five files are committed.
 
 ---
 
+## 3.6 Phase 2 Step 3 — Overview structure (drafted 2026-08-02, unreleased)
+
+Steps 1 and 2 fixed *what the listing says* and *what it shows*. They did not fix **how much it
+says**. By v1.3.6 the README had grown to 419 lines, of which roughly 145 were auto-save
+internals: per-source acquisition contracts, the Cursor CLI persistence contract, VS Code
+profile / Remote SSH / dev container / WSL boundaries, and the diagnostics report field list.
+
+That content is accurate and worth keeping, but on a store overview it sits between the pitch
+and the configuration table, so a visitor evaluating the extension scrolls through an
+engineering spec. Step 3 is a structural edit only — no claim was weakened, removed, or added.
+
+### 3.6.1 Changes
+
+| Change | Rationale |
+| :-- | :-- |
+| Moved the deep auto-save reference verbatim into `docs/auto-save.md`, linked from a short README auto-save section | Keeps the contract documentation intact and findable without spending the listing's mid-page real estate on it |
+| Added a **Quick start** section (save → browse → resume) directly under the hero | The listing had no three-step path; Installation sat at line 90, below Features and Requirements |
+| Added a **Commands** table | The command surface was previously only discoverable by reading Usage prose |
+| Replaced the hardcoded `VS Marketplace-v1.3.6` badge with a static link label; added a dynamic Open VSX downloads badge | The hardcoded badge went stale on every release and had to be hand-edited. Shields' `visual-studio-marketplace/v` badge is **retired** (renders "retired badge"), and `vsmarketplacebadges.dev` — which does work — is an unofficial host whose outage would render a broken image on the listing. The Open VSX badge already shows the live version for the primary channel, so the Marketplace badge carries no version. |
+| Moved Requirements and Installation below the pitch, and noted that each requirement applies only to the provider being used | Reads as prerequisites for a feature, not barriers to installing |
+| Merged the viewer / resume-from-viewer / viewer-command sections into one | Three sections described one feature |
+
+Result: 419 → 293 lines. The privacy warning, the full configuration table, and every
+documented behavior are unchanged.
+
+### 3.6.2 Packaging note
+
+`docs/**` is added to `.vscodeignore`. `vsce` derives base content URLs from `repository` and
+rewrites relative README links to `https://github.com/tempuskg/session-control/blob/HEAD/<path>`
+at package time — verified against the published v1.3.6 readme, where `CONTRIBUTING.md` and
+`LICENSE` are already rewritten. The `docs/auto-save.md` link therefore resolves on both
+listings without shipping the file inside the VSIX.
+
+### 3.6.3 Known gap — Pro commands are undocumented on the listing
+
+`package.json` v1.3.6 contributes `session-control.enterProLicenseKey`,
+`clearProLicenseKey`, `showProLicenseStatus`, `session-control-pro.harvestKnowledge`, and
+`harvestSessionFromExplorer`. A user who installs the extension sees **Session Control Pro:**
+entries in the Command Palette with no explanation anywhere in the overview. Step 1 deliberately
+excluded Pro copy because billing had not shipped; that premise has now changed. Writing the Pro
+section is human-owned (pricing, availability, and tier boundaries are not agent-inferable) and
+is tracked as a separate item rather than being drafted here.
+
+---
+
 ## 4. Approval & ship checklist
 
 Human owner: review and approve before the next release.
@@ -215,6 +260,15 @@ Human owner: review and approve before the next release.
 - [ ] After the next release lands, re-check Open VSX search ranking for `cursor chat history`,
       `claude code session`, `cross-ide ai`, and `windsurf chat`. These are the brief's
       acceptance signals.
+
+### Step 3 — overview structure
+
+- [x] Move the deep auto-save reference into `docs/auto-save.md` without losing content.
+- [x] Add Quick start + Commands table; fix the stale hardcoded version badge.
+- [x] Verify `vsce ls` excludes `docs/**` and still ships README + all five screenshot assets.
+- [ ] Human owner: review the restructured README before the next release.
+- [ ] Decide whether the Pro command surface (Section 3.6.3) gets listing copy this release.
+- [ ] Bump version and push the `v*` tag — the overview only changes on the next publish.
 
 ### Step 2 — screenshots + GIF
 

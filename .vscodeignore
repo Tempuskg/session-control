@@ -27,6 +27,10 @@ Monetization*.md
 raw/**
 wiki/**
 
+# Extended user docs. README links to these relatively; vsce rewrites those to
+# absolute GitHub URLs at package time, so the files themselves need not ship.
+docs/**
+
 # Marketplace screenshot capture brief — dev-only; the PNG/GIF assets in this
 # folder still ship in the VSIX so the listing README images resolve offline.
 media/screenshots/README.md
