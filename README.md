@@ -230,7 +230,7 @@ panel with `@session-control /resume <session-title>` pre-filled.
 | `session-control.cursor.userDataPath` | `""` | Optional Cursor user data directory for legacy workspace `chatSessions` JSONL fallback; when empty, Session Control uses the default Cursor user data location for this OS |
 | `session-control.cursor.projectsPath` | `""` | Optional Cursor projects directory for Agent transcript import; when empty, Session Control uses `~/.cursor/projects` |
 | `session-control.autoSaveOnChatResponse` | `false` | Enable project-scoped auto-save for this workspace folder after each detected response or transcript update |
-| `session-control.autoSave.providers` | `["copilot", "codex", "claude-code", "cursor"]` | Providers monitored while workspace-scoped auto-save is enabled; `copilot` includes both VS Code Copilot Chat and GitHub Copilot CLI sources |
+| `session-control.autoSave.providers` | all four | Providers monitored while workspace-scoped auto-save is enabled — `copilot`, `codex`, `claude-code`, `cursor`. `copilot` includes both VS Code Copilot Chat and GitHub Copilot CLI sources |
 | `session-control.includeInGitignore` | `false` | Add storage folder to `.gitignore` |
 | `session-control.resume.maxTurns` | `50` | Max turns injected when resuming |
 | `session-control.resume.overflowStrategy` | `summarize` | `summarize`, `truncate`, or `recent-only` |
