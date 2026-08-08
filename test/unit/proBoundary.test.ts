@@ -2,9 +2,10 @@ import * as assert from 'node:assert';
 import * as vscode from 'vscode';
 import {
 	activateProFeatures,
-	DEFAULT_PRO_UPGRADE_URL,
 	hasProLicense,
 	loadProFeatureRegistrar,
+	openProPurchasePage,
+	PRO_PURCHASE_URL,
 	PRO_UPGRADE_PROMPT_LABEL,
 	SHARED_HANDOFF_CAPABILITY_VERSION,
 	showUpgradePrompt,
@@ -141,7 +142,7 @@ suite('pro boundary', () => {
 		assert.equal(await hasProLicense(), false);
 	});
 
-	test('showUpgradePrompt opens the upgrade URL only when requested', async () => {
+	test('showUpgradePrompt opens the purchase URL only when requested', async () => {
 		const opened: string[] = [];
 
 		await showUpgradePrompt(undefined, {
@@ -151,9 +152,43 @@ suite('pro boundary', () => {
 				return true;
 			},
 			parseUri: (value) => vscode.Uri.parse(value),
-			upgradeUrl: DEFAULT_PRO_UPGRADE_URL,
+			upgradeUrl: PRO_PURCHASE_URL,
 		});
 
-		assert.deepEqual(opened, [DEFAULT_PRO_UPGRADE_URL]);
+		assert.deepEqual(opened, [PRO_PURCHASE_URL]);
+	});
+
+	test('showUpgradePrompt opens nothing when the prompt is dismissed', async () => {
+		const opened: string[] = [];
+
+		await showUpgradePrompt(undefined, {
+			showInformationMessage: async () => undefined,
+			openExternal: async (target) => {
+				opened.push(target.toString());
+				return true;
+			},
+			parseUri: (value) => vscode.Uri.parse(value),
+			upgradeUrl: PRO_PURCHASE_URL,
+		});
+
+		assert.deepEqual(opened, []);
+	});
+
+	test('the purchase URL points at the landing page Pro section that carries checkout', () => {
+		assert.equal(PRO_PURCHASE_URL, 'https://sessioncontrol.dev/#pro');
+	});
+
+	test('openProPurchasePage opens the purchase URL directly', async () => {
+		const opened: string[] = [];
+
+		await openProPurchasePage({
+			openExternal: async (target) => {
+				opened.push(target.toString());
+				return true;
+			},
+			parseUri: (value) => vscode.Uri.parse(value),
+		});
+
+		assert.deepEqual(opened, [PRO_PURCHASE_URL]);
 	});
 });

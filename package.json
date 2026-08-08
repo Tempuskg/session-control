@@ -2,7 +2,7 @@
   "name": "session-control",
   "displayName": "Session Control",
   "description": "Save your Cursor, Claude Code, Codex, and Copilot chat history across git commits. Cross-IDE session manager that keeps every AI conversation in your repo, locally.",
-  "version": "1.3.7",
+  "version": "1.3.9",
   "publisher": "darrenjmcleod",
   "icon": "media/session-control.png",
   "license": "MIT",
@@ -154,6 +154,12 @@
         "category": "Session Control"
       },
       {
+        "command": "session-control.upgradeToPro",
+        "title": "Get Session Control Pro",
+        "category": "Session Control Pro",
+        "icon": "$(star-full)"
+      },
+      {
         "command": "session-control.enterProLicenseKey",
         "title": "Enter Pro License Key",
         "category": "Session Control Pro"
@@ -178,6 +184,12 @@
         "title": "Harvest This Session",
         "category": "Session Control Pro",
         "icon": "$(book)"
+      },
+      {
+        "command": "session-control-pro.searchSessions",
+        "title": "Search Saved Sessions (All Workspaces)",
+        "category": "Session Control Pro",
+        "icon": "$(search)"
       }
     ],
     "configuration": {
@@ -400,8 +412,8 @@
         },
         "session-control.pro.polar.organizationId": {
           "type": "string",
-          "default": "",
-          "description": "Polar organization ID used to validate Session Control Pro license keys.",
+          "default": "9a3f3f03-1384-425b-8a7a-54866b7d634a",
+          "description": "Polar organization ID used to validate Session Control Pro license keys. Defaults to the production Session Control organization; override only for Polar sandbox testing together with pro.polar.apiBaseUrl.",
           "scope": "application"
         },
         "session-control.pro.polar.apiBaseUrl": {
@@ -409,6 +421,27 @@
           "default": "https://api.polar.sh",
           "description": "Polar API base URL used to validate Session Control Pro license keys. Use https://sandbox-api.polar.sh for Polar sandbox testing.",
           "scope": "application"
+        },
+        "session-control-pro.search.additionalRoots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional workspace roots to include when searching saved sessions.",
+          "scope": "resource"
+        },
+        "session-control-pro.search.maxResults": {
+          "type": "number",
+          "default": 50,
+          "description": "Maximum number of saved-session search results to return.",
+          "scope": "resource"
+        },
+        "session-control-pro.search.includeToolCalls": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include tool-call content when searching saved sessions.",
+          "scope": "resource"
         }
       }
     },
@@ -489,6 +522,10 @@
           "command": "session-control.cleanupOrphanedParts"
         },
         {
+          "command": "session-control.upgradeToPro",
+          "when": "!session-control.hasProLicense"
+        },
+        {
           "command": "session-control.enterProLicenseKey"
         },
         {
@@ -503,6 +540,9 @@
         {
           "command": "session-control-pro.harvestSessionFromExplorer",
           "when": "false"
+        },
+        {
+          "command": "session-control-pro.searchSessions"
         },
         {
           "command": "session-control.analyzeSessionFromExplorer",
@@ -603,7 +643,7 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
-    "@tempuskg/session-control-pro": "^0.2.1",
+    "@tempuskg/session-control-pro": "^0.3.0",
     "marked": "^4.3.0"
   }
 }

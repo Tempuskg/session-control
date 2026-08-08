@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 const DEFAULT_POLAR_API_BASE_URL = 'https://api.polar.sh';
+const DEFAULT_POLAR_ORGANIZATION_ID = '9a3f3f03-1384-425b-8a7a-54866b7d634a';
 const POLAR_VALIDATE_PATH = '/v1/customer-portal/license-keys/validate';
 const SECRETS_KEY = 'session-control.pro.licenseKey';
 const CACHE_STATE_KEY = 'session-control.pro.licenseCache';
@@ -62,7 +63,7 @@ export function createProLicenseManager(deps: ProLicenseManagerDeps): ProLicense
 
 	function getOrganizationId(workspaceFolder?: vscode.WorkspaceFolder): string {
 		return getConfiguration(workspaceFolder)
-			.get<string>('pro.polar.organizationId', '')
+			.get<string>('pro.polar.organizationId', DEFAULT_POLAR_ORGANIZATION_ID)
 			.trim();
 	}
 

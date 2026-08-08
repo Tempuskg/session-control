@@ -83,6 +83,26 @@ captures matching chats for the workspace automatically.
 - **Bloat controls** — Configurable file size limits, session splitting, tool output
   stripping, and automatic pruning of old sessions.
 
+## Session Control Pro
+
+Everything above is free and stays free. **Session Control Pro** is an optional paid layer that
+ships inside this same extension — there is no second extension to install. Enter a license key
+and the Pro commands unlock in place.
+
+| Pro command | What it does |
+|-------------|--------------|
+| Harvest Knowledge to OKF Bundle | Distill saved sessions into a durable, linked knowledge bundle for the workspace |
+| Harvest This Session | Run the same harvest scoped to one session from the Session Explorer |
+| Search Saved Sessions (All Workspaces) | Full-text quick pick across every saved session, including workspaces that are not open |
+
+Knowledge Harvesting sends the selected session content to the AI model you choose, the same way
+the free **Analyze Saved Chats** command does. Saving, resuming, browsing, and auto-save stay
+entirely local.
+
+Run **Get Session Control Pro** from the Command Palette, or visit
+[sessioncontrol.dev/#pro](https://sessioncontrol.dev/#pro) for pricing and checkout. After
+purchase, run **Enter Pro License Key** and paste the key from your receipt.
+
 ## Commands
 
 All commands are available from the Command Palette under the **Session Control** category.

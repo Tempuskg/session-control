@@ -1,5 +1,8 @@
 import * as assert from 'node:assert';
+import * as vscode from 'vscode';
 import { createProLicenseManager } from '../../src/pro/licenseManager';
+
+const PRODUCTION_POLAR_ORGANIZATION_ID = '9a3f3f03-1384-425b-8a7a-54866b7d634a';
 
 function makeFakeContext(): import('vscode').ExtensionContext {
 	const store = new Map<string, unknown>();
@@ -54,13 +57,50 @@ suite('pro license manager', () => {
 				json: async () => ({ status: 'granted' }),
 			}) as Response,
 			getConfiguration: () => ({
-				get<T>(_key: string, defaultValue?: T): T {
+				get<T>(key: string, defaultValue?: T): T {
+					if (key === 'pro.polar.organizationId') {
+						return '' as T;
+					}
 					return defaultValue as T;
 				},
 			}) as import('vscode').WorkspaceConfiguration,
 		});
 
 		assert.equal(await manager.hasProLicense(), false);
+	});
+
+	test('ships the production Polar organization ID as the default', () => {
+		const inspected = vscode.workspace
+			.getConfiguration('session-control')
+			.inspect<string>('pro.polar.organizationId');
+
+		assert.ok(inspected, 'pro.polar.organizationId is not a contributed setting');
+		assert.equal(inspected.defaultValue, PRODUCTION_POLAR_ORGANIZATION_ID);
+	});
+
+	test('uses the production Polar organization ID when configuration is absent', async () => {
+		const context = makeFakeContext();
+		await context.secrets.store('session-control.pro.licenseKey', 'KEY-123');
+
+		let requestBody = '';
+		const manager = createProLicenseManager({
+			context,
+			fetch: async (_input, init) => {
+				requestBody = typeof init?.body === 'string' ? init.body : '';
+				return {
+					ok: true,
+					json: async () => ({ status: 'granted' }),
+				} as Response;
+			},
+			getConfiguration: () => ({
+				get<T>(_key: string, defaultValue?: T): T {
+					return defaultValue as T;
+				},
+			}) as vscode.WorkspaceConfiguration,
+		});
+
+		assert.equal(await manager.hasProLicense(), true);
+		assert.equal(JSON.parse(requestBody).organization_id, PRODUCTION_POLAR_ORGANIZATION_ID);
 	});
 
 	test('hasProLicense validates against the configured Polar sandbox endpoint', async () => {

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.9] - 2026-08-08
+
+### Added
+- New **Get Session Control Pro** command opens the Session Control Pro purchase page. It is hidden from the Command Palette once a license validates, via the new `session-control.hasProLicense` context key.
+- Session Control Pro now exposes **Search Saved Sessions (All Workspaces)** for local full-text search across saved-session stores, with provider, branch, workspace, and date filters.
+- README now documents the Session Control Pro tier, its commands, and where to buy.
+
+### Fixed
+- The in-editor Pro upgrade prompt now opens the sessioncontrol.dev Pro section, which carries the checkout links, instead of the public source repository. Its action button reads **Get Pro**.
+- Production Pro license activation now defaults to the Session Control Polar organization in both the extension manifest and runtime fallback, so paid keys validate without manual organization setup while sandbox overrides remain supported.
+
 ## [1.3.7] - 2026-08-03
 
 ### Changed
