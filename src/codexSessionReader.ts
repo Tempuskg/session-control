@@ -7,9 +7,20 @@ import { SourceChatSession, SavedTurn, ToolCall } from './types';
 interface CodexSessionReaderDeps {
 	listFiles(directoryPath: string): Promise<string[]>;
 	readFile(filePath: string): Promise<string>;
+	readFileHead(filePath: string, maxBytes: number): Promise<string>;
 	hash(value: string): string;
 	showInformationMessage(message: string): Thenable<unknown>;
 	logWarning(message: string): void;
+}
+
+export interface CodexSessionReadOptions {
+	/**
+	 * When supplied, transcripts whose owning workspace can be identified from
+	 * the file head and does not match are skipped without reading the body.
+	 * `~/.codex/sessions` is a machine-wide store, so an unfiltered read loads
+	 * every workspace's history into memory at once.
+	 */
+	matchesWorkspace?(cwd: string): boolean;
 }
 
 export interface CodexSession extends SourceChatSession {
@@ -352,10 +363,65 @@ async function listFilesRecursive(directoryPath: string): Promise<string[]> {
 	return files;
 }
 
+const SESSION_HEAD_BYTES = 64 * 1024;
+
+/**
+ * Codex writes `session_meta` as the first record of a transcript, so the
+ * owning workspace can be read from the head of the file. Returns undefined
+ * when ownership cannot be established, in which case the caller must fall
+ * back to a full read rather than risk dropping a session.
+ */
+async function readCwdFromHead(
+	filePath: string,
+	readFileHead: CodexSessionReaderDeps['readFileHead'],
+): Promise<string | undefined> {
+	let head: string;
+	try {
+		head = await readFileHead(filePath, SESSION_HEAD_BYTES);
+	} catch {
+		return undefined;
+	}
+
+	const newlineIndex = head.indexOf('\n');
+	if (newlineIndex < 0) {
+		// The first record is larger than the head window, so it was truncated.
+		return undefined;
+	}
+
+	const firstLine = head.slice(0, newlineIndex).trim();
+	if (!firstLine) {
+		return undefined;
+	}
+
+	let record: unknown;
+	try {
+		record = JSON.parse(firstLine);
+	} catch {
+		return undefined;
+	}
+
+	if (!isRecord(record) || record.type !== 'session_meta' || !isRecord(record.payload)) {
+		return undefined;
+	}
+
+	const cwd = typeof record.payload.cwd === 'string' ? record.payload.cwd.trim() : '';
+	return cwd.length ? cwd : undefined;
+}
+
 function createDefaultDeps(): CodexSessionReaderDeps {
 	return {
 		listFiles: listFilesRecursive,
 		readFile: async (filePath: string) => fs.readFile(filePath, 'utf8'),
+		readFileHead: async (filePath: string, maxBytes: number) => {
+			const handle = await fs.open(filePath, 'r');
+			try {
+				const buffer = Buffer.alloc(maxBytes);
+				const { bytesRead } = await handle.read(buffer, 0, maxBytes, 0);
+				return buffer.subarray(0, bytesRead).toString('utf8');
+			} finally {
+				await handle.close();
+			}
+		},
 		hash: (value) => createHash('sha256').update(value).digest('hex'),
 		showInformationMessage: async (message: string) => vscode.window.showInformationMessage(message),
 		logWarning: (message: string) => {
@@ -369,7 +435,7 @@ export function deriveCodexSessionsPath(codexHomePath: string): string {
 }
 
 export function createCodexSessionReader(overrides: Partial<CodexSessionReaderDeps> = {}): {
-	readCodexSessions(codexHomePath: string): Promise<CodexSession[]>;
+	readCodexSessions(codexHomePath: string, options?: CodexSessionReadOptions): Promise<CodexSession[]>;
 } {
 	const deps = {
 		...createDefaultDeps(),
@@ -377,7 +443,10 @@ export function createCodexSessionReader(overrides: Partial<CodexSessionReaderDe
 	};
 
 	return {
-		async readCodexSessions(codexHomePath: string): Promise<CodexSession[]> {
+		async readCodexSessions(
+			codexHomePath: string,
+			options: CodexSessionReadOptions = {},
+		): Promise<CodexSession[]> {
 			const sessionsDirectory = deriveCodexSessionsPath(codexHomePath);
 			let files: string[];
 			try {
@@ -398,6 +467,16 @@ export function createCodexSessionReader(overrides: Partial<CodexSessionReaderDe
 			for (const filePath of sessionFiles) {
 				const sourceFile = path.basename(filePath).replace(/\.jsonl?$/i, '');
 				try {
+					if (options.matchesWorkspace) {
+						// Skip other workspaces' transcripts before their bodies are read.
+						// An undetermined owner falls through to the full read so an
+						// unusually shaped transcript is never silently dropped.
+						const cwd = await readCwdFromHead(filePath, deps.readFileHead);
+						if (cwd !== undefined && !options.matchesWorkspace(cwd)) {
+							continue;
+						}
+					}
+
 					const content = await deps.readFile(filePath);
 					if (!content.trim()) {
 						deps.logWarning(`Skipped empty Codex session file: ${path.basename(filePath)}`);

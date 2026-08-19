@@ -1920,7 +1920,12 @@ function createDefaultAutoSaveOnChatResponseDeps(context: vscode.ExtensionContex
 			}),
 		readCodexSessions: async (workspaceFolder) =>
 			filterSessionsForWorkspace(
-				await autoSaveCodexSessionReader.readCodexSessions(getCodexHomePath(workspaceFolder)),
+				await autoSaveCodexSessionReader.readCodexSessions(getCodexHomePath(workspaceFolder), {
+					// Auto-save discards every non-matching session anyway (see
+					// filterSessionsForWorkspace), so applying the same test during the
+					// read keeps the machine-wide Codex store out of memory.
+					matchesWorkspace: (cwd) => pathsOverlap(cwd, workspaceFolder.uri.fsPath),
+				}),
 				workspaceFolder,
 				'codex',
 				'auto-save',

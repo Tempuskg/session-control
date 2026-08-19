@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.10] - 2026-08-18
+
+### Fixed
+- Codex auto-save no longer reads every workspace's transcripts into memory. `~/.codex/sessions` is a machine-wide store, so a scan previously loaded unrelated workspaces' history in full before discarding it. Auto-save now identifies the owning workspace from the `session_meta` record at the head of each transcript and skips non-matching files without reading their bodies. A transcript whose owner cannot be determined still falls back to a full read, so unusually shaped sessions are never silently dropped.
+
 ## [1.3.9] - 2026-08-08
 
 ### Added

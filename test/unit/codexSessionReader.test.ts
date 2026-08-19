@@ -93,6 +93,97 @@ suite('codexSessionReader', () => {
 		assert.equal(result.endsWith(path.join('.codex', 'sessions')), true);
 	});
 
+	test('matchesWorkspace skips other workspaces without reading their bodies', async () => {
+		const setup = await setupCodexHome();
+		const readFiles: string[] = [];
+
+		try {
+			const sessionDirectory = path.join(setup.sessionsDirectory, '2026', '06', '04');
+			await fs.mkdir(sessionDirectory, { recursive: true });
+
+			await fs.writeFile(
+				path.join(sessionDirectory, 'mine.jsonl'),
+				createCodexSessionJsonl(
+					'codex-session-mine',
+					'Mine',
+					'Response for my workspace.',
+					'2026-06-04T10:00',
+					'E:/workspace/mine',
+				),
+				'utf8',
+			);
+			await fs.writeFile(
+				path.join(sessionDirectory, 'theirs.jsonl'),
+				createCodexSessionJsonl(
+					'codex-session-theirs',
+					'Theirs',
+					'Response for a different workspace.',
+					'2026-06-04T11:00',
+					'E:/workspace/theirs',
+				),
+				'utf8',
+			);
+
+			const reader = createCodexSessionReader({
+				readFile: async (filePath: string) => {
+					readFiles.push(path.basename(filePath));
+					return fs.readFile(filePath, 'utf8');
+				},
+				showInformationMessage: async () => undefined,
+				logWarning: () => undefined,
+			});
+
+			const sessions = await reader.readCodexSessions(setup.codexHomePath, {
+				matchesWorkspace: (cwd) => cwd === 'E:/workspace/mine',
+			});
+
+			assert.deepEqual(
+				sessions.map((session) => session.id),
+				['codex-session-mine'],
+			);
+			// The non-matching transcript must never be loaded: reading every
+			// session in the machine-wide store is what exhausted the heap.
+			assert.deepEqual(readFiles, ['mine.jsonl']);
+		} finally {
+			await fs.rm(setup.root, { recursive: true, force: true });
+		}
+	});
+
+	test('an undetermined owner still falls back to a full read', async () => {
+		const setup = await setupCodexHome();
+
+		try {
+			const sessionDirectory = path.join(setup.sessionsDirectory, '2026', '06', '05');
+			await fs.mkdir(sessionDirectory, { recursive: true });
+
+			// No session_meta first record, so the owner cannot be read from the head.
+			const withoutMeta = [
+				JSON.stringify({
+					timestamp: '2026-06-05T10:00:01.000Z',
+					type: 'event_msg',
+					payload: { type: 'user_message', message: 'No meta record here' },
+				}),
+				JSON.stringify({
+					timestamp: '2026-06-05T10:00:02.000Z',
+					type: 'event_msg',
+					payload: { type: 'agent_message', message: 'Still readable.' },
+				}),
+			].join('\n');
+			await fs.writeFile(path.join(sessionDirectory, 'no-meta.jsonl'), withoutMeta, 'utf8');
+
+			const sessions = await createCodexSessionReader({
+				showInformationMessage: async () => undefined,
+				logWarning: () => undefined,
+			}).readCodexSessions(setup.codexHomePath, {
+				matchesWorkspace: () => false,
+			});
+
+			assert.equal(sessions.length, 1);
+		} finally {
+			await fs.rm(setup.root, { recursive: true, force: true });
+		}
+	});
+
 	test('reads Codex JSONL sessions, sorts by recency, and skips corrupt files', async () => {
 		const warnings: string[] = [];
 		const infoMessages: string[] = [];

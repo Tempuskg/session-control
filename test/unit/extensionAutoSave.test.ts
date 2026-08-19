@@ -13,7 +13,12 @@ function drainAsyncWork(): Promise<void> {
 }
 
 function createTestWorkspacePath(): string {
-	return path.join(path.parse(process.cwd()).root, 'chat-commit');
+	// These fixtures are compared against paths that the code under test reads
+	// back from `Uri.file(...).fsPath`, which lowercases the Windows drive
+	// letter. Normalize here so the expectation holds whatever casing the test
+	// runner's cwd reports.
+	const root = path.parse(process.cwd()).root;
+	return path.join(root.replace(/^[a-zA-Z](?=:)/, (drive) => drive.toLowerCase()), 'chat-commit');
 }
 
 interface FakeWatcher {
