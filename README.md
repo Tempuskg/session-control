@@ -92,12 +92,13 @@ and the Pro commands unlock in place.
 | Pro command | What it does |
 |-------------|--------------|
 | Harvest Knowledge to OKF Bundle | Distill saved sessions into a durable, linked knowledge bundle for the workspace |
+| Import and Harvest Word Document... | Import an ordered DOCX source with provenance, then review its extracted knowledge before writing |
 | Harvest This Session | Run the same harvest scoped to one session from the Session Explorer |
 | Search Saved Sessions (All Workspaces) | Full-text quick pick across every saved session, including workspaces that are not open |
 
-Knowledge Harvesting sends the selected session content to the AI model you choose, the same way
-the free **Analyze Saved Chats** command does. Saving, resuming, browsing, and auto-save stay
-entirely local.
+Knowledge Harvesting sends the selected saved-session or document content to the AI model you
+choose, the same way the free **Analyze Saved Chats** command does. Saving, resuming, browsing,
+auto-save, and document extraction stay entirely local.
 
 Run **Get Session Control Pro** from the Command Palette, or visit
 [sessioncontrol.dev/#pro](https://sessioncontrol.dev/#pro) for pricing and checkout. After

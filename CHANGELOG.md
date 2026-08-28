@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.11] - 2026-08-28
+
+### Added
+
+- Session Control Pro now contributes **Import and Harvest Word Document...**, which imports an unchanged DOCX into workspace-local Session Control storage and opens the existing reviewed knowledge-harvest workflow for that document.
+
 ## [1.3.10] - 2026-08-18
 
 ### Fixed
