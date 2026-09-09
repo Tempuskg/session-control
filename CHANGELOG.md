@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.12] - 2026-09-09
+
+### Added
+
+- The **Saved Sessions** view title bar now has a search button for **Search Saved Sessions (All Workspaces)**, so Pro global session search is reachable from the sidebar instead of the Command Palette alone. The Pro gate is unchanged: without an active license the button shows the upgrade prompt.
+
 ## [1.3.11] - 2026-08-28
 
 ### Added

@@ -52,6 +52,8 @@ interface PackageManifest {
 
 // Start with a fixed local wall-clock time, then store it as ISO just like a
 // real savedAt value. This keeps the assertion portable across runner zones.
+const PRO_SEARCH_SESSIONS_COMMAND = 'session-control-pro.searchSessions';
+
 const KNOWN_LOCAL_SAVED_AT = new Date(2026, 3, 12, 4, 0, 0, 0).toISOString();
 const KNOWN_LOCAL_SAVED_AT_TEXT = '2026-04-12 04:00';
 
@@ -482,6 +484,37 @@ suite('session explorer', () => {
 		assert.equal(refreshAction?.group, 'navigation@1');
 		assert.equal(sortAction?.when, 'view == session-control.sessionExplorer');
 		assert.equal(sortAction?.group, 'navigation@2');
+	});
+
+	test('Pro session search is contributed to the Saved Sessions toolbar only', async () => {
+		const manifest = await readPackageManifest();
+		const searchCommand = manifest.contributes.commands.find(
+			(contribution) => contribution.command === PRO_SEARCH_SESSIONS_COMMAND,
+		);
+		assert.equal(searchCommand?.title, 'Search Saved Sessions (All Workspaces)');
+		assert.equal(searchCommand?.icon, '$(search)');
+
+		const titleActions = manifest.contributes.menus['view/title'] ?? [];
+		const searchActions = titleActions.filter(
+			(contribution) => contribution.command === PRO_SEARCH_SESSIONS_COMMAND,
+		);
+		assert.equal(searchActions.length, 1);
+		assert.equal(searchActions[0]?.when, 'view == session-control.sessionExplorer');
+		assert.equal(searchActions[0]?.group, 'navigation@3');
+
+		// Every other view/title action stays pinned to the Saved Sessions view,
+		// so no other view's title bar gains the Pro search button.
+		for (const contribution of titleActions) {
+			assert.equal(contribution.when, 'view == session-control.sessionExplorer');
+		}
+
+		// The gated command keeps its Command Palette entry and must not appear
+		// as a saved-session row action.
+		const itemActions = manifest.contributes.menus['view/item/context'] ?? [];
+		assert.equal(
+			itemActions.some((contribution) => contribution.command === PRO_SEARCH_SESSIONS_COMMAND),
+			false,
+		);
 	});
 
 	test('inline session actions use compact icons and keep delete rightmost', async () => {
