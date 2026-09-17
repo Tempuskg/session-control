@@ -15,8 +15,8 @@ through the `@session-control` chat participant.
 
 Session Control has no cloud of its own — it reads your chats locally and never uploads them
 anywhere. Saved sessions are plain files in your repo, next to the code they produced, in
-source control you already trust. Works inside VS Code, Cursor, VSCodium, and other
-VS-Code-compatible editors via the Open VSX Registry.
+source control you already trust. Works inside Cursor, Windsurf, VSCodium, and other
+VS-Code-compatible editors via the Open VSX Registry, and inside stock VS Code.
 
 ![Animated demo: save a Copilot chat session, browse it in the Session Explorer, and resume it as context in a new chat.](https://raw.githubusercontent.com/tempuskg/session-control/main/media/screenshots/demo.gif)
 

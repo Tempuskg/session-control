@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.13] - 2026-09-17
+
+### Changed
+
+- Marketplace listing metadata is now fork-first. The extension description leads with Cursor, Claude Code, Codex, and Copilot chat history and names Cursor, Windsurf, and VSCodium alongside VS Code; `keywords` are reordered and retargeted around how the listing is actually searched (`cursor`, `claude-code`, `codex`, `windsurf`, `chat-history`, `session-manager`) instead of generic terms like `chat`, `git`, and `history`; and `categories` moved from `Other` to `AI` and `Chat` beside `SCM Providers`. No behavior change — listing and search metadata only.
+
 ## [1.3.12] - 2026-09-09
 
 ### Added
