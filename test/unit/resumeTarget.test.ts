@@ -1,5 +1,10 @@
 import * as assert from 'node:assert';
-import { resolveProviderFocusCommand, resolveResumeTarget } from '../../src/resumeTarget';
+import {
+	buildResumeProviderChoices,
+	listAvailableResumeTargets,
+	resolveProviderFocusCommand,
+	resolveResumeTarget,
+} from '../../src/resumeTarget';
 
 suite('resumeTarget', () => {
 	test('resolves Copilot chat with query support', () => {
@@ -100,5 +105,68 @@ suite('resumeTarget', () => {
 		assert.equal(resolveProviderFocusCommand('codex', ['chatgpt.newCodexPanel']), undefined);
 		assert.equal(resolveProviderFocusCommand('claude-code', ['claude-vscode.sidebar.open']), undefined);
 		assert.equal(resolveProviderFocusCommand('cursor', ['aichat.newchataction']), undefined);
+	});
+	test('lists every provider whose command is registered in the host', () => {
+		const targets = listAvailableResumeTargets([
+			'workbench.action.chat.open',
+			'chatgpt.openSidebar',
+			'composer.newAgentChat',
+			'claude-vscode.sidebar.open',
+		]);
+
+		assert.deepEqual(
+			targets.map((target) => [target.provider, target.commandId, target.supportsQuery]),
+			[
+				['copilot', 'workbench.action.chat.open', true],
+				['codex', 'chatgpt.openSidebar', false],
+				['cursor', 'composer.newAgentChat', false],
+				['claude-code', 'claude-vscode.sidebar.open', false],
+			],
+		);
+	});
+
+	test('excludes providers with no available command from the picker', () => {
+		const choices = buildResumeProviderChoices('codex', [
+			'workbench.action.chat.open',
+			'chatgpt.openSidebar',
+		]);
+
+		assert.deepEqual(choices.map((choice) => choice.provider), ['codex', 'copilot']);
+		assert.equal(choices.some((choice) => choice.provider === 'cursor'), false);
+		assert.equal(choices.some((choice) => choice.provider === 'claude-code'), false);
+	});
+
+	test('lists the origin provider first and labels it', () => {
+		const choices = buildResumeProviderChoices('claude-code', [
+			'workbench.action.chat.open',
+			'chatgpt.openSidebar',
+			'composer.newAgentChat',
+			'claude-vscode.sidebar.open',
+		]);
+
+		assert.deepEqual(
+			choices.map((choice) => [choice.provider, choice.label, choice.isOrigin]),
+			[
+				['claude-code', 'Claude Code', true],
+				['copilot', 'Copilot', false],
+				['codex', 'Codex', false],
+				['cursor', 'Cursor', false],
+			],
+		);
+	});
+
+	test('honors configured provider command overrides when building picker choices', () => {
+		const choices = buildResumeProviderChoices('copilot', ['custom.codex.open'], {
+			codex: 'custom.codex.open',
+		});
+
+		assert.deepEqual(
+			choices.map((choice) => [choice.provider, choice.commandId]),
+			[['codex', 'custom.codex.open']],
+		);
+	});
+
+	test('returns no choices when no provider chat command is registered', () => {
+		assert.deepEqual(buildResumeProviderChoices('cursor', ['some.unrelated.command']), []);
 	});
 });

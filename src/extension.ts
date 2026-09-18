@@ -34,6 +34,7 @@ import {
 	runResumeIntoOriginAgent,
 	type AnalysisAgentProviderId,
 	type AnalysisProviderSelection,
+	type ResumeIntoOriginAgentDeps,
 	type ResumeOverflowStrategy,
 	type ResumeTargetMode,
 } from './chatParticipant';
@@ -76,7 +77,7 @@ import {
 	registerSessionExplorerVisibilityRefresh,
 	runSortSessionExplorerCommand,
 } from './sessionExplorer';
-import { ResumeProviderCommands } from './resumeTarget';
+import { buildResumeProviderChoices, ResumeProviderChoice, ResumeProviderCommands } from './resumeTarget';
 import { SessionViewerPanel } from './sessionViewer';
 import { createSessionStore, OrphanedPartFile, SessionFileNameOptions, SessionPruneAction } from './sessionStore';
 import { applySaveBloatControls, createChatSession, SaveOverflowStrategy } from './sessionWriter';
@@ -198,6 +199,14 @@ interface ImportCopilotGuidanceCommandOptions {
 
 interface ResumeSessionFromViewerCommandDeps {
 	writeClipboard: (text: string) => Promise<void>;
+}
+
+interface ContinueSessionWithProviderCommandDeps {
+	writeClipboard: (text: string) => Promise<void>;
+	getCommands: () => Promise<readonly string[]>;
+	pickTargetProvider: (
+		choices: readonly ResumeProviderChoice[],
+	) => Promise<ResumeProviderChoice | undefined>;
 }
 
 interface SaveSourceSessionFlowDeps {
@@ -2368,6 +2377,140 @@ function updateAutoSaveStatusBar(
 	item.show();
 }
 
+interface ResumeSessionConfiguration {
+	maxTurns: number;
+	maxContextChars: number;
+	overflowStrategy: ResumeOverflowStrategy;
+	providerCommands: ResumeProviderCommands;
+	resumeTargetMode: ResumeTargetMode;
+}
+
+function readResumeSessionConfiguration(filePath: string): ResumeSessionConfiguration {
+	const fileUri = vscode.Uri.file(filePath);
+	const workspaceFolder = vscode.workspace.getWorkspaceFolder(fileUri) ?? getImplicitWorkspaceFolder();
+	const configuration = vscode.workspace.getConfiguration('session-control', workspaceFolder?.uri ?? fileUri);
+
+	return {
+		maxTurns: configuration.get<number>('resume.maxTurns', 50),
+		maxContextChars: configuration.get<number>('resume.maxContextChars', 80000),
+		overflowStrategy: configuration.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize'),
+		providerCommands: configuration.get<ResumeProviderCommands>('resume.providerCommands', {}),
+		resumeTargetMode: configuration.get<ResumeTargetMode>('resume.target', 'origin-agent'),
+	};
+}
+
+function createResumeIntoAgentDeps(
+	writeClipboard: (text: string) => Promise<void>,
+): ResumeIntoOriginAgentDeps {
+	return {
+		getCommands: async () => vscode.commands.getCommands(true),
+		executeCommand: async (commandId: string, args?: unknown) => {
+			if (args === undefined) {
+				await vscode.commands.executeCommand(commandId);
+				return;
+			}
+
+			await vscode.commands.executeCommand(commandId, args);
+		},
+		writeClipboard,
+		streamMarkdown: (markdown: string) => {
+			void vscode.window.showInformationMessage(markdown.replace(/\s+/g, ' ').trim());
+		},
+	};
+}
+
+async function openChatParticipantResume(sessionTitle: string): Promise<void> {
+	await vscode.commands.executeCommand('workbench.action.chat.open', {
+		query: `@session-control /resume ${sessionTitle}`,
+	});
+}
+
+async function pickResumeTargetProvider(
+	choices: readonly ResumeProviderChoice[],
+): Promise<ResumeProviderChoice | undefined> {
+	const picked = await vscode.window.showQuickPick(
+		choices.map((choice) => ({
+			label: choice.label,
+			description: choice.isOrigin
+				? 'Where this session was captured'
+				: 'Continue this session in a different assistant',
+			choice,
+		})),
+		{ title: 'Continue this session in', placeHolder: 'Pick the assistant that should receive the transcript' },
+	);
+
+	return picked?.choice;
+}
+
+// Continues a saved session in any installed provider, independent of where it
+// was captured. Target discovery and delivery reuse the same resume plumbing
+// as origin-agent resume, so there is no second provider-command table.
+export async function runContinueSessionWithProviderCommand(
+	depsOverrides: Partial<ContinueSessionWithProviderCommandDeps> = {},
+): Promise<void> {
+	const deps: ContinueSessionWithProviderCommandDeps = {
+		writeClipboard: async (text: string) => vscode.env.clipboard.writeText(text),
+		getCommands: async () => vscode.commands.getCommands(true),
+		pickTargetProvider: pickResumeTargetProvider,
+		...depsOverrides,
+	};
+	const panel = SessionViewerPanel.currentPanel;
+	if (!panel) {
+		await vscode.window.showInformationMessage('No session viewer is currently open.');
+		return;
+	}
+
+	const sessionTitle = panel.getSessionTitle();
+	if (!sessionTitle) {
+		await vscode.window.showWarningMessage('Unable to determine session title.');
+		return;
+	}
+
+	const session = panel.getSession();
+	const configuration = readResumeSessionConfiguration(panel.getFilePath());
+	const choices = session
+		? buildResumeProviderChoices(
+			session.provider,
+			await deps.getCommands(),
+			configuration.providerCommands,
+		)
+		: [];
+
+	if (session && choices.length) {
+		const choice = await deps.pickTargetProvider(choices);
+		if (!choice) {
+			return;
+		}
+
+		const continued = await runResumeIntoOriginAgent(
+			session,
+			'Continue this session.',
+			{
+				maxTurns: configuration.maxTurns,
+				maxContextChars: configuration.maxContextChars,
+				overflowStrategy: configuration.overflowStrategy,
+				providerCommands: configuration.providerCommands,
+				targetProvider: choice.provider,
+			},
+			createResumeIntoAgentDeps(deps.writeClipboard),
+		);
+		if (continued) {
+			return;
+		}
+	} else {
+		await vscode.window.showInformationMessage(
+			'No installed assistant could be found to continue this session in. Falling back to VS Code chat resume.',
+		);
+	}
+
+	try {
+		await openChatParticipantResume(sessionTitle);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		await vscode.window.showErrorMessage(`Failed to open chat: ${message}`);
+	}
+}
+
 export async function runResumeSessionFromViewerCommand(
 	depsOverrides: Partial<ResumeSessionFromViewerCommandDeps> = {},
 ): Promise<void> {
@@ -2387,44 +2530,21 @@ export async function runResumeSessionFromViewerCommand(
 		return;
 	}
 
-	const openCopilotResume = async (): Promise<void> => {
-		await vscode.commands.executeCommand('workbench.action.chat.open', {
-			query: `@session-control /resume ${sessionTitle}`,
-		});
-	};
-
 	const session = panel.getSession();
 	const provider = panel.getSessionProvider();
 	if (session && provider && provider !== 'copilot') {
-		const fileUri = vscode.Uri.file(panel.getFilePath());
-		const workspaceFolder = vscode.workspace.getWorkspaceFolder(fileUri) ?? getImplicitWorkspaceFolder();
-		const configuration = vscode.workspace.getConfiguration('session-control', workspaceFolder?.uri ?? fileUri);
-		const resumeTargetMode = configuration.get<ResumeTargetMode>('resume.target', 'origin-agent');
-		if (resumeTargetMode === 'origin-agent') {
+		const configuration = readResumeSessionConfiguration(panel.getFilePath());
+		if (configuration.resumeTargetMode === 'origin-agent') {
 			const openedOriginAgent = await runResumeIntoOriginAgent(
 				session,
 				'Continue this session.',
 				{
-					maxTurns: configuration.get<number>('resume.maxTurns', 50),
-					maxContextChars: configuration.get<number>('resume.maxContextChars', 80000),
-					overflowStrategy: configuration.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize'),
-					providerCommands: configuration.get<ResumeProviderCommands>('resume.providerCommands', {}),
+					maxTurns: configuration.maxTurns,
+					maxContextChars: configuration.maxContextChars,
+					overflowStrategy: configuration.overflowStrategy,
+					providerCommands: configuration.providerCommands,
 				},
-				{
-					getCommands: async () => vscode.commands.getCommands(true),
-					executeCommand: async (commandId: string, args?: unknown) => {
-						if (args === undefined) {
-							await vscode.commands.executeCommand(commandId);
-							return;
-						}
-
-						await vscode.commands.executeCommand(commandId, args);
-					},
-					writeClipboard: deps.writeClipboard,
-					streamMarkdown: (markdown: string) => {
-						void vscode.window.showInformationMessage(markdown.replace(/\s+/g, ' ').trim());
-					},
-				},
+				createResumeIntoAgentDeps(deps.writeClipboard),
 			);
 			if (openedOriginAgent) {
 				return;
@@ -2434,7 +2554,7 @@ export async function runResumeSessionFromViewerCommand(
 
 	// Open the chat panel with a pre-filled resume command
 	try {
-		await openCopilotResume();
+		await openChatParticipantResume(sessionTitle);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		await vscode.window.showErrorMessage(`Failed to open chat: ${message}`);
@@ -2603,6 +2723,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		}),
 		vscode.commands.registerCommand('session-control.resumeSessionFromViewer', async () => {
 			await runResumeSessionFromViewerCommand();
+		}),
+		vscode.commands.registerCommand('session-control.continueSessionWithProvider', async () => {
+			await runContinueSessionWithProviderCommand();
 		}),
 		vscode.commands.registerCommand('session-control.analyzeSavedChats', async () => {
 			await runAnalyzeSavedChatsCommand();

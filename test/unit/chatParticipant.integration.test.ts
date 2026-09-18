@@ -14,6 +14,7 @@ import {
 import { createSessionStore } from '../../src/sessionStore';
 import { applySaveBloatControls, createChatSession } from '../../src/sessionWriter';
 import { CopilotSession } from '../../src/sessionReader';
+import { SessionProviderId } from '../../src/types';
 
 function createCopilotSession(): CopilotSession {
 	return {
@@ -52,6 +53,89 @@ function createCopilotSession(): CopilotSession {
 				timestamp: '2026-04-12T12:03:00.000Z',
 			},
 		],
+	};
+}
+
+// Every open/focus command the four supported providers can resolve to, as a
+// host with all of them installed would report from getCommands(true).
+const ALL_PROVIDER_COMMANDS = [
+	'workbench.action.chat.open',
+	'chatgpt.openSidebar',
+	'chatgpt.sidebarView.focus',
+	'composer.newAgentChat',
+	'composer.focusComposer',
+	'claude-vscode.sidebar.open',
+	'claude-vscode.newConversation',
+	'claude-vscode.focus',
+];
+
+const EXPECTED_OPEN_COMMAND: Record<SessionProviderId, string> = {
+	copilot: 'workbench.action.chat.open',
+	codex: 'chatgpt.openSidebar',
+	cursor: 'composer.newAgentChat',
+	'claude-code': 'claude-vscode.sidebar.open',
+};
+
+const PROVIDER_LABELS: Record<SessionProviderId, string> = {
+	copilot: 'Copilot',
+	codex: 'Codex',
+	cursor: 'Cursor',
+	'claude-code': 'Claude Code',
+};
+
+interface ContinueResult {
+	opened: boolean;
+	executedCommands: string[];
+	deliveredPrompt: string | undefined;
+	messages: string[];
+}
+
+async function continueSessionInto(
+	originProvider: SessionProviderId,
+	targetProvider: SessionProviderId,
+	availableCommands: readonly string[] = ALL_PROVIDER_COMMANDS,
+): Promise<ContinueResult> {
+	const saved = {
+		...createChatSession(createCopilotSession(), {
+			title: 'Cross provider continue',
+			savedAt: '2026-04-12T13:00:00.000Z',
+			vscodeVersion: '1.115.0',
+		}),
+		provider: originProvider,
+	};
+	const executedCommands: string[] = [];
+	const messages: string[] = [];
+	let queryPrompt: string | undefined;
+	let clipboardPrompt: string | undefined;
+
+	const opened = await runResumeIntoOriginAgent(saved, 'Continue', {
+		maxTurns: 50,
+		maxContextChars: 30000,
+		overflowStrategy: 'truncate',
+		targetProvider,
+	}, {
+		getCommands: async () => availableCommands,
+		executeCommand: async (commandId: string, args?: unknown) => {
+			executedCommands.push(commandId);
+			const query = (args as { query?: string } | undefined)?.query;
+			if (query !== undefined) {
+				queryPrompt = query;
+			}
+		},
+		writeClipboard: async (text: string) => {
+			clipboardPrompt = text;
+		},
+		sleep: async () => undefined,
+		streamMarkdown: (markdown: string) => {
+			messages.push(markdown);
+		},
+	});
+
+	return {
+		opened,
+		executedCommands,
+		deliveredPrompt: queryPrompt ?? clipboardPrompt,
+		messages,
 	};
 }
 
@@ -758,5 +842,179 @@ suite('chatParticipant integration', () => {
 
 		assert.equal(opened, false);
 		assert.equal(messages[0]?.includes('Falling back to VS Code chat resume'), true);
+	});
+	const PROVIDER_IDS: SessionProviderId[] = ['copilot', 'codex', 'cursor', 'claude-code'];
+
+	for (const originProvider of PROVIDER_IDS) {
+		for (const targetProvider of PROVIDER_IDS) {
+			test(`continues a ${originProvider} session in ${targetProvider}`, async () => {
+				const result = await continueSessionInto(originProvider, targetProvider);
+
+				assert.equal(result.opened, true);
+				assert.equal(result.executedCommands[0], EXPECTED_OPEN_COMMAND[targetProvider]);
+				assert.equal(result.deliveredPrompt?.includes('User follow-up: Continue'), true);
+				assert.equal(
+					result.deliveredPrompt?.includes('First user question about auth bug.'),
+					true,
+				);
+
+				const originNote = `This conversation was originally held with ${PROVIDER_LABELS[originProvider]}, a different AI assistant.`;
+				if (originProvider === targetProvider) {
+					assert.equal(
+						result.deliveredPrompt?.includes('a different AI assistant'),
+						false,
+						'same-provider continue must not claim a different assistant',
+					);
+				} else {
+					assert.equal(result.deliveredPrompt?.includes(originNote), true);
+					assert.equal(
+						result.deliveredPrompt?.includes(`You are ${PROVIDER_LABELS[targetProvider]} continuing it`),
+						true,
+					);
+				}
+			});
+		}
+	}
+
+	test('cross-provider continue applies resume overflow limits', async () => {
+		const saved = {
+			...createChatSession(createCopilotSession(), {
+				title: 'Cursor to Codex',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'cursor' as const,
+		};
+		let clipboardText: string | undefined;
+
+		const opened = await runResumeIntoOriginAgent(saved, 'Continue', {
+			maxTurns: 2,
+			maxContextChars: 30000,
+			overflowStrategy: 'recent-only',
+			targetProvider: 'codex',
+		}, {
+			getCommands: async () => ALL_PROVIDER_COMMANDS,
+			executeCommand: async () => undefined,
+			writeClipboard: async (text: string) => {
+				clipboardText = text;
+			},
+			sleep: async () => undefined,
+			streamMarkdown: () => undefined,
+		});
+
+		assert.equal(opened, true);
+		assert.equal(clipboardText?.includes('Earlier turns omitted (2 total).'), true);
+		assert.equal(clipboardText?.includes('First user question about auth bug.'), false);
+		assert.equal(
+			clipboardText?.includes('This conversation was originally held with Cursor, a different AI assistant.'),
+			true,
+		);
+	});
+
+	test('cross-provider continue honors a resume.providerCommands override for the chosen target', async () => {
+		const saved = {
+			...createChatSession(createCopilotSession(), {
+				title: 'Codex to Claude Code',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'codex' as const,
+		};
+		const executedCommands: string[] = [];
+		let queryPrompt: string | undefined;
+
+		const opened = await runResumeIntoOriginAgent(saved, 'Continue', {
+			maxTurns: 50,
+			maxContextChars: 30000,
+			overflowStrategy: 'truncate',
+			providerCommands: {
+				'claude-code': 'workbench.action.chat.open',
+			},
+			targetProvider: 'claude-code',
+		}, {
+			getCommands: async () => ALL_PROVIDER_COMMANDS,
+			executeCommand: async (commandId: string, args?: unknown) => {
+				executedCommands.push(commandId);
+				queryPrompt = (args as { query?: string } | undefined)?.query ?? queryPrompt;
+			},
+			writeClipboard: async () => undefined,
+			sleep: async () => undefined,
+			streamMarkdown: () => undefined,
+		});
+
+		assert.equal(opened, true);
+		assert.deepEqual(executedCommands, ['workbench.action.chat.open']);
+		assert.equal(
+			queryPrompt?.includes('This conversation was originally held with Codex, a different AI assistant.'),
+			true,
+		);
+	});
+
+	test('cross-provider continue falls back to VS Code chat when the chosen target is not installed', async () => {
+		const result = await continueSessionInto('codex', 'cursor', [
+			'workbench.action.chat.open',
+			'chatgpt.openSidebar',
+		]);
+
+		assert.equal(result.opened, false);
+		assert.deepEqual(result.executedCommands, []);
+		assert.equal(result.messages[0]?.includes('Could not find an installed Cursor chat command'), true);
+		assert.equal(result.messages[0]?.includes('Falling back to VS Code chat resume'), true);
+	});
+
+	test('without an explicit target a Copilot session still routes to the VS Code chat resume flow', async () => {
+		const saved = createChatSession(createCopilotSession(), {
+			title: 'Copilot resume default',
+			savedAt: '2026-04-12T13:00:00.000Z',
+			vscodeVersion: '1.115.0',
+		});
+
+		const opened = await runResumeIntoOriginAgent(saved, 'Continue', {
+			maxTurns: 50,
+			maxContextChars: 30000,
+			overflowStrategy: 'truncate',
+		}, {
+			getCommands: async () => ALL_PROVIDER_COMMANDS,
+			executeCommand: async () => {
+				throw new Error('should not execute');
+			},
+			writeClipboard: async () => undefined,
+			streamMarkdown: () => undefined,
+		});
+
+		assert.equal(opened, false);
+	});
+
+	test('without an explicit target resume keeps using the session origin and no origin note', async () => {
+		const saved = {
+			...createChatSession(createCopilotSession(), {
+				title: 'Codex default resume',
+				savedAt: '2026-04-12T13:00:00.000Z',
+				vscodeVersion: '1.115.0',
+			}),
+			provider: 'codex' as const,
+		};
+		const executedCommands: string[] = [];
+		let clipboardText: string | undefined;
+
+		const opened = await runResumeIntoOriginAgent(saved, 'Continue', {
+			maxTurns: 50,
+			maxContextChars: 30000,
+			overflowStrategy: 'truncate',
+		}, {
+			getCommands: async () => ALL_PROVIDER_COMMANDS,
+			executeCommand: async (commandId: string) => {
+				executedCommands.push(commandId);
+			},
+			writeClipboard: async (text: string) => {
+				clipboardText = text;
+			},
+			sleep: async () => undefined,
+			streamMarkdown: () => undefined,
+		});
+
+		assert.equal(opened, true);
+		assert.equal(executedCommands[0], 'chatgpt.openSidebar');
+		assert.equal(clipboardText?.includes('a different AI assistant'), false);
 	});
 });

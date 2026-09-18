@@ -114,6 +114,7 @@ All commands are available from the Command Palette under the **Session Control*
 | Browse Saved Sessions | Quick pick over every saved session |
 | View Session | Open the active saved-session JSON in the web viewer |
 | Resume This Session in Chat | Resume the session open in the viewer |
+| Continue This Session In... | Continue the session open in the viewer in any installed assistant |
 | Analyze Saved Chats | Generate an analysis report over a timeframe of saved sessions |
 | Implement Latest Analysis | Open the newest analysis report as an implementation prompt |
 | Toggle Auto-Save on Chat Response | Enable or disable auto-save for a workspace folder |
@@ -240,6 +241,21 @@ format is not recognized.
 When a session is open in the viewer, a ▶ **Resume** icon in the editor title bar opens the chat
 panel with `@session-control /resume <session-title>` pre-filled.
 
+### Continue a session in another assistant
+
+A saved session is not tied to the assistant that produced it. With a session open in the viewer,
+use the **Continue This Session In...** title-bar action (also on the Command Palette) to pick
+which assistant should receive the transcript. The picker lists only the providers whose chat
+command is registered in the current editor, so a Cursor session can be continued in Claude Code,
+Codex, or Copilot whenever those are installed. Copilot targets get the transcript prefilled into
+the chat input; the other providers have it copied to the clipboard and pasted into a focused chat
+panel. When the target differs from where the session was captured, the prompt tells the receiving
+assistant that the transcript came from a different assistant.
+
+The same `resume.maxTurns`, `resume.maxContextChars`, `resume.overflowStrategy`, and
+`resume.providerCommands` settings apply, and if the chosen target cannot be opened, Session
+Control falls back to the VS Code chat resume flow.
+
 ## Configuration
 
 | Setting | Default | Description |
@@ -257,6 +273,8 @@ panel with `@session-control /resume <session-title>` pre-filled.
 | `session-control.resume.maxTurns` | `50` | Max turns injected when resuming |
 | `session-control.resume.overflowStrategy` | `summarize` | `summarize`, `truncate`, or `recent-only` |
 | `session-control.resume.maxContextChars` | `80000` | Hard cap on characters injected as context |
+| `session-control.resume.target` | `origin-agent` | Default target for **Resume This Session in Chat**: `origin-agent` or `vscode-chat`. **Continue This Session In...** asks instead |
+| `session-control.resume.providerCommands` | `{}` | Per-provider chat command ID overrides used by both resume and continue |
 | `session-control.save.maxFileSize` | `1mb` | Max size per session file (e.g. `500kb`, `1mb`) |
 | `session-control.save.overflowStrategy` | `split` | `split`, `truncateOldest`, or `warn` |
 | `session-control.save.stripToolOutput` | `false` | Strip verbose tool call outputs to reduce size |

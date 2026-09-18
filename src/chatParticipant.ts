@@ -36,7 +36,13 @@ import {
 	SessionMeta,
 	SessionProviderId,
 } from './types';
-import { resolveProviderFocusCommand, resolveResumeTarget, ResumeProviderCommands, ResumeTarget } from './resumeTarget';
+import {
+	formatResumeProviderLabel,
+	resolveProviderFocusCommand,
+	resolveResumeTarget,
+	ResumeProviderCommands,
+	ResumeTarget,
+} from './resumeTarget';
 import { fuzzyMatchSessions } from './utils';
 
 export { runAnalyzeSessionsFlow } from './analysisOrchestrator';
@@ -95,6 +101,9 @@ export interface ResumeIntoOriginAgentConfig {
 	maxContextChars: number;
 	overflowStrategy: ResumeOverflowStrategy;
 	providerCommands?: ResumeProviderCommands;
+	// Explicit target chosen by the user. When omitted, resume keeps targeting
+	// the session's origin provider.
+	targetProvider?: SessionProviderId;
 }
 
 export interface ResumeIntoOriginAgentDeps {
@@ -824,23 +833,7 @@ function createDefaultAnalyzeSessionsFlowDeps(
 }
 
 function formatProviderLabel(provider: SessionProviderId | string): string {
-	if (/^copilot$/i.test(provider)) {
-		return 'Copilot';
-	}
-
-	if (/^codex$/i.test(provider)) {
-		return 'Codex';
-	}
-
-	if (/^cursor$/i.test(provider)) {
-		return 'Cursor';
-	}
-
-	if (/^claude-code$/i.test(provider)) {
-		return 'Claude Code';
-	}
-
-	return provider.trim() || 'Assistant';
+	return formatResumeProviderLabel(provider) ?? (provider.trim() || 'Assistant');
 }
 
 function createDefaultResumeIntoOriginAgentDeps(
@@ -862,7 +855,7 @@ function createDefaultResumeIntoOriginAgentDeps(
 }
 
 async function runPromptIntoOriginAgent(
-	provider: AnalysisAgentProviderId,
+	provider: SessionProviderId,
 	prompt: string,
 	config: Pick<ResumeIntoOriginAgentConfig, 'providerCommands'>,
 	depsOverrides: Partial<ResumeIntoOriginAgentDeps> = {},
@@ -939,8 +932,15 @@ export async function runResumeIntoOriginAgent(
 	config: ResumeIntoOriginAgentConfig,
 	depsOverrides: Partial<ResumeIntoOriginAgentDeps> = {},
 ): Promise<boolean> {
-	const provider = session.provider;
-	if (!provider || provider === 'copilot') {
+	const originProvider = session.provider;
+	const targetProvider = config.targetProvider ?? originProvider;
+	if (!targetProvider) {
+		return false;
+	}
+
+	// Without an explicit target choice, a Copilot-origin session still belongs
+	// to the VS Code chat participant flow that the caller falls back to.
+	if (!config.targetProvider && originProvider === 'copilot') {
 		return false;
 	}
 
@@ -950,8 +950,14 @@ export async function runResumeIntoOriginAgent(
 		config.maxContextChars,
 		config.overflowStrategy,
 	);
-	const resumePrompt = composeResumePrompt(constrained.turns, userPrompt, constrained.note);
-	return runPromptIntoOriginAgent(provider, resumePrompt, config, depsOverrides);
+	const originNote = composeOriginProviderNote(originProvider, targetProvider);
+	const resumePrompt = composeResumePrompt(
+		constrained.turns,
+		userPrompt,
+		constrained.note,
+		originNote,
+	);
+	return runPromptIntoOriginAgent(targetProvider, resumePrompt, config, depsOverrides);
 }
 
 function createDefaultImplementationHandoffFlowDeps(
@@ -1183,13 +1189,37 @@ function turnsToContextBlock(turns: SavedTurn[]): string {
 		.join('\n\n');
 }
 
-function composeResumePrompt(turns: SavedTurn[], prompt: string, note?: string): string {
+// Tells the receiving assistant that the transcript came from a different
+// assistant. Omitted for a same-provider continue so the default resume
+// prompt is unchanged.
+function composeOriginProviderNote(
+	originProvider: SessionProviderId | undefined,
+	targetProvider: SessionProviderId,
+): string | undefined {
+	if (!originProvider || originProvider === targetProvider) {
+		return undefined;
+	}
+
+	return [
+		`This conversation was originally held with ${formatProviderLabel(originProvider)}, a different AI assistant.`,
+		`You are ${formatProviderLabel(targetProvider)} continuing it, so treat the transcript as prior context rather than your own replies.`,
+	].join(' ');
+}
+
+function composeResumePrompt(
+	turns: SavedTurn[],
+	prompt: string,
+	note?: string,
+	originNote?: string,
+): string {
 	const contextBlock = turnsToContextBlock(turns);
 	const overflowNote = note ? `${note}\n\n` : '';
+	const originPreamble = originNote ? [originNote] : [];
 
 	return [
 		'The following is a previous conversation that the user wants to continue.',
 		'Use it as context for the next response.',
+		...originPreamble,
 		'',
 		overflowNote,
 		contextBlock,

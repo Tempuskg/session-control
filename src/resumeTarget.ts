@@ -126,3 +126,73 @@ export function resolveResumeTarget(
 
 	return undefined;
 }
+
+// Every provider a saved session can be continued in. A session's origin only
+// decides the default selection; any installed provider can receive any
+// transcript, so the picker iterates this list rather than the session's own
+// provider.
+export const RESUME_PROVIDER_IDS: readonly SessionProviderId[] = [
+	'copilot',
+	'codex',
+	'cursor',
+	'claude-code',
+];
+
+const RESUME_PROVIDER_LABELS: Record<SessionProviderId, string> = {
+	copilot: 'Copilot',
+	codex: 'Codex',
+	cursor: 'Cursor',
+	'claude-code': 'Claude Code',
+};
+
+export interface ResumeProviderChoice {
+	provider: SessionProviderId;
+	label: string;
+	commandId: string;
+	isOrigin: boolean;
+}
+
+export function formatResumeProviderLabel(provider: SessionProviderId | string): string | undefined {
+	const normalized = provider.trim().toLowerCase();
+	return RESUME_PROVIDER_LABELS[normalized as SessionProviderId];
+}
+
+// Resolves every provider whose chat command is actually registered in this
+// host, using the same resolution (and `resume.providerCommands` overrides)
+// that delivery uses, so the picker can never offer a target that resume
+// cannot open.
+export function listAvailableResumeTargets(
+	availableCommands: readonly string[],
+	configuredCommands: ResumeProviderCommands = {},
+): ResumeTarget[] {
+	const targets: ResumeTarget[] = [];
+	for (const provider of RESUME_PROVIDER_IDS) {
+		const target = resolveResumeTarget(provider, availableCommands, configuredCommands);
+		if (target) {
+			targets.push(target);
+		}
+	}
+
+	return targets;
+}
+
+// Ordered choices for the target-provider picker: the session's origin first
+// (when it is installed), then the remaining installed providers in canonical
+// order.
+export function buildResumeProviderChoices(
+	originProvider: SessionProviderId | undefined,
+	availableCommands: readonly string[],
+	configuredCommands: ResumeProviderCommands = {},
+): ResumeProviderChoice[] {
+	const choices = listAvailableResumeTargets(availableCommands, configuredCommands).map((target) => ({
+		provider: target.provider,
+		label: RESUME_PROVIDER_LABELS[target.provider],
+		commandId: target.commandId,
+		isOrigin: target.provider === originProvider,
+	}));
+
+	return [
+		...choices.filter((choice) => choice.isOrigin),
+		...choices.filter((choice) => !choice.isOrigin),
+	];
+}

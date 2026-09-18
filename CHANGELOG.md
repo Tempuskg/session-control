@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.14] - 2026-09-17
+
+### Added
+
+- New **Continue This Session In...** command in the session viewer title bar continues any saved session in any installed assistant — Copilot, Codex, Cursor, or Claude Code — independent of where the session was captured. The picker only lists providers whose chat command is actually registered in the current host, and delivery reuses the existing resume path (query prefill when supported, otherwise open, copy, focus, paste). When the target differs from the session's origin, the generated prompt tells the receiving assistant which assistant produced the transcript. `resume.maxTurns`, `resume.maxContextChars`, `resume.overflowStrategy`, and `resume.providerCommands` all apply, and an unresolvable target still falls back to the VS Code chat resume flow. **Resume This Session in Chat** is unchanged and still follows `session-control.resume.target`.
+
 ## [1.3.13] - 2026-09-17
 
 ### Changed
