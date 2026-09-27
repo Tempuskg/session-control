@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-37",
+	"sourceKey": "07a60df2178f",
+	"provider": "claude-code",
+	"title": "hello",
+	"savedDate": "2026-06-21",
+	"split": null,
+	"counts": {
+		"turns": 5,
+		"requests": 4,
+		"responses": 1
+	},
+	"tools": {
+		"total": 0,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 0,
+		"topTools": {},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 3,
+			"text": "hello"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "Hello! How can I help you today?",
+	"lastResponse": ""
+}

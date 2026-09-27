@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-27
+
+### Added
+
+- Optional TypeSafe System One (Jev) integration for chat intent routing, analysis triage, resume context selection, report verification, and saved-session knowledge and skill indicators. The integration is opt-in and supports per-feature settings.
+- A one-time Session Control Pro upgrade notice that highlights finding past solutions across workspaces and turning them into reusable knowledge, with reassurance that free features stay free. It appears at most once per installation, no earlier than 24 hours after the extension first activates, and only for users without an active Pro license. Dismissing it, ignoring it, or acting on it all retire it permanently — it is never shown a second time, and licensed users never see it at all. The notice offers **Get Pro** and **Enter License Key** and nothing else.
+
 ## [1.3.14] - 2026-09-17
 
 ### Added

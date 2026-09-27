@@ -1,0 +1,112 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-05",
+	"sourceKey": "273cf7647afe",
+	"provider": "copilot",
+	"title": "Branch vs. Extension Publishing Order",
+	"savedDate": "2026-04-16",
+	"split": null,
+	"counts": {
+		"turns": 38,
+		"requests": 19,
+		"responses": 19
+	},
+	"tools": {
+		"total": 121,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"run_in_terminal": 77,
+			"copilot_readFile": 21,
+			"copilot_findTextInFiles": 11,
+			"copilot_applyPatch": 5,
+			"copilot_getErrors": 4,
+			"copilot_memory": 1,
+			"copilot_findFiles": 1,
+			"copilot_githubRepo": 1
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "should I publish branch first or publish extension to marketplace next?"
+		},
+		{
+			"index": 1,
+			"text": "proceed"
+		},
+		{
+			"index": 2,
+			"text": "proceed"
+		},
+		{
+			"index": 3,
+			"text": "3"
+		},
+		{
+			"index": 4,
+			"text": "the github account is <owner>"
+		},
+		{
+			"index": 5,
+			"text": "continue"
+		},
+		{
+			"index": 6,
+			"text": "Proceed"
+		},
+		{
+			"index": 7,
+			"text": "what should I put as the description when creating the session-control repo in github"
+		},
+		{
+			"index": 8,
+			"text": "ok created https://github.com/<owner>/session-control.git"
+		},
+		{
+			"index": 9,
+			"text": "Proceed"
+		},
+		{
+			"index": 10,
+			"text": "PS E:\\chat-commit> npm exec --yes @vscode/vsce publish --packagePath session-control-0.1.18.vsix npm warn \"session-control-0.1.18.vsix\" is being parsed as a normal command line argument. npm warn Unknown cli config \"--packagePath\". This will stop working in the next major version of npm. Executing prepublish script 'npm run vscode:prepublish'... npm warn Unknown env config \"packagepath\". This will stop working in the next major version of npm. > session-control@0.1.18 vscode:prepublish > npm run package npm warn Unknown env config \"packagepath\". This will stop working in the next major versio…"
+		},
+		{
+			"index": 11,
+			"text": "proceed"
+		},
+		{
+			"index": 12,
+			"text": "how do I generate Marketplace PAT"
+		},
+		{
+			"index": 13,
+			"text": "I don't see Personal access tokens"
+		},
+		{
+			"index": 14,
+			"text": "that is the screen I get when I log into dev.azure.com"
+		},
+		{
+			"index": 15,
+			"text": "what do I set Scopes for the Marketplace PAT?"
+		},
+		{
+			"index": 16,
+			"text": "ok I have the marketplace PAT"
+		},
+		{
+			"index": 17,
+			"text": "[Terminal <uuid> notification: command completed with exit code 0. Use send_to_terminal to send another command or kill_terminal to stop it.] Terminal output: PS E:\\chat-commit> npm exec --yes @vscode/vsce -- login <user> https://marketplace.visualstudio.com/manage/publishers/ Personal Access Token for publisher '<user>': ************************************************************************************ The Personal Access Token verification succeeded for the publisher '<user>'. WARNING The latest version of @vscode/vsce is 3.9.0 and you have 3.7.1. Update it now: npm install -g @vscode/vsce"
+		},
+		{
+			"index": 18,
+			"text": "[Terminal <uuid> notification: command completed with exit code 0. Use send_to_terminal to send another command or kill_terminal to stop it.] Terminal output: PS E:\\chat-commit> npm exec --yes @vscode/vsce -- publish --packagePath session-control-0.1.18.vsix https://marketplace.visualstudio.com/manage/publishers/ Personal Access Token for publisher '<user>': ************************************************************************************ The Personal Access Token verification succeeded for the publisher '<user>'. INFO Publishing '<user>.session-control v0.1.18'... INFO Extension URL (migh…"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "Publish the branch first. For this extension, marketplace publish should be the last step after the code is on a branch, reviewed if needed, and validated. The practical order is: branch pushed, CI/tests/lint clean, changelog/version confirmed, merge or at least final approval, then publish the extension. That keeps the published package traceable to a committed revision and avoids shipping something that only exists locally. The only reason to publish the extension next would be if the branch is already pushed and reviewed, and you’re really asking whether to do “merge vs marketplace publish.” In that case, I’d still finalize the git state first, then publish. The repo guidance also points that way: should be updated for user-facing changes, and expects lint and tests to pass before commit. If you want, I can check the current repo state and tell you the exact next step: 1. Inspect bra…",
+	"lastResponse": "**Session Control v0.1.18 is live on the Marketplace!** - Extension page: https://marketplace.visualstudio.com/items?itemName=<user>.session-control - Manage: https://marketplace.visualstudio.com/manage/publishers/<user>/extensions/session-control/hub It may take a few minutes for the listing to fully populate. You can install it from VS Code by searching for \"Session Control\" in the Extensions panel."
+}

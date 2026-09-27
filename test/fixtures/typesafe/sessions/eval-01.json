@@ -1,0 +1,64 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-01",
+	"sourceKey": "ebfc65a73f52",
+	"provider": "copilot",
+	"title": "Unrecognized Copilot session format error in VS Code",
+	"savedDate": "2026-04-13",
+	"split": null,
+	"counts": {
+		"turns": 14,
+		"requests": 7,
+		"responses": 7
+	},
+	"tools": {
+		"total": 135,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 5,
+		"topTools": {
+			"run_in_terminal": 55,
+			"copilot_readFile": 33,
+			"manage_todo_list": 10,
+			"copilot_findTextInFiles": 9,
+			"copilot_memory": 5,
+			"copilot_replaceString": 5,
+			"mcp_snyk_snyk_code_scan": 4,
+			"copilot_applyPatch": 3
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "when I tried to save current chat session from Command Palette I got: Unrecognized Copilot session format (VS Code 1.115.0). Session Control may need an update."
+		},
+		{
+			"index": 1,
+			"text": "how do I build the vsix again?"
+		},
+		{
+			"index": 2,
+			"text": "still getting: Unrecognized Copilot session format (VS Code 1.115.0). Session Control may need an update."
+		},
+		{
+			"index": 3,
+			"text": "I restarted and still get same error"
+		},
+		{
+			"index": 4,
+			"text": "@agent Pause: \"Continue to iterate?\""
+		},
+		{
+			"index": 5,
+			"text": "how about you just increase the version number on each build"
+		},
+		{
+			"index": 6,
+			"text": "1"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "You’re reporting a save failure caused by a new Copilot session format in VS Code 1.115.0, so I’ll inspect the session reader and format detection logic, patch it to support the new shape, and run the tests to verify the fix end-to-end. I’ve loaded the active instruction files; next I’m locating where the session format is validated so we can add compatibility for VS Code 1.115.0. I found the format gate in the session reader. I’m now checking existing fixtures and parser assumptions to identify what shape from 1.115.0 isn’t being normalized. I’ve narrowed this to strict turn/content parsing in , so I’m updating normalization to accept richer nested message formats (including structured content arrays) and adding a regression fixture that represents a likely VS Code 1.115.0 shape. ``` ``` ``` ``` ``` ``` The parser and tests are patched for a nested/structured session shape, including r…",
+	"lastResponse": "I’ll package a fresh VSIX now using the updated release flow so the output has a new version number. I’ll verify the produced file and report the exact artifact name. Packaged successfully. New artifact: - What happened during packaging: - The prepublish flow ran. - Version auto-bumped from 0.1.1 to 0.1.2 via . - VSIX was generated at 68.52 KB. Next step: 1. Install this VSIX now (I can run the install command for you)."
+}

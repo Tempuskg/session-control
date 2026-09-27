@@ -1,0 +1,54 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-35",
+	"sourceKey": "c83ff3cd9093",
+	"provider": "claude-code",
+	"title": "Choose payment processor for VSX extension",
+	"savedDate": "2026-06-27",
+	"split": null,
+	"counts": {
+		"turns": 22,
+		"requests": 7,
+		"responses": 15
+	},
+	"tools": {
+		"total": 62,
+		"errorLike": 1,
+		"maxErrorStreak": 1,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"Write": 19,
+			"Read": 16,
+			"Bash": 10,
+			"Glob": 6,
+			"TodoWrite": 6,
+			"PowerShell": 3,
+			"Grep": 1,
+			"ToolSearch": 1
+		},
+		"errorSamples": [
+			"Bash: Exit code 2 /e/chat-commit/.gitignore /e/chat-commit/package-lock.json /e/chat-commit/package.json /e/chat-commit/tsconfig.json /e/chat-commit/tsconfig.test.json /e/chat-commit/tsconfig.test.json"
+		]
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "The following is a previous conversation that the user wants to continue. Use it as context for the next response. User: do I need to create a stripe account before creating a Polar.sh account? Claude Code: No, you don't need a pre-existing Stripe account. Polar.sh uses Stripe Connect under the hood, and their onboarding flow guides you through creating/connecting a Stripe account as part of the Polar.sh setup process — you do it all from within Polar.sh. That said, my knowledge cuts off August 2025 and Polar.sh's onboarding flow may have changed. Check their current docs at polar.sh for the …"
+		},
+		{
+			"index": 1,
+			"text": "scaffold the pro project at e:\\session-control-pro"
+		},
+		{
+			"index": 5,
+			"text": "copy ai instructions and skills to e:\\session-control-pro"
+		},
+		{
+			"index": 6,
+			"text": "yes adapt the files to the Pro project"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "Let me check the project memory and current state to pick up the thread properly.",
+	"lastResponse": "This AGENTS.md is mostly a wiki-schema doc plus coding-agent workflow — and the Pro repo has no `wiki/` or `raw/` tree, no chat participant, no analysis system, and no `version:build` script. I'll rewrite it to match what's actually in the Pro repo, keeping the genuinely useful workflow guidance and dropping the wiki schema that doesn't apply. Let me also check the instruction files and skills so I adapt the whole set coherently."
+}

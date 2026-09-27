@@ -1,0 +1,40 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-30",
+	"sourceKey": "1c9116d50888",
+	"provider": "codex",
+	"title": "You are an AI coding agent picking up a Methodology With No Name (MWNN) Kanban …",
+	"savedDate": "2026-07-30",
+	"split": null,
+	"counts": {
+		"turns": 11,
+		"requests": 2,
+		"responses": 9
+	},
+	"tools": {
+		"total": 58,
+		"errorLike": 12,
+		"maxErrorStreak": 2,
+		"maxRepeatStreak": 2,
+		"topTools": {
+			"shell_command": 58
+		},
+		"errorSamples": [
+			"shell_command: execution error: Io(Custom { kind: Other, error: \"windows sandbox: runner failed during SpawnChild: CreateProcessAsUserW failed: 1312 (A specified logon session does not exist. It may already have be…",
+			"shell_command: execution error: Io(Custom { kind: Other, error: \"windows sandbox: runner failed during SpawnChild: CreateProcessAsUserW failed: 1312 (A specified logon session does not exist. It may already have be…",
+			"shell_command: execution error: Io(Custom { kind: Other, error: \"windows sandbox: runner failed during SpawnChild: CreateProcessAsUserW failed: 1312 (A specified logon session does not exist. It may already have be…",
+			"shell_command: execution error: Io(Custom { kind: Other, error: \"windows sandbox: runner failed during SpawnChild: CreateProcessAsUserW failed: 1312 (A specified logon session does not exist. It may already have be…",
+			"shell_command: execution error: Io(Custom { kind: Other, error: \"windows sandbox: runner failed during SpawnChild: CreateProcessAsUserW failed: 1312 (A specified logon session does not exist. It may already have be…",
+			"shell_command: execution error: Io(Custom { kind: Other, error: \"windows sandbox: runner failed during SpawnChild: CreateProcessAsUserW failed: 1312 (A specified logon session does not exist. It may already have be…"
+		]
+	},
+	"userPrompts": [
+		{
+			"index": 1,
+			"text": "You are an AI coding agent picking up a Methodology With No Name (MWNN) Kanban card. Do the actual work this card describes in the current workspace — write code, create files, run commands as needed. Do not just describe the work. This card is stored as a markdown file at: .mwnn/cards/card-ms66eb9r-20.md Keep the card's \"## Acceptance criteria\" checklist current while you work: change each verified `- [ ]` item to `- [x]`, and leave any unmet item unchecked. When you finish, update that file: append a short summary of what you did under its \"Activity\" section. Also append the exact terminal …"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I’m starting with the card’s current board state and the repository’s implementation guidance. I’m using the repo’s Copilot, AI-control implementation, and validation skills because they govern code changes and the required verification order here; I’ll keep the card checklist and Activity log synchronized with verified results.",
+	"lastResponse": "Status: completed Changed files - `src/autoSaveController.ts`, `src/autoSaveDiagnostics.ts`, `src/extension.ts` - `test/unit/autoSaveController.test.ts`, `test/unit/autoSaveDiagnostics.test.ts`, `test/unit/extensionAutoSave.test.ts` - `.mwnn/cards/card-ms66eb9r-20.md` Results - Failures now pause and retry only the affected source. - Persistent failures warn once per failure episode and retry every 60 seconds. - Recovery clears only that source’s error/retry state. - All 333 extension-host tests passed. - Card checklist is complete and board automation moved it to Verify. Commands run - `npm run compile-tests` - `npm run compile` - `$env:VSCODE_EXECUTABLE_PATH='E:\\chat-commit\\.vscode-test\\vscode-win32-x64-archive-1.93.0\\Code.exe'; npm test` - `npm run lint` - `git diff --check -- src/extension.ts test/unit/extensionAutoSave.test.ts` Blockers: none. Unverified: manual real-provider fault…"
+}

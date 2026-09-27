@@ -1,0 +1,84 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-18",
+	"sourceKey": "bbc1a484a3a7",
+	"provider": "copilot",
+	"title": "Viewing web content with open JSON file",
+	"savedDate": "2026-09-18",
+	"split": null,
+	"counts": {
+		"turns": 23,
+		"requests": 12,
+		"responses": 11
+	},
+	"tools": {
+		"total": 160,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"copilot_readFile": 86,
+			"run_in_terminal": 14,
+			"copilot_findTextInFiles": 12,
+			"manage_todo_list": 10,
+			"copilot_replaceString": 9,
+			"copilot_applyPatch": 8,
+			"copilot_multiReplaceString": 6,
+			"run_task": 5
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "create a plan to be able to view the web view when the json file is open"
+		},
+		{
+			"index": 1,
+			"text": "Start implementation"
+		},
+		{
+			"index": 2,
+			"text": "proceed"
+		},
+		{
+			"index": 3,
+			"text": "build vsix"
+		},
+		{
+			"index": 4,
+			"text": "update the documentation on how this works"
+		},
+		{
+			"index": 5,
+			"text": "@agent Try Again"
+		},
+		{
+			"index": 6,
+			"text": "how come the project wiki isn't being automatically updated?"
+		},
+		{
+			"index": 7,
+			"text": "checkin and push changes"
+		},
+		{
+			"index": 8,
+			"text": "the session control autosave didn't work, can you change it so when autosave is on it autosaves the session after every chat response"
+		},
+		{
+			"index": 9,
+			"text": "@agent Continue: \"Continue to iterate?\""
+		},
+		{
+			"index": 10,
+			"text": "build vsix"
+		},
+		{
+			"index": 11,
+			"text": "commit changes"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "Let me explore the codebase to understand how the webview and session viewer currently work. Now let me check the current file the user has open to understand the context better. Now I have a complete picture of the codebase. Let me check one more thing — how validates files, since this is key for detecting session files. Good. Now I have full context. Let me draft the plan. ## Plan: View Session Webview from Open JSON File Add a Markdown-preview-style button in the editor title bar so users can open the Session Viewer webview when a `.json`/`.jsonl` session file is already open in the editor. Currently the webview is only reachable from the Session Explorer sidebar. --- **Steps** ### Phase 1: Command & Handler 1. **Register new command** in → : add (\"Session Control: View Session\") with icon `$(open-preview)`. 2. **Implement command handler** in (~L710 area): - Get the active text edit…",
+	"lastResponse": "Committed successfully: **d3c4245** 10 files changed (526 insertions, 22 deletions): - - new setting - - listener + wiring - - 4 new tests - 6 wiki pages updated"
+}

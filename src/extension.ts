@@ -81,7 +81,13 @@ import { buildResumeProviderChoices, ResumeProviderChoice, ResumeProviderCommand
 import { SessionViewerPanel } from './sessionViewer';
 import { createSessionStore, OrphanedPartFile, SessionFileNameOptions, SessionPruneAction } from './sessionStore';
 import { applySaveBloatControls, createChatSession, SaveOverflowStrategy } from './sessionWriter';
-import { activateProFeatures, hasProLicense, initializeProLicenseCommands, showUpgradePrompt } from './pro';
+import {
+	activateProFeatures,
+	hasProLicense,
+	initializeProLicenseCommands,
+	maybeShowProUpgradeNotice,
+	showUpgradePrompt,
+} from './pro';
 import {
 	type AnalysisReportReference,
 	type AnalysisSelection,
@@ -92,6 +98,20 @@ import {
 	SessionProviderId,
 	SourceChatSession,
 } from './types';
+import { isTypeSafeSpikeEnabled, runTypeSafeSpikeCommand, TYPESAFE_SPIKE_COMMAND } from './typesafe/spike';
+import { registerTypeSafeApiKeyCommands, resolveTypeSafeApiKey } from './typesafe/apiKey';
+import { createExtensionConsentGate } from './typesafe/consent';
+import { createJudgmentService } from './typesafe/judgmentService';
+import {
+	SESSION_INDICATORS_ENABLED_SETTING,
+	SESSION_INDICATORS_KNOWLEDGE_THRESHOLD_SETTING,
+	SESSION_INDICATORS_SKILL_THRESHOLD_SETTING,
+	SESSION_INDICATOR_QUESTION_SET_VERSION,
+	SessionIndicatorDecorationProvider,
+	createPassiveConsentGate,
+	createSessionIndicatorService,
+	resolveSessionIndicatorThresholds,
+} from './typesafe/sessionIndicators';
 import { parseFileSize } from './utils';
 
 const sessionStore = createSessionStore();
@@ -2587,6 +2607,46 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	const explorerSessionStore = createSessionStore({
 		logWarning: (message) => output.appendLine(`[session-explorer] ${message}`),
 	});
+	const typeSafeConsentGate = createExtensionConsentGate(context, vscode.window, (message) => output.appendLine(message));
+	// Jev session indicators run in the background while the tree renders, so they
+	// never prompt: no consent modal (only previously recorded consent counts) and
+	// no API-key warning on auth errors. Tool output is always stripped.
+	const sessionIndicatorService = createSessionIndicatorService({
+		judgment: createJudgmentService({
+			secrets: context.secrets,
+			consent: createPassiveConsentGate(typeSafeConsentGate),
+			getStripToolOutput: () => true,
+			onUnauthorized: () => output.appendLine('[session-indicators] TypeSafe rejected the API key; indicators hidden.'),
+			log: (message) => output.appendLine(`[session-indicators] ${message}`),
+		}),
+		isIndicatorsEnabled: () => vscode.workspace
+			.getConfiguration('session-control')
+			.get<boolean>(SESSION_INDICATORS_ENABLED_SETTING, true),
+		getThresholds: () => {
+			const config = vscode.workspace.getConfiguration('session-control');
+			return resolveSessionIndicatorThresholds({
+				knowledgeHarvest: config.get<number>(SESSION_INDICATORS_KNOWLEDGE_THRESHOLD_SETTING),
+				aiSkill: config.get<number>(SESSION_INDICATORS_SKILL_THRESHOLD_SETTING),
+			});
+		},
+		getCacheTarget: (storageDirectory, fingerprint) => ({
+			store: analysisStore,
+			storageDirectory,
+			sessionFingerprint: fingerprint,
+			questionSetVersion: SESSION_INDICATOR_QUESTION_SET_VERSION,
+		}),
+		log: (message) => output.appendLine(message),
+	});
+	const sessionIndicatorDecorations = new SessionIndicatorDecorationProvider(sessionIndicatorService);
+	context.subscriptions.push(
+		sessionIndicatorDecorations,
+		vscode.window.registerFileDecorationProvider(sessionIndicatorDecorations),
+		vscode.workspace.onDidChangeConfiguration((event) => {
+			if (event.affectsConfiguration('session-control.typesafe')) {
+				sessionIndicatorDecorations.refresh();
+			}
+		}),
+	);
 	const storedSessionExplorerSortOrder = context.workspaceState.get<unknown>(SESSION_EXPLORER_SORT_ORDER_STATE_KEY);
 	const sessionExplorerProvider = new SessionExplorerProvider(
 		{
@@ -2595,6 +2655,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		isSessionExplorerSortOrder(storedSessionExplorerSortOrder)
 			? storedSessionExplorerSortOrder
 			: DEFAULT_SESSION_EXPLORER_SORT_ORDER,
+		(uris) => sessionIndicatorDecorations.track(uris),
 	);
 	const sessionExplorerView = vscode.window.createTreeView('session-control.sessionExplorer', {
 		treeDataProvider: sessionExplorerProvider,
@@ -2697,7 +2758,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				refreshSessionExplorer: () => sessionExplorerProvider.refresh(),
 			});
 		}),
-		vscode.commands.registerCommand('session-control.refreshSessionExplorer', () => sessionExplorerProvider.refresh()),
+		vscode.commands.registerCommand('session-control.refreshSessionExplorer', () => {
+			sessionExplorerProvider.refresh();
+			// An explicit refresh also retries indicator judgments that failed or lacked consent.
+			sessionIndicatorDecorations.refresh();
+		}),
 		vscode.commands.registerCommand(SORT_SESSION_EXPLORER_COMMAND, () =>
 			runSortSessionExplorerCommand({
 				getSortOrder: () => sessionExplorerProvider.currentSortOrder,
@@ -2826,9 +2891,37 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		extensionContext: context,
 		hasProLicense,
 		showUpgradePrompt,
+		judgment: createJudgmentService({
+			secrets: context.secrets,
+			consent: typeSafeConsentGate,
+			outputChannel: output,
+		}),
 		log: (message) => output.appendLine(`[pro] ${message}`),
 		registerDisposable: (disposable) => context.subscriptions.push(disposable),
 	});
+
+	// Fire-and-forget: the one-time upgrade notice must never delay activation, and it
+	// retires itself the first time it is displayed.
+	void maybeShowProUpgradeNotice(context);
+
+	context.subscriptions.push(...registerTypeSafeApiKeyCommands(context));
+
+	// Phase 0 spike (see AGENTS.md TypeSafe plan): proves the @typesafe-ai/sdk integration
+	// path from the extension host. Opt-in via SESSION_CONTROL_TYPESAFE_SPIKE=1; not part of
+	// the shipped feature set yet.
+	if (isTypeSafeSpikeEnabled()) {
+		context.subscriptions.push(
+			vscode.commands.registerCommand(TYPESAFE_SPIKE_COMMAND, async () => {
+				await runTypeSafeSpikeCommand({
+					getApiKey: () => resolveTypeSafeApiKey(context.secrets),
+					log: (message) => output.appendLine(message),
+					showInformationMessage: (message) => vscode.window.showInformationMessage(message),
+					showWarningMessage: (message) => vscode.window.showWarningMessage(message),
+					showErrorMessage: (message) => vscode.window.showErrorMessage(message),
+				});
+			}),
+		);
+	}
 
 	registerChatParticipant(context);
 }

@@ -157,6 +157,25 @@ export interface AnalysisIndex {
 	analyzedSessions: AnalysisIndexEntry[];
 }
 
+export interface CachedJudgmentEntry<TAnswers = Record<string, unknown>> {
+	key: string;
+	sessionFingerprint: string;
+	questionSetVersion: string;
+	createdAt: string;
+	answers: TAnswers;
+	model?: string;
+	usage?: {
+		input_tokens: number;
+		output_tokens: number;
+	};
+}
+
+export interface JudgmentCache {
+	version: number;
+	updatedAt: string;
+	judgments: Record<string, CachedJudgmentEntry>;
+}
+
 // Minimal read-only view of the harvest index written by Session Control Pro
 // at <storageDirectory>/harvest/index.json. Only the fields the free
 // extension consumes are validated; Pro owns the full schema and may include
@@ -388,6 +407,44 @@ export function isAnalysisIndex(value: unknown): value is AnalysisIndex {
 		&& value.reports.every((report) => isAnalysisReportReference(report))
 		&& Array.isArray(value.analyzedSessions)
 		&& value.analyzedSessions.every((entry) => isAnalysisIndexEntry(entry));
+}
+
+export function isCachedJudgmentEntry(value: unknown): value is CachedJudgmentEntry {
+	if (!isRecord(value)) {
+		return false;
+	}
+
+	const usageValid = value.usage === undefined || (
+		isRecord(value.usage)
+		&& typeof value.usage.input_tokens === 'number'
+		&& typeof value.usage.output_tokens === 'number'
+	);
+
+	return (
+		typeof value.key === 'string'
+		&& typeof value.sessionFingerprint === 'string'
+		&& typeof value.questionSetVersion === 'string'
+		&& isIsoTimestamp(value.createdAt)
+		&& isRecord(value.answers)
+		&& (value.model === undefined || typeof value.model === 'string')
+		&& usageValid
+	);
+}
+
+export function isJudgmentCache(value: unknown): value is JudgmentCache {
+	if (!isRecord(value)) {
+		return false;
+	}
+
+	if (typeof value.version !== 'number' || !isIsoTimestamp(value.updatedAt)) {
+		return false;
+	}
+
+	if (!isRecord(value.judgments)) {
+		return false;
+	}
+
+	return Object.values(value.judgments).every((entry) => isCachedJudgmentEntry(entry));
 }
 
 export function isHarvestIndexEntry(value: unknown): value is HarvestIndexEntry {

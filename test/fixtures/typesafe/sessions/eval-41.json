@@ -1,0 +1,48 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-41",
+	"sourceKey": "f76aa15190b4",
+	"provider": "claude-code",
+	"title": "Open VSX keyword optimization",
+	"savedDate": "2026-09-17",
+	"split": null,
+	"counts": {
+		"turns": 40,
+		"requests": 5,
+		"responses": 35
+	},
+	"tools": {
+		"total": 65,
+		"errorLike": 1,
+		"maxErrorStreak": 1,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"Bash": 58,
+			"Edit": 3,
+			"AskUserQuestion": 1,
+			"ToolSearch": 1,
+			"Read": 1,
+			"Write": 1
+		},
+		"errorSamples": [
+			"Bash: Exit code 1 <anonymous_script>:2 SyntaxError: Unexpected end of JSON input at JSON.parse (<anonymous>) at Socket.<anonymous> ([eval]:1:70) at Socket.emit (node:events:520:35) at endReadableNT (node:i…"
+		]
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "You are an AI coding agent picking up a Methodology With No Name (MWNN) Kanban card. Do the actual work this card describes in the current workspace — write code, create files, run commands as needed. Do not just describe the work. This card is stored as a markdown file at: .mwnn/cards/card-mtt7s3gg-2.md Keep the card's \"## Acceptance criteria\" checklist current while you work: change each verified `- [ ]` item to `- [x]`, and leave any unmet item unchecked. When you finish, update that file: append a short summary of what you did under its \"Activity\" section. Also append the exact terminal m…"
+		},
+		{
+			"index": 1,
+			"text": "Publish"
+		},
+		{
+			"index": 4,
+			"text": "Session Control is the name of the extension, that is not changing."
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I'll start by reading the card and the current package.json.",
+	"lastResponse": "Noted and recorded so it doesn't come back. Two places: - **The card** — the flag is replaced with the decision: keyword and description tuning happens *around* the name, not to it. The loop won't pick it up as a follow-up. - **Memory** — saved as a project constraint, since a future listing or SEO pass would otherwise re-derive \"rename displayName\" as the biggest available lever and raise it again. Nothing shipped depended on this. `v1.3.13` is live on both registries with `displayName: \"Session Control\"` unchanged — the release only touched `description`, `keywords`, and `categories`."
+}

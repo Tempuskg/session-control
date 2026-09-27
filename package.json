@@ -2,7 +2,7 @@
   "name": "session-control",
   "displayName": "Session Control",
   "description": "Save Cursor, Claude Code, Codex, and Copilot chat history into your own repo, linked to the commit it produced. Local-first AI session manager for Cursor, Windsurf, VSCodium, and VS Code.",
-  "version": "1.3.14",
+  "version": "1.4.0",
   "publisher": "darrenjmcleod",
   "icon": "media/session-control.png",
   "license": "MIT",
@@ -162,6 +162,16 @@
       {
         "command": "session-control.cleanupOrphanedParts",
         "title": "Clean Up Orphaned Session Part Files",
+        "category": "Session Control"
+      },
+      {
+        "command": "session-control.setTypeSafeApiKey",
+        "title": "Set TypeSafe API Key",
+        "category": "Session Control"
+      },
+      {
+        "command": "session-control.clearTypeSafeApiKey",
+        "title": "Clear TypeSafe API Key",
         "category": "Session Control"
       },
       {
@@ -427,6 +437,73 @@
           "description": "What to do with the oldest sessions when save.maxSavedSessions is exceeded.",
           "scope": "resource"
         },
+        "session-control.typesafe.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable TypeSafe System One judgments (Jev) for intent routing, analysis triage, resume context selection, and report verification.",
+          "scope": "resource"
+        },
+        "session-control.typesafe.model": {
+          "type": "string",
+          "default": "jev-latest",
+          "description": "TypeSafe System One model used for judgments. Defaults to jev-latest.",
+          "scope": "resource"
+        },
+        "session-control.typesafe.sessionIndicators.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show Jev indicator badges in Saved Sessions: ◆ knowledge worth harvesting, ▲ a workflow that should become an AI skill, ★ both. Only active when `#session-control.typesafe.enabled#` is on, a TypeSafe API key is set, and TypeSafe consent has been given.",
+          "scope": "resource"
+        },
+        "session-control.typesafe.sessionIndicators.knowledgeThreshold": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum Jev probability (0-1) for flagging a saved session as a knowledge-harvest candidate.",
+          "scope": "resource"
+        },
+        "session-control.typesafe.sessionIndicators.skillThreshold": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum Jev probability (0-1) for flagging a saved session as an AI-skill candidate.",
+          "scope": "resource"
+        },
+        "session-control.typesafe.features": {
+          "type": "object",
+          "default": {
+            "routing": true,
+            "triage": true,
+            "resumeSelection": true,
+            "reportVerification": true
+          },
+          "properties": {
+            "routing": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable TypeSafe intent routing for chat prompts without a slash command."
+            },
+            "triage": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable TypeSafe triage and scoring of candidate sessions before full analysis."
+            },
+            "resumeSelection": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable TypeSafe relevance-ranked turn selection when resuming a session."
+            },
+            "reportVerification": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable TypeSafe verification of analysis report recommendations against evidence."
+            }
+          },
+          "description": "Per-feature toggles for TypeSafe System One judgments when session-control.typesafe.enabled is true.",
+          "scope": "resource"
+        },
         "session-control.pro.polar.organizationId": {
           "type": "string",
           "default": "9a3f3f03-1384-425b-8a7a-54866b7d634a",
@@ -537,6 +614,12 @@
         },
         {
           "command": "session-control.cleanupOrphanedParts"
+        },
+        {
+          "command": "session-control.setTypeSafeApiKey"
+        },
+        {
+          "command": "session-control.clearTypeSafeApiKey"
         },
         {
           "command": "session-control.upgradeToPro",
@@ -673,7 +756,8 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
-    "@tempuskg/session-control-pro": "^0.4.1",
+    "@tempuskg/session-control-pro": "^0.5.0",
+    "@typesafe-ai/sdk": "^0.6.0",
     "marked": "^4.3.0"
   }
 }

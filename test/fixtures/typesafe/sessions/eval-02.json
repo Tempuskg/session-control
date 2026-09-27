@@ -1,0 +1,118 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-02",
+	"sourceKey": "1a50051d78cb",
+	"provider": "copilot",
+	"title": "Adding Resume Icon to Chat Session Title Bar",
+	"savedDate": "2026-04-13",
+	"split": null,
+	"counts": {
+		"turns": 40,
+		"requests": 20,
+		"responses": 20
+	},
+	"tools": {
+		"total": 201,
+		"errorLike": 1,
+		"maxErrorStreak": 1,
+		"maxRepeatStreak": 5,
+		"topTools": {
+			"copilot_readFile": 88,
+			"run_in_terminal": 33,
+			"copilot_findTextInFiles": 24,
+			"copilot_replaceString": 21,
+			"manage_todo_list": 9,
+			"copilot_multiReplaceString": 9,
+			"mcp_gitkraken_git_add_or_commit": 6,
+			"run_task": 3
+		},
+		"errorSamples": [
+			"run_in_terminal: Running `npm test 2>&1 | Select-String -Pattern \"passing|failing|Error\" | Select-Objec...`"
+		]
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "create a plan to add a resume icon in the editor title bar when viewing a chat session that resumes that chat session"
+		},
+		{
+			"index": 1,
+			"text": "proceed"
+		},
+		{
+			"index": 2,
+			"text": "update wiki"
+		},
+		{
+			"index": 3,
+			"text": "commit changes"
+		},
+		{
+			"index": 4,
+			"text": "build vsix"
+		},
+		{
+			"index": 5,
+			"text": "@session-control /resume Unrecognized Copilot session format error in VS Code"
+		},
+		{
+			"index": 6,
+			"text": "the autosave doesn't seem to be working"
+		},
+		{
+			"index": 7,
+			"text": "build vsix"
+		},
+		{
+			"index": 8,
+			"text": "commit changes"
+		},
+		{
+			"index": 9,
+			"text": "is this ready to publish?"
+		},
+		{
+			"index": 10,
+			"text": "autosave still not working"
+		},
+		{
+			"index": 11,
+			"text": "build vsix"
+		},
+		{
+			"index": 12,
+			"text": "commit changes"
+		},
+		{
+			"index": 13,
+			"text": "fix Missing property \"icon\""
+		},
+		{
+			"index": 14,
+			"text": "autosave still not working"
+		},
+		{
+			"index": 15,
+			"text": "remove auto save on commit"
+		},
+		{
+			"index": 16,
+			"text": "update wiki"
+		},
+		{
+			"index": 17,
+			"text": "update the autosave filename to be the same as the title of the chat session"
+		},
+		{
+			"index": 18,
+			"text": "build vsix"
+		},
+		{
+			"index": 19,
+			"text": "commit changes"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "Here's the plan: --- ## Plan: Resume Icon in Editor Title Bar for Session Viewer ### Goal Add a clickable icon button to the editor title bar that appears when a saved chat session is open in the Session Viewer webview panel. Clicking it resumes that session in Copilot Chat via . ### Current State - The Session Viewer is a with viewType ( ) - There's already an menu contribution for `viewSessionFile` that uses context ( ) - The class tracks the current of the displayed session - Resume works via the chat participant command ( ) ### Changes Required #### 1. Expose session metadata from **File:** - Add a public getter on to expose the current session's title and file name (already has ; need title too). - Store and the bare (basename) alongside on each call. #### 2. Register a new command: **File:** - Add a command handler that: 1. Reads to get the session title/filename. 2. Opens Copilot…",
+	"lastResponse": "Committed as `6f4a604` — 13 files changed."
+}

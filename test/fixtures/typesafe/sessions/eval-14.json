@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-14",
+	"sourceKey": "c90332f73693",
+	"provider": "copilot",
+	"title": "Create VS Code extension plan",
+	"savedDate": "2026-06-11",
+	"split": null,
+	"counts": {
+		"turns": 2,
+		"requests": 1,
+		"responses": 1
+	},
+	"tools": {
+		"total": 0,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 0,
+		"topTools": {},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "Create a plan to create a new project on e drive called Ezra. Ezra will be a vscode extension so copy any relevant agent instructions and skills from this project."
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I'll create a detailed plan for setting up the Ezra VS Code extension project. Here's the structured approach: ```markdown ## Plan: Create Ezra VS Code Extension Project TL;DR - Create a new VS Code extension project structure based on session-control patterns, adapt it for Ezra's specific needs, and set up core dependencies. **Steps** 1. Research & Discovery * Review session-control AGENTS.md and package.json to identify core components needed * Identify key files to copy from session-control (AGENTS.md, .github/copyleft-instructions.md) * Validate required build tools (TypeScript, Webpack) 2. Design Phase * Create Ezra project structure: - src/ - test/ - dist/ - AGENTS.md - package.json - README.md - tsconfig.json * Adapt session-control patterns to Ezra's needs 3. Implementation * Create directories on E:\\Ezra * Copy relevant templates from session-control * Update package.json with …",
+	"lastResponse": ""
+}

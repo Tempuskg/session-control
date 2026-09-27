@@ -1,0 +1,44 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-07",
+	"sourceKey": "257f2a0bb162",
+	"provider": "copilot",
+	"title": "Snyk vulnerability report for follow-redirects module",
+	"savedDate": "2026-04-17",
+	"split": null,
+	"counts": {
+		"turns": 4,
+		"requests": 2,
+		"responses": 2
+	},
+	"tools": {
+		"total": 37,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"run_in_terminal": 15,
+			"copilot_readFile": 6,
+			"copilot_memory": 4,
+			"copilot_findTextInFiles": 3,
+			"execution_subagent": 2,
+			"mcp_snyk_snyk_sca_scan": 2,
+			"copilot_listDirectory": 1,
+			"copilot_applyPatch": 1
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "snyk found an issue: Improper Removal of Sensitive Information Before Storage or Transfer Issue CWE-212 CVSS 6.9 SNYK-JS-FOLLOWREDIRECTS-16032162 Vulnerable module follow-redirects Introduced through @microsoft/dev-tunnels-management@1.3.41 , @microsoft/dev-tunnels-connections@1.3.41 Fixed in follow-redirects@1.16.0 Exploit maturity Not Defined"
+		},
+		{
+			"index": 1,
+			"text": "commit changes and push"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I’m checking the project’s dependency graph and Snyk-related instructions first so I can make the smallest safe fix and verify it against this repo’s build setup. I’m gathering the repo’s package management details and the Snyk rules now, then I’ll patch the dependency resolution path that actually pulls in `follow-redirects`. I’ve confirmed this repo uses npm with a checked-in lockfile, so the right fix is to force a safe transitive resolution and update the lockfile rather than touch extension code.Next I’m checking the actual resolved tree for `follow-redirects` so I can patch the minimal package metadata and validate it cleanly. The vulnerable package is not in this extension’s npm dependency graph. The only place it appears to line up with your report is the downloaded VS Code test runtime under , which is not first-party code for this repo.I’m checking the ignore/setup files now s…",
+	"lastResponse": "I’m checking the current git state and the exact diff before committing so I can avoid sweeping in anything unintended, then I’ll create a focused commit and push it to . This batch is to verify the staged/unstaged state and review the pending diff so the commit contains only the intended Snyk scan workflow change. There’s one unrelated local change in from Snyk auth state. I’m excluding that and committing only the intended change, then pushing ."
+}

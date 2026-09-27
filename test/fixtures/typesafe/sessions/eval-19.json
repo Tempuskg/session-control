@@ -1,0 +1,72 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-19",
+	"sourceKey": "1f1bf8273d61",
+	"provider": "cursor",
+	"title": "is it possible to add cursor chat sessions to this extension?",
+	"savedDate": "2026-06-07",
+	"split": null,
+	"counts": {
+		"turns": 46,
+		"requests": 9,
+		"responses": 37
+	},
+	"tools": {
+		"total": 97,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"StrReplace": 23,
+			"Read": 22,
+			"ReadFile": 11,
+			"Glob": 11,
+			"rg": 6,
+			"Grep": 6,
+			"Shell": 5,
+			"TodoWrite": 4
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "is it possible to add cursor chat sessions to this extension?"
+		},
+		{
+			"index": 1,
+			"text": "create a implementation plan for the jsonl chats, do not bother with the SQLite data."
+		},
+		{
+			"index": 2,
+			"text": "Cursor JSONL Import Plan Implement the plan as specified, it is attached for your reference. Do NOT edit the plan file itself. To-do's from the plan have already been created. Do not create them again. Mark them as in_progress as you work, starting with the first one. Don't stop until you have completed all the to-dos."
+		},
+		{
+			"index": 3,
+			"text": "Implement the plan as specified, it is attached for your reference. Do NOT edit the plan file itself. To-do's from the plan have already been created. Do not create them again. Mark them as in_progress as you work, starting with the first one. Don't stop until you have completed all the to-dos."
+		},
+		{
+			"index": 4,
+			"text": "What would you recommend we update version of the extension to?"
+		},
+		{
+			"index": 5,
+			"text": "Update version to 1.2.0"
+		},
+		{
+			"index": 6,
+			"text": "when I try to Save Session From Provider Cursor I don't see this current session \"Cursor chat sessions..."
+		},
+		{
+			"index": 7,
+			"text": "Yes change the cursor save session list to work with where these current chats are"
+		},
+		{
+			"index": 8,
+			"text": "now when I run Session Control: Save Session From Provider... I don't get the options copilot, codex or cursor"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I’m checking the extension’s current session import path and the repo guidance first, then I’ll answer whether Cursor chats are realistically supportable and what the blocker would be. **Exploring Cursor chat sessions** I think the user is asking whether it's possible to add Cursor chat sessions to a VS Code extension called chat-commit, which might save AI chat sessions. I’ll check the codebase to see if there's support for Codex sessions, and look into the README to confirm current capabilities. I might need to web search about Cursor’s chat session storage or API access, to understand how it manages chat transcripts. I'll also make sure to follow the instructions before making any edits. **Checking git status** I’m considering whether it’s necessary to check the git status or diff in this context. The guidelines suggest starting with `git status --short` and then running a scoped dif…",
+	"lastResponse": "I’m checking whether this is a stale build/reload issue or a real regression in the provider picker wiring by inspecting the command registration, contribution points, and current diff. **Troubleshooting session control options** I’m trying to figure out why I don't see the options like copilot, codex, or cursor when running \"Session Control: Save Session From Provider...\" It seems like the command palette command might be missing, or maybe it runs without showing the QuickPick options. I need to check the code around pickSessionProvider and the package.json file. It could also be due to the extension running a stale build, so I should verify whether the command palette and its entries are properly defined in package.json. **Examining command functionality** I’m trying to figure out why `resolveManualWorkspaceFolder` returns undefined and triggers the message to \"Open a workspace folder…"
+}

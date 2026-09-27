@@ -1,0 +1,46 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-21",
+	"sourceKey": "f10f33e14eea",
+	"provider": "cursor",
+	"title": "Analyze saved chat sessions using full workspace access. Session Control coul...",
+	"savedDate": "2026-06-07",
+	"split": null,
+	"counts": {
+		"turns": 30,
+		"requests": 3,
+		"responses": 27
+	},
+	"tools": {
+		"total": 79,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"ReadFile": 51,
+			"Shell": 14,
+			"Glob": 7,
+			"ApplyPatch": 4,
+			"ReadLints": 2,
+			"rg": 1
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "Analyze saved chat sessions using full workspace access. Session Control could not call a host language model directly in this environment, so this prompt is a handoff fallback. Start by reading AGENTS.md, .github/copilot-instructions.md, .github/instructions/saved-chat-analysis.instructions.md, src/sessionAnalysis.ts, and src/analysisStore.ts. Restrict all recommendations to repository-local AI control files and compare them against the existing AI instruction and skill files before recommending changes. Selection: Last 24 Hours Selection mode: last24Hours Only unanalyzed: yes Matching root …"
+		},
+		{
+			"index": 1,
+			"text": "implement"
+		},
+		{
+			"index": 2,
+			"text": "implement remaining"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I’m starting with the repo’s analysis instructions and owner files you named, then I’ll inspect the existing Session Control analysis/report schema so I can generate and persist the report in the expected format.",
+	"lastResponse": "The remaining in-scope work was syncing the imported repo-guidance skill wrappers to the source instruction changes, so the saved-analysis AI-control recommendations are now represented in both the source files and the project skills. Status: completed Changed files - `.cursor/skills/github-copilot-instructions/SKILL.md` - `.<blob>.md` - `.<blob>.md` Commands run - `git status --short` - `git diff -- .github/copilot-instructions.md .github/instructions/repo-validation.instructions.md .github/instructions/saved-chat-analysis.instructions.md .cursor/skills/github-copilot-instructions/SKILL.md .<blob>.md .<blob>.md .cursor/skills/cursor-session-sources/SKILL.md` - `git status --short -- .github/copilot-instructions.md .github/instructions/repo-validation.instructions.md .github/instructions/saved-chat-analysis.instructions.md .cursor/skills/github-copilot-instructions/SKILL.md .<blob>.md .…"
+}

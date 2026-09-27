@@ -1,0 +1,38 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-44",
+	"sourceKey": "4e2bb6b81ece",
+	"provider": "claude-code",
+	"title": "Fix saved sessions not updating after deletion",
+	"savedDate": "2026-06-28",
+	"split": null,
+	"counts": {
+		"turns": 17,
+		"requests": 1,
+		"responses": 16
+	},
+	"tools": {
+		"total": 38,
+		"errorLike": 1,
+		"maxErrorStreak": 1,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"Bash": 15,
+			"Read": 12,
+			"Grep": 8,
+			"Edit": 3
+		},
+		"errorSamples": [
+			"Bash: Exit code 1 node:internal/modules/cjs/loader:1423 throw err; ^ Error: Cannot find module '/tmp/vscode-stub.js' Require stack: - E:\\chat-commit\\[eval] at Module._resolveFilename (node:internal/modules…"
+		]
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "when I delete a session in the session control: Saved sessions screen it deletes from disk but the session name still shows in the saved sessions"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I'll investigate the saved sessions delete flow. Let me find the relevant code.",
+	"lastResponse": "I found and fixed the bug. ## Root cause The delete logic, the on-disk store, and the tree-view refresh wiring are all correct — I verified end-to-end that after a delete, `getChildren` returns the smaller list. The problem was in how VS Code identifies tree nodes. The tree items in [sessionExplorer.ts](src/sessionExplorer.ts) never set an explicit `TreeItem.id`. Per the VS Code API, when no id is provided, **VS Code auto-generates one from the item's label**. The session node's label is `session.title`. So whenever two sessions share a title — which happens routinely with multi-part saves or re-saving the same chat — they get the **same** auto-generated id. Ids must be unique across the tree, so when you delete one, VS Code's id-keyed model still holds a node with that id/label and keeps rendering the name, even though the file is gone from disk and the provider correctly reports it de…"
+}

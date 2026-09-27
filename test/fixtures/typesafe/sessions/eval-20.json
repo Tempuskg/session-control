@@ -1,0 +1,52 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-20",
+	"sourceKey": "21601a7c37e2",
+	"provider": "cursor",
+	"title": "\"`@session-control /analyze`\" doesn't work in cursor chat sessions. What do y...",
+	"savedDate": "2026-06-07",
+	"split": null,
+	"counts": {
+		"turns": 77,
+		"requests": 4,
+		"responses": 73
+	},
+	"tools": {
+		"total": 116,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"ReadFile": 49,
+			"rg": 20,
+			"ApplyPatch": 15,
+			"Shell": 14,
+			"WebSearch": 5,
+			"ReadLints": 5,
+			"Glob": 4,
+			"WebFetch": 2
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "\"`@session-control /analyze`\" doesn't work in cursor chat sessions. What do you recommend?"
+		},
+		{
+			"index": 1,
+			"text": "proceed"
+		},
+		{
+			"index": 2,
+			"text": "tried analyze and got: No host chat model is available for analysis. Sign in or enable a chat model, then try again."
+		},
+		{
+			"index": 3,
+			"text": "proceed"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I’m going to check the repo’s local guidance first, then inspect how `@session-control` routes slash commands so I can give a recommendation grounded in the extension’s current behavior.",
+	"lastResponse": "`Session Control: Analyze Saved Chats` now falls back gracefully in Cursor. If Cursor returns no extension-callable chat models, the command no longer stops with the dead-end warning; it opens chat with a prefilled analysis handoff prompt that points the agent at the saved sessions, the repo AI-control guidance, and the existing analysis report/index schema. In non-Cursor hosts, the command still warns normally when no chat model is available. This follow-up only changed the Cursor fallback path and its tests. The next time you run Analyze in Cursor, you should get a prefilled chat prompt instead of the “No host chat model is available” warning. Status: completed Changed files - `src/extension.ts` - `test/unit/extensionPhase10.test.ts` Commands run - `npm run compile-tests` - `npm run compile; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm test; if ($LASTEXITCODE -ne 0) { exit $LA…"
+}

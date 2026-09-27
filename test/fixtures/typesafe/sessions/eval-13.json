@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-13",
+	"sourceKey": "be9c4e32c52a",
+	"provider": "copilot",
+	"title": "Hello and model information",
+	"savedDate": "2026-06-09",
+	"split": null,
+	"counts": {
+		"turns": 1,
+		"requests": 1,
+		"responses": 0
+	},
+	"tools": {
+		"total": 0,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 0,
+		"topTools": {},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "Say hello and tell me which model you are using."
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "",
+	"lastResponse": ""
+}

@@ -1,0 +1,80 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-04",
+	"sourceKey": "aa3dbfbbeeda",
+	"provider": "copilot",
+	"title": "Committing Changes in Version Control",
+	"savedDate": "2026-04-13",
+	"split": null,
+	"counts": {
+		"turns": 21,
+		"requests": 11,
+		"responses": 10
+	},
+	"tools": {
+		"total": 66,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 2,
+		"topTools": {
+			"copilot_readFile": 28,
+			"run_in_terminal": 13,
+			"copilot_replaceString": 6,
+			"copilot_findFiles": 5,
+			"copilot_memory": 4,
+			"copilot_findTextInFiles": 4,
+			"copilot_listDirectory": 2,
+			"copilot_multiReplaceString": 2
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "commit changes"
+		},
+		{
+			"index": 1,
+			"text": "don't use gitkraken. update all settings telling all agents to not use gitkraken"
+		},
+		{
+			"index": 2,
+			"text": "yes"
+		},
+		{
+			"index": 3,
+			"text": "are there any security issues with the .chat sessions I have as they will be in a public repo."
+		},
+		{
+			"index": 4,
+			"text": "yes add it to .gitignore and make sure they are not in source control, but make sure they stay on disk"
+		},
+		{
+			"index": 5,
+			"text": "update documentation to warn users about saving chat sessions in public repos"
+		},
+		{
+			"index": 6,
+			"text": "update wiki"
+		},
+		{
+			"index": 7,
+			"text": "commit changes"
+		},
+		{
+			"index": 8,
+			"text": "the settings still show auto save on commit"
+		},
+		{
+			"index": 9,
+			"text": "the extension settings still say auto save on commit"
+		},
+		{
+			"index": 10,
+			"text": "the extension description Features still says Auto-save on commit"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I'll store this as a user preference in memory and create a `.instructions.md` file in the VS Code prompts folder so it applies to all agents globally. Done. I've: 1. Created — an `alwaysApply` instruction that tells all agents to avoid `mcp_gitkraken_*` tools and use native git commands instead. 2. Saved the same preference to user memory so it persists across conversations. Now, for the original commit — shall I proceed using `git` in the terminal?",
+	"lastResponse": "The README change removing that bullet wasn't committed before the VSIX was built. Let me commit and rebuild."
+}

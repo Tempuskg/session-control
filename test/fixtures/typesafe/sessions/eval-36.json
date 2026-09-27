@@ -1,0 +1,33 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-36",
+	"sourceKey": "05b0a09a3d95",
+	"provider": "claude-code",
+	"title": "Fix monetization plan markdown formatting",
+	"savedDate": "2026-06-28",
+	"split": null,
+	"counts": {
+		"turns": 6,
+		"requests": 4,
+		"responses": 2
+	},
+	"tools": {
+		"total": 1,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"Write": 1
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 3,
+			"text": "fix @src/monetization_plan.md markdown is messed up"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I'll rewrite the file with proper markdown headers, bullet lists, code fences, and pipe-style tables throughout.",
+	"lastResponse": "These are all spellcheck warnings from the IDE's spell-checker (Information severity, not errors) — \"Squeezy\", \"<owner>\", \"frontmatter\", \"Tabnine\", \"Commoditizable\", \"upsell\" are all correct proper nouns or established tech terms. The markdown is fixed and renders correctly; these diagnostics don't need any changes."
+}

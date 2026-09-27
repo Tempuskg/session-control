@@ -1,0 +1,44 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-42",
+	"sourceKey": "f825331bc592",
+	"provider": "claude-code",
+	"title": "Spike TypeSafe SDK in extension host",
+	"savedDate": "2026-09-25",
+	"split": null,
+	"counts": {
+		"turns": 15,
+		"requests": 2,
+		"responses": 13
+	},
+	"tools": {
+		"total": 74,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"Bash": 38,
+			"Read": 13,
+			"WebFetch": 9,
+			"Edit": 5,
+			"Grep": 4,
+			"Write": 2,
+			"Glob": 1,
+			"Skill": 1
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "You are an AI coding agent picking up a Methodology With No Name (MWNN) Kanban card. Do the actual work this card describes in the current workspace — write code, create files, run commands as needed. Do not just describe the work. This card is stored as a markdown file at: .mwnn/cards/card-mug8ch4z-1.md Keep the card's \"## Acceptance criteria\" checklist current while you work: change each verified `- [ ]` item to `- [x]`, and leave any unmet item unchecked. When you finish, update that file: append a short summary of what you did under its \"Activity\" section. Also append the exact terminal m…"
+		},
+		{
+			"index": 1,
+			"text": "Base directory for this skill: C:\\Users\\<user>\\.claude\\skills\\typesafe-ai # Build with TypeSafe TypeSafe makes units of AI intelligence usable like programming primitives: small judgments you can compose into larger capabilities. Its **System One models** return fast, focused judgments that software can consume directly. **Jev** is TypeSafe's flagship and first System One model. It understands natural language and returns typed answers and probabilities rather than generating text or reasoning explanations. Code owns the workflow; the model supplies programmable common sense where ordinary co…"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "Now let me check `src/pro/index.ts`'s uncommitted diff briefly to avoid confusion, then design the spike module.",
+	"lastResponse": "The Phase 0 TypeSafe spike is implemented and validated. Summary: - Added `@typesafe-ai/sdk@0.6.0` and `src/typesafe/spike.ts` — a dev-flag-gated (`SESSION_CONTROL_TYPESAFE_SPIKE=1`) `systemOne` call wired into `src/extension.ts` as `session-control.devTypeSafeSpike`. - `test/unit/typesafeSpike.test.ts` (17 tests) runs inside the **real VS Code extension host** (via `npm test` → `@vscode/test-electron`), proving: Node 24.20.0 in the host, a full `systemOne` round trip against a local mock server, real `vscode.CancellationToken` → `AbortSignal` cancellation (mid-flight and pre-cancelled), and every error mapping (401/429/529/other-5xx/timeout/connection) via genuine local HTTP responses. - Bundle delta: +36,328 B dev build, +19,102 B production/minified build. - `npm run compile-tests`, `compile`, `test` (429/429 passing), and `lint` all green. One gap remains: Cursor's Node version and …"
+}

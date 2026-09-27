@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-24",
+	"sourceKey": "36aceeb92b1d",
+	"provider": "cursor",
+	"title": "hi",
+	"savedDate": "2026-08-01",
+	"split": null,
+	"counts": {
+		"turns": 2,
+		"requests": 1,
+		"responses": 1
+	},
+	"tools": {
+		"total": 0,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 0,
+		"topTools": {},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "hi"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "Hi — what would you like to work on in `chat-commit`?",
+	"lastResponse": ""
+}

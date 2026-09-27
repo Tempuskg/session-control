@@ -1,0 +1,44 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-22",
+	"sourceKey": "96e1da5e60e9",
+	"provider": "cursor",
+	"title": "I tried to do a chat analysis in another project(metatron) in cursor ide and...",
+	"savedDate": "2026-06-08",
+	"split": null,
+	"counts": {
+		"turns": 42,
+		"requests": 2,
+		"responses": 40
+	},
+	"tools": {
+		"total": 79,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"ReadFile": 38,
+			"rg": 12,
+			"Shell": 11,
+			"ApplyPatch": 7,
+			"Glob": 4,
+			"TodoWrite": 3,
+			"ReadLints": 2,
+			"CreatePlan": 1
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "I tried to do a chat analysis in another project(metatron) in cursor ide and it started asking about \"fingerprint contract\". This is the chat session \"E:\\metatron\\.chat\\<blob>.json\" can you create plan to address this?"
+		},
+		{
+			"index": 1,
+			"text": "Fix Cross-Repo Analysis Handoff Implement the plan as specified, it is attached for your reference. Do NOT edit the plan file itself. To-do's from the plan have already been created. Do not create them again. Mark them as in_progress as you work, starting with the first one. Don't stop until you have completed all the to-dos."
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I’m treating this as a planning/debugging task around the saved-chat analysis flow, and I’m first pulling the repo guidance plus the current analysis prompt/hotspot files that could explain why an unrelated “fingerprint contract” topic appeared. **Evaluating guidance and plans** I’m considering the need to read the repository guidance from .github/copilot-instructions.md, as that might be relevant. It seems important to check the saved-chat-analysis skill file too. I'm also wondering about the command surface renaming, but maybe not; that could be complex. For now, I should focus on planning and perhaps inspecting the git status and creating a scoped diff before diving into diagnostics.",
+	"lastResponse": "Implemented the cross-repo analysis handoff fix in `chat-commit` without touching the attached plan file. The Cursor no-model fallback prompt now stays focused on the target repo’s saved chats, carries its own report/index/fingerprint contract inline, and no longer nudges the agent toward Session Control internals when opened in another workspace like `metatron`. Status: completed Changed files - `src/analysisStore.ts` - `src/extension.ts` - `src/sessionAnalysis.ts` - `test/unit/analysisStore.test.ts` - `test/unit/extensionPhase10.test.ts` Commands run - `git status --short` - `git diff -- src/extension.ts src/sessionAnalysis.ts src/analysisStore.ts src/analysisOrchestrator.ts test/unit/extensionPhase10.test.ts test/unit/sessionAnalysis.test.ts test/unit/analysisStore.test.ts` - `npm run compile-tests; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm run compile` - `npm test` - `npm…"
+}

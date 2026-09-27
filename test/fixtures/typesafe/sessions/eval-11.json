@@ -1,0 +1,38 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-11",
+	"sourceKey": "55dc0f5db0b8",
+	"provider": "copilot",
+	"title": "Locate /analyze prompt",
+	"savedDate": "2026-05-19",
+	"split": null,
+	"counts": {
+		"turns": 2,
+		"requests": 1,
+		"responses": 1
+	},
+	"tools": {
+		"total": 14,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"copilot_findTextInFiles": 5,
+			"copilot_findFiles": 5,
+			"search_subagent": 1,
+			"copilot_searchCodebase": 1,
+			"copilot_memory": 1,
+			"copilot_readFile": 1
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "where is the prompt used for /analyze"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I’m locating the `/analyze` command wiring and the prompt source so I can point you to the exact file and call path. I found the command handler; next I’m reading the prompt builder itself so I can separate the slash-command entry point from the actual `/analyze` prompt template. The prompt builder is in ; I’m pulling the template constant now so I can give you the exact source instead of only the caller",
+	"lastResponse": ""
+}

@@ -368,6 +368,9 @@ export class SessionExplorerProvider implements vscode.TreeDataProvider<SessionE
 	constructor(
 		private readonly depsOverrides: Partial<SessionExplorerDeps> = {},
 		private sortOrder: SessionExplorerSortOrder = DEFAULT_SESSION_EXPLORER_SORT_ORDER,
+		// Receives the resource URIs of listed session items so a decoration
+		// provider (e.g. Jev session indicators) can badge them.
+		private readonly onSessionItemsListed?: (uris: vscode.Uri[]) => void,
 	) {}
 
 	get currentSortOrder(): SessionExplorerSortOrder {
@@ -398,8 +401,10 @@ export class SessionExplorerProvider implements vscode.TreeDataProvider<SessionE
 		}
 
 		if (element instanceof SessionExplorerWorkspaceItem) {
-			return sortSessionExplorerSessions(element.group.sessions, this.sortOrder)
+			const items = sortSessionExplorerSessions(element.group.sessions, this.sortOrder)
 				.map((session) => new SessionExplorerSessionItem(element.group, session));
+			this.onSessionItemsListed?.(items.flatMap((item) => (item.resourceUri ? [item.resourceUri] : [])));
+			return items;
 		}
 
 		return [];

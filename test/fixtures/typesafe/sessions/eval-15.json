@@ -1,0 +1,77 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-15",
+	"sourceKey": "6821d39ce94f",
+	"provider": "copilot",
+	"title": "hello",
+	"savedDate": "2026-08-01",
+	"split": null,
+	"counts": {
+		"turns": 15,
+		"requests": 12,
+		"responses": 3
+	},
+	"tools": {
+		"total": 1,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"ask_user": 1
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "hello"
+		},
+		{
+			"index": 1,
+			"text": "hi"
+		},
+		{
+			"index": 2,
+			"text": "<system_notification> The Visual Studio Code connection is available again. IDE tools are working again. </system_notification>"
+		},
+		{
+			"index": 3,
+			"text": "<system_notification> The Visual Studio Code connection is available again. IDE tools are working again. </system_notification>"
+		},
+		{
+			"index": 4,
+			"text": "<system_notification> The Visual Studio Code connection is available again. IDE tools are working again. </system_notification>"
+		},
+		{
+			"index": 5,
+			"text": "<system_notification> The Visual Studio Code connection is available again. IDE tools are working again. </system_notification>"
+		},
+		{
+			"index": 6,
+			"text": "<system_notification> The Visual Studio Code connection is available again. IDE tools are working again. </system_notification>"
+		},
+		{
+			"index": 7,
+			"text": "<system_notification> The Visual Studio Code connection is available again. IDE tools are working again. </system_notification>"
+		},
+		{
+			"index": 8,
+			"text": "<system_notification> The Visual Studio Code connection is available again. IDE tools are working again. </system_notification>"
+		},
+		{
+			"index": 9,
+			"text": "<system_notification> The Visual Studio Code connection is available again. IDE tools are working again. </system_notification>"
+		},
+		{
+			"index": 10,
+			"text": "<system_notification> The Visual Studio Code connection is available again. IDE tools are working again. </system_notification>"
+		},
+		{
+			"index": 11,
+			"text": "<system_notification> The Visual Studio Code connection is available again. IDE tools are working again. </system_notification>"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "Hello! How can I help you today? I can inspect the repo, run builds/tests, search or edit files, create commits/PRs, or answer coding questions. What would you like to do?",
+	"lastResponse": "Got it — just chatting. Anything you'd like to talk about or try while the workspace is available?"
+}

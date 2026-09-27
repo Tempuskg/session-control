@@ -1,0 +1,38 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-23",
+	"sourceKey": "2671a7c0b201",
+	"provider": "cursor",
+	"title": "do you agree with the Ranked top 5 monetization strategies in @Monetization_r...",
+	"savedDate": "2026-06-24",
+	"split": null,
+	"counts": {
+		"turns": 7,
+		"requests": 2,
+		"responses": 5
+	},
+	"tools": {
+		"total": 4,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"Read": 2,
+			"AskQuestion": 2
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "do you agree with the Ranked top 5 monetization strategies in @Monetization_research..md Is there anything else you wourd recomend?"
+		},
+		{
+			"index": 1,
+			"text": "the extension is on VS Code Marketplace, I put it on both Open VSX and VS Code Marketplace at the same time. VS Code Marketplace only has 20 installs."
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I need to pull up the Monetization_research file and evaluate the top five strategies they've ranked, then think through what additional recommendations might strengthen their approach.",
+	"lastResponse": "Got it — I'll hold off on the follow-up direction until you tell me which thread to pull. To recap the strategic shift the new data forces: 1. **Audience identity, confirmed by the 100:1 ratio**: you serve polyglot AI-tooling power users on Cursor/Windsurf/Claude Code/Codex/VSCodium — not stock-VS-Code users. Pricing, positioning, and channel selection all need to reflect that. 2. **Open VSX is the primary distribution channel.** Don't waste cycles trying to fix the Marketplace number; it's a residual-audience symptom, not a listing failure. 3. **Higher pricing tolerance than I initially estimated** — $7–10/mo individual is defensible because these users already pay $20/mo for Cursor and/or API fees for Claude/Codex. 4. **The skills-bridge is the Pro feature.** Bidirectional sync between Copilot instructions, Cursor rules, Claude skills, and Codex prompts is non-leaky against your curre…"
+}

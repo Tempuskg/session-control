@@ -1,0 +1,39 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-33",
+	"sourceKey": "09b639a8f8bf",
+	"provider": "claude-code",
+	"title": "Debug autosave feature in Claude Code chats",
+	"savedDate": "2026-06-21",
+	"split": null,
+	"counts": {
+		"turns": 16,
+		"requests": 1,
+		"responses": 15
+	},
+	"tools": {
+		"total": 22,
+		"errorLike": 1,
+		"maxErrorStreak": 1,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"Bash": 7,
+			"Grep": 5,
+			"Read": 5,
+			"PowerShell": 3,
+			"Edit": 2
+		},
+		"errorSamples": [
+			"Bash: Exit code 1 [eval]:8 const rest = (windowsMatch[2] ?? '').replace(/[.\\/\\]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, ''); ^ Unterminated regexp literal SyntaxError: Invalid regular expression: mi…"
+		]
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "autosave doesn't seem to be working for Claude Code chats"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I'll investigate how autosave works for chats in this extension, focusing on the Claude Code provider path since that's what's not working.",
+	"lastResponse": "The fix produces `e--chat-commit`, matching the real directory. The earlier mismatch was just shell backslash mangling. ## Summary Autosave wasn't working for Claude Code chats because the extension was watching the wrong directory. **Root cause:** [deriveClaudeCodeProjectSlug](src/claudeCodeSessionReader.ts#L322) computed the transcript directory name as `e-chat-commit` (single dash), but Claude Code actually stores transcripts in `e--chat-commit` (double dash) — confirmed: 5 active `.jsonl` transcripts there, updated today, in `C:\\Users\\<user>\\.claude\\projects\\e--chat-commit\\`. The autosave watcher pointed at a non-existent path, so it never detected new chats. This was a **regression from commit `0ed4ad8` (\"improve project slug derivation\", yesterday)**. The original code `replace(/[:\\\\/]/g, '-')` was correct, but the rewrite added drive-letter special-casing plus dash-collapsing (`.…"
+}

@@ -8,10 +8,21 @@ import {
 	AnalysisReportReference,
 	AnalysisReportSourceSession,
 	AnalysisSelection,
+	CachedJudgmentEntry,
 	ChatSession,
 	GitContext,
+	JudgmentCache,
 	isAnalysisIndex,
+	isCachedJudgmentEntry,
+	isJudgmentCache,
 } from './types';
+
+export {
+	CachedJudgmentEntry,
+	JudgmentCache,
+	isCachedJudgmentEntry,
+	isJudgmentCache,
+};
 
 interface AnalysisStoreDeps {
 	mkdir(directoryPath: string): Promise<void>;
@@ -55,6 +66,47 @@ export interface PersistedAnalysisReport {
 }
 
 export const ANALYSIS_INDEX_VERSION = 1;
+export const JUDGMENT_CACHE_VERSION = 1;
+
+export function createJudgmentCacheKey(
+	sessionFingerprint: string,
+	questionSetVersion: string | number,
+): string {
+	const normalizedFingerprint = sessionFingerprint.trim();
+	const normalizedVersion = String(questionSetVersion).trim();
+	if (!normalizedFingerprint) {
+		throw new Error('sessionFingerprint must be a non-empty string');
+	}
+	if (!normalizedVersion) {
+		throw new Error('questionSetVersion must be a non-empty string or number');
+	}
+	return `${normalizedFingerprint}:${normalizedVersion}`;
+}
+
+export function parseJudgmentCacheKey(
+	key: string,
+): { sessionFingerprint: string; questionSetVersion: string } | undefined {
+	const colonIndex = key.indexOf(':');
+	if (colonIndex <= 0 || colonIndex === key.length - 1) {
+		return undefined;
+	}
+	return {
+		sessionFingerprint: key.slice(0, colonIndex),
+		questionSetVersion: key.slice(colonIndex + 1),
+	};
+}
+
+export interface SaveJudgmentInput<TAnswers = Record<string, unknown>> {
+	sessionFingerprint: string;
+	questionSetVersion: string | number;
+	answers: TAnswers;
+	createdAt?: string;
+	model?: string;
+	usage?: {
+		input_tokens: number;
+		output_tokens: number;
+	};
+}
 
 function createDefaultDeps(): AnalysisStoreDeps {
 	return {
@@ -111,14 +163,17 @@ function getAnalysisPaths(storageDirectory: string): {
 	analysisDirectory: string;
 	reportsDirectory: string;
 	indexPath: string;
+	judgmentsPath: string;
 } {
 	const analysisDirectory = path.join(storageDirectory, 'analysis');
 	const reportsDirectory = path.join(analysisDirectory, 'reports');
 	const indexPath = path.join(analysisDirectory, 'index.json');
+	const judgmentsPath = path.join(analysisDirectory, 'judgments.json');
 	return {
 		analysisDirectory,
 		reportsDirectory,
 		indexPath,
+		judgmentsPath,
 	};
 }
 
@@ -128,6 +183,14 @@ function createDefaultIndex(nowIso: string): AnalysisIndex {
 		updatedAt: nowIso,
 		reports: [],
 		analyzedSessions: [],
+	};
+}
+
+function createDefaultJudgmentCache(nowIso: string): JudgmentCache {
+	return {
+		version: JUDGMENT_CACHE_VERSION,
+		updatedAt: nowIso,
+		judgments: {},
 	};
 }
 
@@ -427,6 +490,7 @@ export function createAnalysisStore(overrides: Partial<AnalysisStoreDeps> = {}) 
 		analysisDirectory: string;
 		reportsDirectory: string;
 		indexPath: string;
+		judgmentsPath: string;
 	}> {
 		const paths = getAnalysisPaths(storageDirectory);
 		await deps.mkdir(paths.analysisDirectory);
@@ -543,6 +607,116 @@ export function createAnalysisStore(overrides: Partial<AnalysisStoreDeps> = {}) 
 		return index.analyzedSessions.some((entry) => entry.fingerprint === fingerprint);
 	}
 
+	function getJudgmentCachePath(storageDirectory: string): string {
+		return getAnalysisPaths(storageDirectory).judgmentsPath;
+	}
+
+	async function readJudgments(storageDirectory: string): Promise<JudgmentCache> {
+		const { judgmentsPath } = await ensureAnalysisDirectories(storageDirectory);
+
+		if (!(await deps.exists(judgmentsPath))) {
+			return createDefaultJudgmentCache(deps.now().toISOString());
+		}
+
+		const content = await deps.readFile(judgmentsPath);
+		const parsed = JSON.parse(content) as unknown;
+		if (!isJudgmentCache(parsed)) {
+			throw new Error(`Invalid judgment cache schema: ${judgmentsPath}`);
+		}
+
+		return parsed;
+	}
+
+	async function writeJudgments(storageDirectory: string, cache: JudgmentCache): Promise<void> {
+		const { judgmentsPath } = await ensureAnalysisDirectories(storageDirectory);
+		await writeAtomic(deps, judgmentsPath, JSON.stringify(cache, null, 2));
+	}
+
+	async function getJudgment<TAnswers = Record<string, unknown>>(
+		storageDirectory: string,
+		sessionFingerprint: string,
+		questionSetVersion: string | number,
+	): Promise<CachedJudgmentEntry<TAnswers> | undefined> {
+		const key = createJudgmentCacheKey(sessionFingerprint, questionSetVersion);
+		const cache = await readJudgments(storageDirectory);
+		const entry = cache.judgments[key];
+		if (!entry) {
+			return undefined;
+		}
+		return entry as CachedJudgmentEntry<TAnswers>;
+	}
+
+	async function saveJudgment<TAnswers = Record<string, unknown>>(
+		storageDirectory: string,
+		input: SaveJudgmentInput<TAnswers>,
+	): Promise<CachedJudgmentEntry<TAnswers>> {
+		const key = createJudgmentCacheKey(input.sessionFingerprint, input.questionSetVersion);
+		const cache = await readJudgments(storageDirectory);
+		const nowIso = deps.now().toISOString();
+		const entry: CachedJudgmentEntry<TAnswers> = {
+			key,
+			sessionFingerprint: input.sessionFingerprint.trim(),
+			questionSetVersion: String(input.questionSetVersion).trim(),
+			createdAt: input.createdAt ?? nowIso,
+			answers: input.answers,
+			...(input.model !== undefined ? { model: input.model } : {}),
+			...(input.usage !== undefined ? { usage: input.usage } : {}),
+		};
+
+		const nextCache: JudgmentCache = {
+			version: JUDGMENT_CACHE_VERSION,
+			updatedAt: nowIso,
+			judgments: {
+				...cache.judgments,
+				[key]: entry as CachedJudgmentEntry,
+			},
+		};
+
+		await writeJudgments(storageDirectory, nextCache);
+		return entry;
+	}
+
+	async function hasJudgment(
+		storageDirectory: string,
+		sessionFingerprint: string,
+		questionSetVersion: string | number,
+	): Promise<boolean> {
+		const judgment = await getJudgment(storageDirectory, sessionFingerprint, questionSetVersion);
+		return judgment !== undefined;
+	}
+
+	async function deleteJudgment(
+		storageDirectory: string,
+		sessionFingerprint: string,
+		questionSetVersion: string | number,
+	): Promise<boolean> {
+		const key = createJudgmentCacheKey(sessionFingerprint, questionSetVersion);
+		const cache = await readJudgments(storageDirectory);
+		if (!cache.judgments[key]) {
+			return false;
+		}
+		const remaining: Record<string, CachedJudgmentEntry> = {};
+		for (const [entryKey, entry] of Object.entries(cache.judgments)) {
+			if (entryKey !== key) {
+				remaining[entryKey] = entry;
+			}
+		}
+		const nextCache: JudgmentCache = {
+			version: JUDGMENT_CACHE_VERSION,
+			updatedAt: deps.now().toISOString(),
+			judgments: remaining,
+		};
+		await writeJudgments(storageDirectory, nextCache);
+		return true;
+	}
+
+	async function clearJudgments(storageDirectory: string): Promise<void> {
+		const { judgmentsPath } = await ensureAnalysisDirectories(storageDirectory);
+		if (await deps.exists(judgmentsPath)) {
+			await deps.unlink(judgmentsPath);
+		}
+	}
+
 	return {
 		ensureAnalysisDirectories,
 		readIndex,
@@ -550,5 +724,56 @@ export function createAnalysisStore(overrides: Partial<AnalysisStoreDeps> = {}) 
 		writeReport,
 		recordAnalysis,
 		hasAnalyzedFingerprint,
+		getJudgmentCachePath,
+		readJudgments,
+		writeJudgments,
+		getJudgment,
+		saveJudgment,
+		hasJudgment,
+		deleteJudgment,
+		clearJudgments,
 	};
+}
+
+export type AnalysisStore = ReturnType<typeof createAnalysisStore>;
+
+export async function getOrQueryCachedJudgment<TAnswers = Record<string, unknown>>(
+	store: {
+		getJudgment<T = TAnswers>(
+			storageDirectory: string,
+			sessionFingerprint: string,
+			questionSetVersion: string | number,
+		): Promise<CachedJudgmentEntry<T> | undefined>;
+		saveJudgment<T = TAnswers>(
+			storageDirectory: string,
+			input: SaveJudgmentInput<T>,
+		): Promise<CachedJudgmentEntry<T>>;
+	},
+	storageDirectory: string,
+	sessionFingerprint: string,
+	questionSetVersion: string | number,
+	query: () => Promise<TAnswers | undefined>,
+	options?: {
+		model?: string;
+		usage?: {
+			input_tokens: number;
+			output_tokens: number;
+		};
+	},
+): Promise<TAnswers | undefined> {
+	const cached = await store.getJudgment<TAnswers>(storageDirectory, sessionFingerprint, questionSetVersion);
+	if (cached) {
+		return cached.answers;
+	}
+	const answers = await query();
+	if (answers !== undefined) {
+		await store.saveJudgment(storageDirectory, {
+			sessionFingerprint,
+			questionSetVersion,
+			answers,
+			...(options?.model !== undefined ? { model: options.model } : {}),
+			...(options?.usage !== undefined ? { usage: options.usage } : {}),
+		});
+	}
+	return answers;
 }

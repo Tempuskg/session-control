@@ -1,0 +1,47 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-17",
+	"sourceKey": "9f167659d26f",
+	"provider": "copilot",
+	"title": "Token limit exceeded error",
+	"savedDate": "2026-08-02",
+	"split": null,
+	"counts": {
+		"turns": 6,
+		"requests": 3,
+		"responses": 3
+	},
+	"tools": {
+		"total": 78,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"copilot_readFile": 32,
+			"run_in_terminal": 13,
+			"copilot_applyPatch": 12,
+			"copilot_findTextInFiles": 11,
+			"manage_todo_list": 6,
+			"copilot_getErrors": 3,
+			"copilot_listDirectory": 1
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "In another project I got: 223 x 24 CHAT @SESSION-CONTROL /ANALYZE Start Over @session-control /analyze session-control Analysis failed before a report could be saved. Analysis failed: Message exceeds token limit."
+		},
+		{
+			"index": 1,
+			"text": "also make it skip session-control /analze chats"
+		},
+		{
+			"index": 2,
+			"text": "now I get: session-control Analysis failed before a report could be saved. Analysis failed: The saved session exceeds the model token limit even when analyzed on its own."
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I’m checking the analysis prompt path and repo state first so I can confirm whether batching misses the real token budget and then patch the narrowest control point. I’m loading the repo-specific analysis and validation rules and checking the working tree against the likely owner files so I can keep the fix local and validate it the way this repo expects. I’ve got a clean baseline. Next I’m reading the owner flow and the nearest tests to see whether the failure is in per-batch prompt sizing, the synthesis step, or both. The first pass supports the main hypothesis: batching only counts raw evidence text, while every real model call adds prompt scaffolding and the baseline block. I’m checking the remainder of the orchestrator to see whether synthesis has the same blind spot and where the smallest safe fix belongs. I’ve narrowed it to the generation path. I’m doing one focused search for t…",
+	"lastResponse": "I’m checking the single-session prompt path now. The likely defect is that we can split across sessions, but we still send a full raw transcript for one oversized chat with no degradation path. I’ve confirmed the current implementation still has no per-session degradation path: once a single chat is too large, it fails. I’m reading the nearest tests and a real oversized saved session next so I can add a compact fallback instead of just changing the error text. I’ve got the controlling gap: we only know how to split across sessions, not how to degrade evidence within one oversized session. I’m locating the default prompt wiring now so I can add a compact single-session fallback without broadening the surface. Plan: 1. Add detail-level prompt building so analysis can retry a single oversized session with condensed evidence instead of failing immediately. 2. Cover the single-session compac…"
+}

@@ -1,0 +1,53 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-39",
+	"sourceKey": "f001bd4a8ad9",
+	"provider": "claude-code",
+	"title": "Add analyzed indicator to saved sessions view",
+	"savedDate": "2026-08-02",
+	"split": null,
+	"counts": {
+		"turns": 22,
+		"requests": 6,
+		"responses": 16
+	},
+	"tools": {
+		"total": 72,
+		"errorLike": 1,
+		"maxErrorStreak": 1,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"Edit": 35,
+			"PowerShell": 12,
+			"Read": 11,
+			"Grep": 10,
+			"Glob": 2,
+			"Skill": 1,
+			"ToolSearch": 1
+		},
+		"errorSamples": [
+			"PowerShell: Exit code 2 > session-control@1.3.5 compile-tests > tsc -p tsconfig.test.json test/unit/extensionDeleteFlow.test.ts(39,8): error TS2741: Property 'analyzedSessions' is missing in type '{ workspaceFol…"
+		]
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "You are an AI coding agent picking up a Methodology With No Name (MWNN) Kanban card. Do the actual work this card describes in the current workspace — write code, create files, run commands as needed. Do not just describe the work. This card is stored as a markdown file at: .mwnn/cards/card-ms1vnrbi-2.md Keep the card's \"## Acceptance criteria\" checklist current while you work: change each verified `- [ ]` item to `- [x]`, and leave any unmet item unchecked. When you finish, update that file: append a short summary of what you did under its \"Activity\" section. Also append the exact terminal m…"
+		},
+		{
+			"index": 1,
+			"text": "Base directory for this skill: e:\\chat-commit\\.claude\\skills\\github-copilot-instructions Follow this imported repository guidance from `.github/copilot-instructions.md` when the task overlaps with its original scope. ## Instructions - Treat the guidance below as repository-specific instructions for this project. - Apply it together with higher-priority system, developer, and repo instructions already in effect. - Preserve the intent of the source guidance while adapting it to the current task. ## Imported guidance # Copilot Instructions for Session Control ## Project Overview Session Control …"
+		},
+		{
+			"index": 2,
+			"text": "there are going to be 2 indicators needed one for analyzed and one for harvested(session-control-pro). Just having a color isn't going to be ideal to show the various combinations analyzed only, harvested only, analyzed and harvested."
+		},
+		{
+			"index": 4,
+			"text": "add glasceable icon's"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "Picking up the MWNN card — let me read it and the relevant source files first.",
+	"lastResponse": "Glanceable icons are in — 276 tests passing, lint and webpack build clean. Each state combination now has its own icon shape in [sessionExplorer.ts:130](src/sessionExplorer.ts#L130), so you can read the status from the icon column alone: | State | Icon | Tint | |---|---|---| | Untouched | comment-discussion | none (unchanged from today) | | Analyzed only | graph | green | | Harvested only | book | orange | | Analyzed + harvested | library | purple | The shape carries the distinction and the color is only reinforcement, so the four combinations stay unambiguous for colorblind users and in themes where the tints render subtly. The text badges and dated tooltip lines from before are unchanged, giving you both the glanceable cue and the explicit label. Status: completed Changed files: `src/sessionExplorer.ts`, `test/unit/sessionExplorer.test.ts`, `CHANGELOG.md`, `.mwnn/cards/card-ms1vnrbi-2…"
+}

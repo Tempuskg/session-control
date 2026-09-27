@@ -1,0 +1,68 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-38",
+	"sourceKey": "3ce56831998c",
+	"provider": "claude-code",
+	"title": "Fix Cursor resume session auto-paste flow (Part 1/2)",
+	"savedDate": "2026-08-02",
+	"split": {
+		"part": 1,
+		"totalParts": 2
+	},
+	"counts": {
+		"turns": 28,
+		"requests": 6,
+		"responses": 22
+	},
+	"tools": {
+		"total": 130,
+		"errorLike": 4,
+		"maxErrorStreak": 1,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"Bash": 34,
+			"Edit": 23,
+			"Grep": 22,
+			"Read": 21,
+			"PowerShell": 18,
+			"TodoWrite": 6,
+			"Write": 5,
+			"ToolSearch": 1
+		},
+		"errorSamples": [
+			"Bash: <uuid>-0aaf2be5-618.json <uuid>.json 2026<blob>.json 2026-04-13T22-25-<uuid>.json 2026<blob>.json 2026-04-13T22-31-issues-with-problems-tab-fixes.json 2026-04-13T22-42-publication-readiness-assessmen…",
+			"Bash: Exit code 1 /c/Users/<user>/.cursor/extensions/<user>.session-control-1.3.2-universal \"version\": \"1.3.2\" 0",
+			"Bash: Exit code 2 /c/Users/<user>/.cursor/extensions/<user>.session-control-1.3.2-universal /c/Users/<user>/.cursor/extensions/<user>.session-control-1.3.3 grep: /c/Users/<user>/.cursor/extensions/<user>.s…",
+			"Bash: > session-control@1.3.3 pretest > npm run compile-tests && npm run compile > session-control@1.3.3 compile-tests > tsc -p tsconfig.test.json test/unit/extensionPhase10.test.ts(119,16): error TS2532: …"
+		]
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "You are an AI coding agent picking up a Methodology With No Name (MWNN) Kanban card. Do the actual work this card describes in the current workspace — write code, create files, run commands as needed. Do not just describe the work. This card is stored as a markdown file at: .mwnn/cards/card-mr4zz0gk-2.md When you finish, update that file: append a short summary of what you did under its \"Activity\" section. End your work by reporting the card status on its own line, exactly one of: STATUS: DONE — the acceptance criteria are met. STATUS: BLOCKED: <reason> — you cannot proceed and need a human. …"
+		},
+		{
+			"index": 1,
+			"text": "In Cursor the resumed session isn't visible/focused in the chat window"
+		},
+		{
+			"index": 2,
+			"text": "[Image: original 6080x1440, displayed at 2000x474. Multiply coordinates by 3.04 to map to original image.]"
+		},
+		{
+			"index": 3,
+			"text": "It still doesn't show the chat with the pasted in prompt when I resume"
+		},
+		{
+			"index": 4,
+			"text": "[Request interrupted by user]"
+		},
+		{
+			"index": 5,
+			"text": "When calling the save session command it lists copilot, codex and claude code. Can it detect when in Cursor and if so then change copilot option to Cursor?"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I'll pick up this card. Let me start by reading the card file and the relevant source files.",
+	"lastResponse": "Strict indexed access — quick fix in the test:"
+}

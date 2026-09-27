@@ -10,7 +10,9 @@ import {
 	SHARED_HANDOFF_CAPABILITY_VERSION,
 	showUpgradePrompt,
 	type ProFeatureRegistrationContext,
+	type ProServices,
 } from '../../src/pro';
+import { createFakeJudgmentService } from '../../src/typesafe/judgmentService';
 
 function createModuleNotFoundError(specifier: string): NodeJS.ErrnoException {
 	const error = new Error(`Cannot find module '${specifier}'`) as NodeJS.ErrnoException;
@@ -136,6 +138,30 @@ suite('pro boundary', () => {
 			{ promptLabel: 'harvest prompt' },
 		);
 		assert.equal(dispatchResult.method, 'paste');
+	});
+
+	test('activateProFeatures passes the judgment service through ProServices', async () => {
+		const logs: string[] = [];
+		const registrations: vscode.Disposable[] = [];
+		const judgment = createFakeJudgmentService();
+		let registrarContext: ProFeatureRegistrationContext | undefined;
+
+		const result = await activateProFeatures(
+			{ ...createRegistrationContext(logs, registrations), judgment },
+			{
+				moduleSpecifier: 'session-control-pro-test',
+				resolveModule: () => 'C:/temp/pro/index.js',
+				requireModule: () => ({
+					registerProFeatures: async (context: ProFeatureRegistrationContext) => {
+						registrarContext = context;
+					},
+				}),
+			},
+		);
+
+		assert.equal(result.kind, 'available');
+		const services: ProServices | undefined = registrarContext;
+		assert.equal(services?.judgment, judgment);
 	});
 
 	test('hasProLicense defaults to false until billing is wired', async () => {

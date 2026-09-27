@@ -1,0 +1,54 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-26",
+	"sourceKey": "27c3cca67e41",
+	"provider": "codex",
+	"title": "is it possible to save codex sessions the way this app saves copilot sessions?",
+	"savedDate": "2026-06-11",
+	"split": {
+		"part": 1,
+		"totalParts": 2
+	},
+	"counts": {
+		"turns": 30,
+		"requests": 4,
+		"responses": 26
+	},
+	"tools": {
+		"total": 92,
+		"errorLike": 3,
+		"maxErrorStreak": 1,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"shell_command": 90,
+			"request_user_input": 1,
+			"update_plan": 1
+		},
+		"errorSamples": [
+			"shell_command: Exit code: 1 Wall time: 1.6 seconds Output: Error: HEAD https://developers.openai.com/codex/codex-manual.md could not be fetched. Hint: on Windows, pass a cache dir under `%TEMP%` or `%TMP%`. Details…",
+			"shell_command: Exit code: 0 Wall time: 3.5 seconds Output: 431: try { 432: await deps.readReport(candidate.storageDirectory, candidate.reportPath); 433: return { report: candidate, warnings }; 434: } catch (error) …",
+			"shell_command: Exit code: 0 Wall time: 3.2 seconds Output: 431: try { 432: await deps.readReport(candidate.storageDirectory, candidate.reportPath); 433: return { report: candidate, warnings }; 434: } catch (error) …"
+		]
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "is it possible to save codex sessions the way this app saves copilot sessions?"
+		},
+		{
+			"index": 1,
+			"text": "create a plan to add Codex provider option. Make sure it doesn't affect existing users on copilot. Have the option to import skills from copilot to codex."
+		},
+		{
+			"index": 2,
+			"text": "implement plan"
+		},
+		{
+			"index": 3,
+			"text": "implement plan"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I’ll ground this in the repo’s own docs and current implementation so the answer is about this extension, not a generic “probably.” I’m going to check the local instructions, README/wiki, and the chat/session hotspots.",
+	"lastResponse": "There’s one piece where I’m being a bit careful: the Codex skill files. I want those imports to land in a shape Codex actually recognizes, so I’m peeking at the local manual format before I write the generator."
+}

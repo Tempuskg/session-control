@@ -42,7 +42,7 @@ async function resolveVscodeExecutablePath(): Promise<string> {
 	// propagate and every run reports success. On Windows, resolve a locally
 	// installed VS Code to the electron Code.exe next to its bin\ directory;
 	// otherwise download an archive and use its executable directly.
-	if (process.platform === 'win32') {
+	if (process.platform === 'win32' && process.env.VSCODE_SKIP_LOCAL !== '1') {
 		const localCli = await findExecutableOnPath(['code.cmd', 'code-insiders.cmd']);
 		if (localCli) {
 			const installRoot = path.dirname(path.dirname(localCli));

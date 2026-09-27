@@ -1,0 +1,54 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-34",
+	"sourceKey": "2283899d909e",
+	"provider": "claude-code",
+	"title": "Add resume chat provider selection option",
+	"savedDate": "2026-06-21",
+	"split": null,
+	"counts": {
+		"turns": 17,
+		"requests": 7,
+		"responses": 10
+	},
+	"tools": {
+		"total": 17,
+		"errorLike": 1,
+		"maxErrorStreak": 1,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"Grep": 5,
+			"Glob": 3,
+			"Read": 3,
+			"Agent": 2,
+			"AskUserQuestion": 1,
+			"Write": 1,
+			"ToolSearch": 1,
+			"ExitPlanMode": 1
+		},
+		"errorSamples": [
+			"ExitPlanMode: Tool permission request failed: Error: Tool permission stream closed before response received"
+		]
+	},
+	"userPrompts": [
+		{
+			"index": 3,
+			"text": "I had an idea to have the resume chat give you the option to choose to resume in copilot, codex or claude code. Should I put that in the Pro version?"
+		},
+		{
+			"index": 4,
+			"text": "currently the resume only resumes into copilot. Create a plan to have resume go back to the same agent it came from."
+		},
+		{
+			"index": 5,
+			"text": "Continue from where you left off."
+		},
+		{
+			"index": 6,
+			"text": "when I start the pro version do I keep the free part open source license the same?"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "Let me look at how the project is structured so I can give you a grounded answer rather than a generic one.",
+	"lastResponse": "Good question to settle now, before any Pro code exists. First, a fact about your current setup: [package.json](package.json#L8) declares `\"license\": \"MIT\"`, but there's **no `LICENSE` file at the repo root** (the only LICENSE files are in `node_modules`). Worth adding the actual MIT text — right now the license is asserted but not shipped. (Not legal advice — but here's the practical shape of the decision.) ## Short answer Yes, you can keep the free part MIT and add a paid Pro tier — that's the standard **open-core** model. But *how* you structure it matters, because MIT is very permissive. ## What MIT does and doesn't let you do - **You can keep selling Pro alongside an MIT free core.** Nothing about MIT forces Pro to be open. Pro just has to live in code you *don't* publish under MIT. - **MIT is irrevocable per release.** Any version you've already shipped as MIT stays MIT forever. Y…"
+}

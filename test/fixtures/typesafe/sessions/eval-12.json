@@ -1,0 +1,44 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-12",
+	"sourceKey": "f396e3c97ef2",
+	"provider": "copilot",
+	"title": "Session-control file error",
+	"savedDate": "2026-05-24",
+	"split": null,
+	"counts": {
+		"turns": 4,
+		"requests": 2,
+		"responses": 2
+	},
+	"tools": {
+		"total": 91,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"copilot_readFile": 39,
+			"copilot_findTextInFiles": 18,
+			"run_in_terminal": 17,
+			"copilot_memory": 6,
+			"copilot_applyPatch": 6,
+			"manage_todo_list": 2,
+			"copilot_getErrors": 2,
+			"copilot_listDirectory": 1
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "getting error in another project: @session-control /analyze session-control A system error occurred (ENOENT: no such file or directory, open 'e:\\metatron.chat\\2026<blob>.json')"
+		},
+		{
+			"index": 1,
+			"text": "in another project now it doesn't recognize this as a session to analyze: \"E:\\metatron\\.chat\\<blob>.json\""
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I’m checking the Session Control analyze flow that resolves analysis files, then I’ll trace why it is trying to open a missing file path from another workspace. I’m gathering the owner file and nearby rules first: repo state, the saved-analysis instruction, and the code path that opens analysis report files. I’ve narrowed the likely fault to saved-analysis state reuse across workspaces. Next I’m reading the exact `/analyze` control path and the store code that resolves report files. I found the likely owner slice in and : the extension rehydrates the “latest analysis report” and currently probes saved file paths directly. I’m reading those local sections now and checking whether stale paths are handled or purged. The code confirms one concrete hypothesis: stale entries stay in the saved analysis index, and only catches the read failure but leaves the broken entry in place. I’m checking …",
+	"lastResponse": "I’m checking the actual saved file against Session Control’s session schema and the analyze candidate loader, so I can pin down why this one file is being skipped. The saved file itself looks like a valid Session Control session header. The next discriminating check is whether its linked actually exists, because analyze currently treats split sessions as one reassembled chain. I found the concrete mismatch: the saved part points to `2026<blob>.json`, but the actual file on disk is or . That means the multipart link fields are being written with names that don’t match the final saved filenames. I’ve isolated the root cause to the split-save path, not the analyze parser. Multipart sessions are saved with / names generated one way, but the actual files can be written with different names once `save.useTimestampInFileName` or collision suffixing is applied. I’ve got the controlling slice no…"
+}

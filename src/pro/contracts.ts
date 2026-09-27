@@ -1,4 +1,7 @@
 import * as vscode from 'vscode';
+import type { JudgmentService } from '../typesafe/judgmentService';
+
+export type { JudgmentService };
 
 export const SHARED_HANDOFF_CAPABILITY_VERSION = 1 as const;
 
@@ -46,6 +49,8 @@ export interface ProFeatureCapabilities {
 export interface ProServices {
 	hasProLicense: (workspaceFolder?: vscode.WorkspaceFolder) => Promise<boolean>;
 	showUpgradePrompt: (workspaceFolder?: vscode.WorkspaceFolder) => Promise<void>;
+	/** Shared TypeSafe judgment service; `ask` resolves `undefined` when disabled, unconsented, or failing. */
+	judgment?: JudgmentService;
 }
 
 export interface ProFeatureRegistrationContext extends ProServices {

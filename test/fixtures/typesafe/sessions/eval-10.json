@@ -1,0 +1,116 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-10",
+	"sourceKey": "960bea7f006a",
+	"provider": "copilot",
+	"title": "AI prompt analysis feature plan",
+	"savedDate": "2026-05-19",
+	"split": null,
+	"counts": {
+		"turns": 40,
+		"requests": 20,
+		"responses": 20
+	},
+	"tools": {
+		"total": 598,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 3,
+		"topTools": {
+			"copilot_readFile": 277,
+			"copilot_findTextInFiles": 93,
+			"copilot_applyPatch": 62,
+			"run_in_terminal": 54,
+			"copilot_findFiles": 45,
+			"copilot_memory": 18,
+			"copilot_getErrors": 18,
+			"copilot_searchCodebase": 6
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "create a plan to add a feature that runs the following AI prompt on the .chat folder. Allow the user to select a time frame or just any chats that haven't been analyzed before. Keep track of which chats have been analyzed. The AI prompt is: Review my last interactions with AI from {user chosen timeframe}. Look for any problems that I encountered, things that weren't working efficiently, and unnecessary tool calling. Look for common mistakes AI was doing and other things that can be optimized. Look thoroughly through all conversations and make a plan for how we can optimize our flow in the fut…"
+		},
+		{
+			"index": 1,
+			"text": "save the plan as a mark down file in this repo and start implementation"
+		},
+		{
+			"index": 2,
+			"text": "proceed"
+		},
+		{
+			"index": 3,
+			"text": "after running session-control /analyze have it ask to implement recommendations."
+		},
+		{
+			"index": 4,
+			"text": "when the user pick a date range to analyze ask them if they want to only analyze unanalyzed items in that date range or analyze everything in that date range even if it was already analyzed."
+		},
+		{
+			"index": 5,
+			"text": "why doesn't @sym:# Session Control /implement have filesystem access to read AGENTS.md, .github/copilot-instructions.md, package.json, or the current source files."
+		},
+		{
+			"index": 6,
+			"text": "I want this command to behave more like the coding agent, can we hand it over to the coding agent?"
+		},
+		{
+			"index": 7,
+			"text": "Add a lighter handoff command that opens chat or the Agents window with a generated implementation prompt."
+		},
+		{
+			"index": 8,
+			"text": "proceed"
+		},
+		{
+			"index": 9,
+			"text": "Remove the /implement command and update all documentation"
+		},
+		{
+			"index": 10,
+			"text": "update the #sym:# Chat Analysis Feature Plan and proceed with the plan"
+		},
+		{
+			"index": 11,
+			"text": "update the plan to specify that the analysis should be restricted to only recommendations for AGENTS.md, .github/copilot-instructions.md, CLAUDE.md or any other AI specific control files."
+		},
+		{
+			"index": 12,
+			"text": "proceed to implement the change"
+		},
+		{
+			"index": 13,
+			"text": "rename /handoff command to /implement"
+		},
+		{
+			"index": 14,
+			"text": "2"
+		},
+		{
+			"index": 15,
+			"text": "update the plan to have the analysis to also look for AI skills that could be created to make things better and have the /implement command create those AI skills."
+		},
+		{
+			"index": 16,
+			"text": "proceed"
+		},
+		{
+			"index": 17,
+			"text": "when creating the asalysis report can it only list things that are not existing in the AGENT.md AI instructions and skill files."
+		},
+		{
+			"index": 18,
+			"text": "going to publish another release. Should I bump the release number to 1.01 or 1.1 or what do you recommend?"
+		},
+		{
+			"index": 19,
+			"text": "proceed"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I’m gathering the smallest set of repo facts needed to design this feature cleanly, starting with existing memory notes and the extension surfaces that already handle sessions and commands. I’m splitting discovery into the three decision areas that drive the plan: where the feature plugs into commands/UI, how chat files are read and filtered, and where analysis state/output should live and be tested. The discovery confirms the main gap: there’s no persistent “analyzed already” state today, so the plan will need a dedicated metadata store and a command flow that fits the existing extension patterns. I’m doing a small local read now to pin the exact functions and config surfaces the plan should reference. I have enough to see the architectural shape. One more read will lock down how multi-workspace selection, existing browse flows, and command registration are structured so the plan can c…",
+	"lastResponse": "I’m proceeding with the `1.1.0` release bump. First I’m checking the current release-related file state and where the version is referenced so I only touch the expected release files. The release bump is isolated to the expected files. I’m setting the package version to `1.1.0` now, then I’ll verify the manifest/lockfile update before syncing the README badge. The manifest bump completed. I’m checking the version fields in the package files now; if that looks right, the only remaining release sync should be the README marketplace badge. The package files are updated correctly. I’m making the one remaining manual change now: syncing the marketplace badge in the README to `1.1.0`. ``` ``` The version sync is done. I’m verifying the final release delta now so I can confirm only the intended files changed and the visible version strings are consistent. The release version is bumped in the w…"
+}

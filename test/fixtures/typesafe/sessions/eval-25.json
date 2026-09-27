@@ -1,0 +1,39 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-25",
+	"sourceKey": "b12cd35fd4a1",
+	"provider": "cursor",
+	"title": "You are an AI coding agent picking up a Methodology With No Name (MWNN) Kanba...",
+	"savedDate": "2026-09-25",
+	"split": null,
+	"counts": {
+		"turns": 66,
+		"requests": 1,
+		"responses": 65
+	},
+	"tools": {
+		"total": 68,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"Shell": 28,
+			"Read": 24,
+			"Grep": 8,
+			"Glob": 5,
+			"GetDynamicTools": 1,
+			"CallDynamicTool": 1,
+			"StrReplace": 1
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "You are an AI coding agent picking up a Methodology With No Name (MWNN) Kanban card. Do the actual work this card describes in the current workspace — write code, create files, run commands as needed. Do not just describe the work. This card is stored as a markdown file at: .mwnn/cards/card-mug8ch4z-1.md Keep the card's \"## Acceptance criteria\" checklist current while you work: change each verified `- [ ]` item to `- [x]`, and leave any unmet item unchecked. When you finish, update that file: append a short summary of what you did under its \"Activity\" section. Also append the exact terminal m…"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "**Analyzing Agent Capabilities** I'm currently reviewing the agent's defined rules and skills, specifically in relation to `/implement` and `/proceed` directives. My focus is on understanding the existing frameworks and limitations to determine the best approach for taking on the specified Kanban card. **Refining Card Interpretation** I'm now focusing on how I interpret Kanban cards. My current thoughts are centered on extracting the essential data like the column ID, title, and role, directly from the card and `columns.json` without making assumptions. **Verifying Card Status** My current thinking is to meticulously check each Kanban card against the repository for concrete evidence of completion, especially within the `Activity` section and acceptance criteria. I'm focusing on avoiding redundant implementations if the card is already done or its criteria are met, and documenting any d…",
+	"lastResponse": "I have completed the verification and work for Methodology With No Name (MWNN) card `card-mug8ch4z-1`. ### Summary of Verification and Findings 1. **Criterion 1: Webpack build bundles SDK and bundle size delta recorded** - Development build (`npm run compile`): 609,060 -> 645,388 bytes (+36,328 B, +5.96%). - Production build (`npm run build:production`): 283,990 -> 303,092 bytes (+19,102 B, +6.73%). - SDK contribution: 28.7 KiB of bundled source. 2. **Criterion 2: A call succeeds from the VS Code extension host and Node version (20+) is confirmed for VS Code and Cursor** - **Cursor Node version**: Confirmed `24.15.0` (>= 20) via direct binary execution (`Cursor.exe` running with `ELECTRON_RUN_AS_NODE=1`) and via `@vscode/test-electron` test host execution (`test/unit/typesafeSpike.test.ts` logged `[typesafe-spike] extension host Node version: 24.15.0` and asserted `process.versions.node…"
+}

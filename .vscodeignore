@@ -23,6 +23,7 @@ AGENTS.md
 PLAN.md
 CHAT_ANALYSIS_PLAN.md
 PROJECT_CHAT_AUTOSAVE_PLAN.md
+TYPESAFE_AI_PLAN.md
 Monetization*.md
 raw/**
 wiki/**
@@ -46,6 +47,7 @@ knowledge/**
 session-control-pro/**
 
 # Build / development only
+.coderabbit.yaml
 scripts/**
 node_modules/**
 debug.log

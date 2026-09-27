@@ -1,0 +1,56 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-09",
+	"sourceKey": "0408ef2ecbdc",
+	"provider": "copilot",
+	"title": "Renaming chat files to exclude dates",
+	"savedDate": "2026-04-23",
+	"split": null,
+	"counts": {
+		"turns": 10,
+		"requests": 5,
+		"responses": 5
+	},
+	"tools": {
+		"total": 45,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"copilot_readFile": 21,
+			"copilot_applyPatch": 5,
+			"run_in_terminal": 5,
+			"copilot_findTextInFiles": 4,
+			"copilot_memory": 3,
+			"execution_subagent": 3,
+			"runSubagent": 1,
+			"vscode_askQuestions": 1
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "create a plan to have a config setting option that makes chat file names just have title and not date"
+		},
+		{
+			"index": 1,
+			"text": "update the plan for when there is two sessions with the same title then include the id in the filename"
+		},
+		{
+			"index": 2,
+			"text": "I don't see use Timestamp in filename in settings"
+		},
+		{
+			"index": 3,
+			"text": "increment version and publish"
+		},
+		{
+			"index": 4,
+			"text": "proceed"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I'll help you plan this feature. Let me first explore the codebase to understand how chat file names are currently generated and how the configuration system works. Perfect! I've gathered the key context. Now let me clarify a few things about your feature to ensure the plan is complete: Excellent! I have all the clarity I need. Let me save my findings and create a comprehensive plan: ## Plan: Add config for timestamp-optional file names **TL;DR:** Add a boolean config setting `session-control.save.useTimestampInFileName` (default `true`) to let users choose between `YYYY-MM-DDTHH-MM-{title}.json` (current) or `{title}.json` (new). When disabled, file names will be `{title}.json` for clarity and readability. Only affects new sessions; existing files are unaffected. --- **Steps** 1. **Update configuration schema** — Add new setting `session-control.save.useTimestampInFileName` with type `…",
+	"lastResponse": "I’m proceeding with the release follow-up now: I’ll inspect git state, commit the publish/version changes, create tag v0.1.20, and push branch plus tag. Release follow-up is complete. 1. Committed the pending release changes with message: chore: release v0.1.20 2. Created annotated tag: v0.1.20 3. Pushed main to origin 4. Pushed tag v0.1.20 to origin Everything succeeded end-to-end. Completed the requested release flow end-to-end: version was incremented and published, then release changes were committed, tagged as v0.1.20, and both main and the tag were pushed to origin."
+}

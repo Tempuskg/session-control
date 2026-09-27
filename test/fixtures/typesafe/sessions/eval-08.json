@@ -1,0 +1,44 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-08",
+	"sourceKey": "588a61520178",
+	"provider": "copilot",
+	"title": "Understanding VS Marketplace Retired Badge Meaning",
+	"savedDate": "2026-04-18",
+	"split": null,
+	"counts": {
+		"turns": 4,
+		"requests": 2,
+		"responses": 2
+	},
+	"tools": {
+		"total": 21,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 3,
+		"topTools": {
+			"copilot_fetchWebPage": 6,
+			"vscode_fetchWebPage_internal": 6,
+			"copilot_readFile": 3,
+			"copilot_githubRepo": 2,
+			"copilot_memory": 1,
+			"open_browser_page": 1,
+			"read_page": 1,
+			"copilot_findTextInFiles": 1
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "why does VS Marketplace say retired badge"
+		},
+		{
+			"index": 1,
+			"text": "continue"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "I’m checking the extension’s marketplace metadata and any publishing or deprecation settings in the repo to determine what would cause the “Retired” badge. I’m pulling the publish-related instructions and the extension manifest, then I’ll check whether the repository metadata indicates the extension was deprecated, unpublished, or superseded. The manifest doesn’t show a built-in retirement flag, so the next step is checking Marketplace behavior and this extension’s public listing state. The public listing itself looks live and installable, so I’m checking whether “Retired” is coming from a separate Marketplace state, not from your manifest. I’ve opened the actual listing page in a browser context so I can inspect the header state directly and see whether the badge is on the listing or only in the VS Code client. I’m scanning the rendered page text for any explicit retirement marker so w…",
+	"lastResponse": "I’ve confirmed the public listing is active, so the remaining useful check is whether the Marketplace management tooling exposes a retire/deprecate state for this publisher or whether the label is only visible inside VS Code. I’m checking whether VS Code itself has a distinct “Retired” extension label separate from “Deprecated,” which would explain why you see that wording even though the web listing is installable. I dug further and the useful conclusion is narrower now: VS Code itself does not appear to have a separate extension state called “Retired.” In the VS Code codebase, the relevant gallery-driven states are: 1. `deprecated` 2. `missingFromGallery` / no longer available 3. `malicious` The extension UI logic is built around `deprecationInfo`, and the user-facing messages are all “This extension is deprecated…” or “This extension is no longer available on the Extension Marketplac…"
+}

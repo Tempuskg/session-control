@@ -1,0 +1,44 @@
+{
+	"schemaVersion": 1,
+	"id": "eval-03",
+	"sourceKey": "069a72ccbaa2",
+	"provider": "copilot",
+	"title": "Issues with Problems Tab Fixes",
+	"savedDate": "2026-04-13",
+	"split": null,
+	"counts": {
+		"turns": 6,
+		"requests": 3,
+		"responses": 3
+	},
+	"tools": {
+		"total": 8,
+		"errorLike": 0,
+		"maxErrorStreak": 0,
+		"maxRepeatStreak": 1,
+		"topTools": {
+			"run_in_terminal": 4,
+			"copilot_getErrors": 2,
+			"copilot_readFile": 1,
+			"copilot_replaceString": 1
+		},
+		"errorSamples": []
+	},
+	"userPrompts": [
+		{
+			"index": 0,
+			"text": "fix problems on the problems tab"
+		},
+		{
+			"index": 1,
+			"text": "build vsix"
+		},
+		{
+			"index": 2,
+			"text": "commit changes"
+		}
+	],
+	"omittedUserPrompts": 0,
+	"firstResponse": "``` ``` Fixed — added `\"icon\": \"$(history)\"` to the `session-control.sessionExplorer` view definition, which was required by the VS Code schema.",
+	"lastResponse": "Committed as `fix: add missing icon to sessionExplorer view, bump to 0.1.14` (commit `ecd85ab`)."
+}

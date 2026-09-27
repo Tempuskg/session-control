@@ -83,7 +83,7 @@ function createFileName(savedAt: string, title: string): string {
 	return `${formatTimestamp(new Date(savedAt))}-${slugify(title)}.json`;
 }
 
-function replaceToolOutput(value: string | undefined): string | undefined {
+export function replaceToolOutput(value: string | undefined): string | undefined {
 	if (!value) {
 		return value;
 	}
