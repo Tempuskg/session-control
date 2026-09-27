@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-09-27
+
+### Fixed
+
+- Saved Session search now shows prompt and reply matches even when the session title does not contain the query.
+
 ## [1.4.0] - 2026-09-27
 
 ### Added
