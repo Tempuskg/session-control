@@ -696,10 +696,12 @@
           "command": "session-control-pro.syncAiSkills"
         },
         {
-          "command": "session-control-pro.gitSyncPush"
+          "command": "session-control-pro.gitSyncPush",
+          "when": "false"
         },
         {
-          "command": "session-control-pro.gitSyncPull"
+          "command": "session-control-pro.gitSyncPull",
+          "when": "false"
         },
         {
           "command": "session-control.analyzeSessionFromExplorer",
@@ -728,12 +730,12 @@
         },
         {
           "command": "session-control-pro.gitSyncPush",
-          "when": "view == session-control.sessionExplorer",
+          "when": "false && view == session-control.sessionExplorer",
           "group": "gitSync@1"
         },
         {
           "command": "session-control-pro.gitSyncPull",
-          "when": "view == session-control.sessionExplorer",
+          "when": "false && view == session-control.sessionExplorer",
           "group": "gitSync@2"
         }
       ],

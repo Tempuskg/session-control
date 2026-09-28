@@ -518,8 +518,9 @@ suite('session explorer', () => {
 
 		// Every other view/title action stays pinned to the Saved Sessions view,
 		// so no other view's title bar gains the Pro search button.
+		// A `false && ` prefix hides an action until its Pro release ships.
 		for (const contribution of titleActions) {
-			assert.equal(contribution.when, 'view == session-control.sessionExplorer');
+			assert.match(contribution.when ?? '', /^(false && )?view == session-control\.sessionExplorer$/);
 		}
 
 		// The gated command keeps its Command Palette entry and must not appear
@@ -563,7 +564,7 @@ suite('session explorer', () => {
 		);
 	});
 
-	test('Pro Git sync push and pull are Saved Sessions title actions and palette commands', async () => {
+	test('Pro Git sync push and pull are hidden Saved Sessions title actions until the Pro release ships them', async () => {
 		const manifest = await readPackageManifest();
 		const commandById = new Map(
 			manifest.contributes.commands.map((contribution) => [contribution.command, contribution]),
@@ -577,13 +578,14 @@ suite('session explorer', () => {
 		for (const commandId of [PRO_GIT_SYNC_PUSH_COMMAND, PRO_GIT_SYNC_PULL_COMMAND]) {
 			const actions = titleActions.filter((contribution) => contribution.command === commandId);
 			assert.equal(actions.length, 1, commandId);
-			assert.equal(actions[0]?.when, 'view == session-control.sessionExplorer', commandId);
+			// Hidden until a Pro release registers the commands; drop the `false &&` prefix then.
+			assert.equal(actions[0]?.when, 'false && view == session-control.sessionExplorer', commandId);
 			// Overflow menu, so the toolbar keeps refresh, sort, and search only.
 			assert.equal(actions[0]?.group?.startsWith('navigation'), false, commandId);
 
 			const palette = paletteEntries.filter((contribution) => contribution.command === commandId);
 			assert.equal(palette.length, 1, commandId);
-			assert.equal(palette[0]?.when, undefined, commandId);
+			assert.equal(palette[0]?.when, 'false', commandId);
 
 			assert.equal(itemActions.some((contribution) => contribution.command === commandId), false, commandId);
 		}
