@@ -41,6 +41,7 @@ interface MenuContribution {
 
 interface SettingContribution {
 	type?: string;
+	default?: unknown;
 	scope?: string;
 	description?: string;
 }
@@ -63,6 +64,7 @@ interface PackageManifest {
 // real savedAt value. This keeps the assertion portable across runner zones.
 const PRO_SEARCH_SESSIONS_COMMAND = 'session-control-pro.searchSessions';
 const PRO_EXPORT_SESSION_TO_CONTROL_FILE_COMMAND = 'session-control-pro.exportSessionToControlFile';
+const PRO_SYNC_AI_SKILLS_COMMAND = 'session-control-pro.syncAiSkills';
 const PRO_GIT_SYNC_PUSH_COMMAND = 'session-control-pro.gitSyncPush';
 const PRO_GIT_SYNC_PULL_COMMAND = 'session-control-pro.gitSyncPull';
 
@@ -566,8 +568,8 @@ suite('session explorer', () => {
 		const commandById = new Map(
 			manifest.contributes.commands.map((contribution) => [contribution.command, contribution]),
 		);
-		assert.equal(commandById.get(PRO_GIT_SYNC_PUSH_COMMAND)?.title, 'Push Saved Sessions to Git Sync Remote');
-		assert.equal(commandById.get(PRO_GIT_SYNC_PULL_COMMAND)?.title, 'Pull Saved Sessions from Git Sync Remote');
+		assert.equal(commandById.get(PRO_GIT_SYNC_PUSH_COMMAND)?.title, 'Push Saved Sessions to Git');
+		assert.equal(commandById.get(PRO_GIT_SYNC_PULL_COMMAND)?.title, 'Pull Saved Sessions from Git');
 
 		const titleActions = manifest.contributes.menus['view/title'] ?? [];
 		const paletteEntries = manifest.contributes.menus.commandPalette ?? [];
@@ -592,11 +594,33 @@ suite('session explorer', () => {
 		const properties = manifest.contributes.configuration.properties;
 
 		assert.equal(properties['session-control-pro.gitSync.remoteUrl']?.type, 'string');
+		assert.equal(properties['session-control-pro.gitSync.remoteUrl']?.default, '');
 		assert.equal(properties['session-control-pro.gitSync.remoteUrl']?.scope, 'machine');
 		assert.equal(properties['session-control-pro.gitSync.branch']?.type, 'string');
+		assert.equal(properties['session-control-pro.gitSync.branch']?.default, 'main');
 		assert.equal(properties['session-control-pro.gitSync.branch']?.scope, 'machine');
 		assert.equal(properties['session-control-pro.gitSync.workspaceKey']?.type, 'string');
+		assert.equal(properties['session-control-pro.gitSync.workspaceKey']?.default, '');
 		assert.equal(properties['session-control-pro.gitSync.workspaceKey']?.scope, 'resource');
+	});
+
+	test('Pro AI skills sync is a palette command with no Saved Sessions menu entries', async () => {
+		const manifest = await readPackageManifest();
+		const syncCommand = manifest.contributes.commands.find(
+			(contribution) => contribution.command === PRO_SYNC_AI_SKILLS_COMMAND,
+		);
+		assert.equal(syncCommand?.title, 'Sync AI Skills Across Assistants');
+
+		// Workspace-wide command with no argument, so it stays in the palette.
+		const paletteEntries = (manifest.contributes.menus.commandPalette ?? []).filter(
+			(contribution) => contribution.command === PRO_SYNC_AI_SKILLS_COMMAND,
+		);
+		assert.equal(paletteEntries.length, 1);
+		assert.equal(paletteEntries[0]?.when, undefined);
+
+		for (const menu of [manifest.contributes.menus['view/title'], manifest.contributes.menus['view/item/context']]) {
+			assert.equal((menu ?? []).some((contribution) => contribution.command === PRO_SYNC_AI_SKILLS_COMMAND), false);
+		}
 	});
 
 	test('inline session actions use compact icons and keep delete rightmost', async () => {

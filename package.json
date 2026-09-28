@@ -225,14 +225,19 @@
         "icon": "$(export)"
       },
       {
+        "command": "session-control-pro.syncAiSkills",
+        "title": "Sync AI Skills Across Assistants",
+        "category": "Session Control Pro"
+      },
+      {
         "command": "session-control-pro.gitSyncPush",
-        "title": "Push Saved Sessions to Git Sync Remote",
+        "title": "Push Saved Sessions to Git",
         "category": "Session Control Pro",
         "icon": "$(cloud-upload)"
       },
       {
         "command": "session-control-pro.gitSyncPull",
-        "title": "Pull Saved Sessions from Git Sync Remote",
+        "title": "Pull Saved Sessions from Git",
         "category": "Session Control Pro",
         "icon": "$(cloud-download)"
       }
@@ -557,17 +562,20 @@
         },
         "session-control-pro.gitSync.remoteUrl": {
           "type": "string",
-          "description": "URL of a Git repository you own that Git sync pushes saved sessions to and pulls them from. Machine-scoped, so it is not synced across devices and cannot be set by a workspace.",
+          "default": "",
+          "description": "Clone URL (SSH or HTTPS) of a private Git repository you own that Push and Pull Saved Sessions to Git use. Empty disables Git sync. Machine scope: only your user setting is read, never a workspace value. Do not put credentials in the URL; Git uses your credential manager or SSH agent.",
           "scope": "machine"
         },
         "session-control-pro.gitSync.branch": {
           "type": "string",
-          "description": "Branch in the Git sync remote that holds saved sessions. Machine-scoped, so it is not synced across devices and cannot be set by a workspace.",
+          "default": "main",
+          "description": "Branch of the Git sync repository that holds saved sessions. Machine scope: only your user setting is read, never a workspace value.",
           "scope": "machine"
         },
         "session-control-pro.gitSync.workspaceKey": {
           "type": "string",
-          "description": "Key that identifies this workspace folder's saved sessions inside the Git sync remote. Set it per workspace folder so the same project matches across machines.",
+          "default": "",
+          "description": "Folder name this workspace uses inside the Git sync repository. When empty, it is derived from the workspace's origin remote, or from the workspace folder name when there is no origin. Set it so the same project maps to the same folder on every machine.",
           "scope": "resource"
         }
       }
@@ -683,6 +691,9 @@
         {
           "command": "session-control-pro.exportSessionToControlFile",
           "when": "false"
+        },
+        {
+          "command": "session-control-pro.syncAiSkills"
         },
         {
           "command": "session-control-pro.gitSyncPush"
