@@ -217,6 +217,24 @@
         "title": "Search Saved Sessions (All Workspaces)",
         "category": "Session Control Pro",
         "icon": "$(search)"
+      },
+      {
+        "command": "session-control-pro.exportSessionToControlFile",
+        "title": "Export Session to AI Control File...",
+        "category": "Session Control Pro",
+        "icon": "$(export)"
+      },
+      {
+        "command": "session-control-pro.gitSyncPush",
+        "title": "Push Saved Sessions to Git Sync Remote",
+        "category": "Session Control Pro",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "session-control-pro.gitSyncPull",
+        "title": "Pull Saved Sessions from Git Sync Remote",
+        "category": "Session Control Pro",
+        "icon": "$(cloud-download)"
       }
     ],
     "configuration": {
@@ -536,6 +554,21 @@
           "default": false,
           "description": "Include tool-call content when searching saved sessions.",
           "scope": "resource"
+        },
+        "session-control-pro.gitSync.remoteUrl": {
+          "type": "string",
+          "description": "URL of a Git repository you own that Git sync pushes saved sessions to and pulls them from. Machine-scoped, so it is not synced across devices and cannot be set by a workspace.",
+          "scope": "machine"
+        },
+        "session-control-pro.gitSync.branch": {
+          "type": "string",
+          "description": "Branch in the Git sync remote that holds saved sessions. Machine-scoped, so it is not synced across devices and cannot be set by a workspace.",
+          "scope": "machine"
+        },
+        "session-control-pro.gitSync.workspaceKey": {
+          "type": "string",
+          "description": "Key that identifies this workspace folder's saved sessions inside the Git sync remote. Set it per workspace folder so the same project matches across machines.",
+          "scope": "resource"
         }
       }
     },
@@ -648,6 +681,16 @@
           "command": "session-control-pro.searchSessions"
         },
         {
+          "command": "session-control-pro.exportSessionToControlFile",
+          "when": "false"
+        },
+        {
+          "command": "session-control-pro.gitSyncPush"
+        },
+        {
+          "command": "session-control-pro.gitSyncPull"
+        },
+        {
           "command": "session-control.analyzeSessionFromExplorer",
           "when": "false"
         },
@@ -671,6 +714,16 @@
           "command": "session-control-pro.searchSessions",
           "when": "view == session-control.sessionExplorer",
           "group": "navigation@3"
+        },
+        {
+          "command": "session-control-pro.gitSyncPush",
+          "when": "view == session-control.sessionExplorer",
+          "group": "gitSync@1"
+        },
+        {
+          "command": "session-control-pro.gitSyncPull",
+          "when": "view == session-control.sessionExplorer",
+          "group": "gitSync@2"
         }
       ],
       "editor/title": [
@@ -715,6 +768,11 @@
           "command": "session-control.deleteSessionFromExplorer",
           "when": "view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/",
           "group": "inline@4"
+        },
+        {
+          "command": "session-control-pro.exportSessionToControlFile",
+          "when": "view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/",
+          "group": "pro@1"
         }
       ]
     }
