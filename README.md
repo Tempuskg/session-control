@@ -95,6 +95,18 @@ and the Pro commands unlock in place.
 | Import and Harvest Word Document... | Import an ordered DOCX source with provenance, then review its extracted knowledge before writing |
 | Harvest This Session | Run the same harvest scoped to one session from the Session Explorer |
 | Search Saved Sessions (All Workspaces) | Full-text quick pick across every saved session, including workspaces that are not open |
+| Export Session to AI Control File... | Right-click a session in Saved Sessions to turn that one session into an AI control file for the repo |
+| Push / Pull Saved Sessions to Git Sync Remote | **Coming in the next Pro release, not available yet.** Sync saved sessions with a Git repository you own, from the Saved Sessions title-bar menu |
+
+**Export Session to AI Control File...** works from a single saved session you pick. It is
+separate from the free **Analyze Saved Chats** command, which writes an analysis report across a
+timeframe of sessions, and from the free **Import Copilot Guidance as ... Skills** commands, which
+convert existing repo guidance files into skills rather than reading saved sessions.
+
+Git sync will use three settings: `session-control-pro.gitSync.remoteUrl` and
+`session-control-pro.gitSync.branch` are per machine, and `session-control-pro.gitSync.workspaceKey`
+is per workspace folder. Until the Pro release that includes Git sync, the push and pull
+commands are not available and these settings have no effect.
 
 Knowledge Harvesting sends the selected saved-session or document content to the AI model you
 choose, the same way the free **Analyze Saved Chats** command does. Saving, resuming, browsing,
