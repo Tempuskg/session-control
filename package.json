@@ -2,7 +2,7 @@
   "name": "session-control",
   "displayName": "Session Control",
   "description": "Save Cursor, Claude Code, Codex, and Copilot chat history into your own repo, linked to the commit it produced. Local-first AI session manager for Cursor, Windsurf, VSCodium, and VS Code.",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "publisher": "darrenjmcleod",
   "icon": "media/session-control.png",
   "license": "MIT",
@@ -696,12 +696,10 @@
           "command": "session-control-pro.syncAiSkills"
         },
         {
-          "command": "session-control-pro.gitSyncPush",
-          "when": "false"
+          "command": "session-control-pro.gitSyncPush"
         },
         {
-          "command": "session-control-pro.gitSyncPull",
-          "when": "false"
+          "command": "session-control-pro.gitSyncPull"
         },
         {
           "command": "session-control.analyzeSessionFromExplorer",
@@ -730,12 +728,12 @@
         },
         {
           "command": "session-control-pro.gitSyncPush",
-          "when": "false && view == session-control.sessionExplorer",
+          "when": "view == session-control.sessionExplorer",
           "group": "gitSync@1"
         },
         {
           "command": "session-control-pro.gitSyncPull",
-          "when": "false && view == session-control.sessionExplorer",
+          "when": "view == session-control.sessionExplorer",
           "group": "gitSync@2"
         }
       ],
@@ -827,7 +825,7 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
-    "@tempuskg/session-control-pro": "^0.6.1",
+    "@tempuskg/session-control-pro": "^0.7.0",
     "@typesafe-ai/sdk": "^0.6.0",
     "marked": "^4.3.0"
   }

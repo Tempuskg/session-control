@@ -97,7 +97,7 @@ and the Pro commands unlock in place.
 | Search Saved Sessions (All Workspaces) | Full-text quick pick across every saved session, including workspaces that are not open |
 | Export Session to AI Control File... | Right-click one session in Saved Sessions and turn it into a Cursor rule, Claude Code skill, Copilot `*.instructions.md` file, or `AGENTS.md` section, reviewed before anything is written |
 | Sync AI Skills Across Assistants | Keep the same repo guidance matching across Copilot, Cursor, Claude Code, and Codex copies, including edits made to any copy, and ask before overwriting |
-| Push Saved Sessions to Git / Pull Saved Sessions from Git | **Coming in the next Pro release, not available yet.** Sync saved sessions with a private Git repository you own, from the Saved Sessions title-bar menu |
+| Push Saved Sessions to Git / Pull Saved Sessions from Git | Sync saved sessions with a private Git repository you own, from the Saved Sessions title-bar menu. Both run only when you choose them, and a session changed on two machines is shown to you to resolve, never overwritten |
 
 How these differ from the free commands:
 
@@ -108,11 +108,11 @@ How these differ from the free commands:
   files once and skip copies that already exist. **Sync AI Skills Across Assistants** also updates
   existing copies in both directions. The free import commands stay free.
 
-Git sync will use three settings: `session-control-pro.gitSync.remoteUrl` (empty by default,
+Git sync uses three settings: `session-control-pro.gitSync.remoteUrl` (empty by default,
 which leaves sync off) and `session-control-pro.gitSync.branch` (default `main`) are
-machine-scoped, and `session-control-pro.gitSync.workspaceKey` is set per workspace folder. Until
-the Pro release that includes Git sync, the push and pull commands are not available and these
-settings have no effect.
+machine-scoped, so a workspace cannot redirect your sessions, and
+`session-control-pro.gitSync.workspaceKey` is set per workspace folder. Git uses your own
+credentials (SSH agent or credential manager); Session Control never stores them.
 
 Knowledge Harvesting and **Export Session to AI Control File...** send the selected saved-session
 or document content to the AI model you choose, the same way the free **Analyze Saved Chats**

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-30
+
+### Added
+
+- **Export Session to AI Control File...** (Pro) is now available from the right-click menu on a saved session. It turns one session into a Cursor rule, Claude Code skill, Copilot `*.instructions.md` file, or `AGENTS.md` section, and shows you the result before anything is written.
+- **Sync AI Skills Across Assistants** (Pro) is now in the Command Palette. It keeps the same repository guidance matching across the Copilot, Cursor, Claude Code, and Codex copies, in both directions, and asks before overwriting.
+- **Push Saved Sessions to Git** and **Pull Saved Sessions from Git** (Pro), in the Saved Sessions title-bar menu, sync saved sessions with a private Git repository you own. Configure `session-control-pro.gitSync.remoteUrl` in your user settings. Multi-part sessions move as a whole, sessions changed on two machines are shown to you to resolve, Push never force-pushes, and Git uses your own credentials.
+
+### Changed
+
+- Requires Session Control Pro 0.7.0 or later for the Pro features above.
+
 ## [1.4.1] - 2026-09-27
 
 ### Fixed
