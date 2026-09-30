@@ -39,9 +39,19 @@ interface MenuContribution {
 	group?: string;
 }
 
+interface SettingContribution {
+	type?: string;
+	default?: unknown;
+	scope?: string;
+	description?: string;
+}
+
 interface PackageManifest {
 	contributes: {
 		commands: CommandContribution[];
+		configuration: {
+			properties: Record<string, SettingContribution>;
+		};
 		menus: {
 			commandPalette?: MenuContribution[];
 			'view/title'?: MenuContribution[];
@@ -53,6 +63,10 @@ interface PackageManifest {
 // Start with a fixed local wall-clock time, then store it as ISO just like a
 // real savedAt value. This keeps the assertion portable across runner zones.
 const PRO_SEARCH_SESSIONS_COMMAND = 'session-control-pro.searchSessions';
+const PRO_EXPORT_SESSION_TO_CONTROL_FILE_COMMAND = 'session-control-pro.exportSessionToControlFile';
+const PRO_SYNC_AI_SKILLS_COMMAND = 'session-control-pro.syncAiSkills';
+const PRO_GIT_SYNC_PUSH_COMMAND = 'session-control-pro.gitSyncPush';
+const PRO_GIT_SYNC_PULL_COMMAND = 'session-control-pro.gitSyncPull';
 
 const KNOWN_LOCAL_SAVED_AT = new Date(2026, 3, 12, 4, 0, 0, 0).toISOString();
 const KNOWN_LOCAL_SAVED_AT_TEXT = '2026-04-12 04:00';
@@ -504,8 +518,9 @@ suite('session explorer', () => {
 
 		// Every other view/title action stays pinned to the Saved Sessions view,
 		// so no other view's title bar gains the Pro search button.
+		// A `false && ` prefix hides an action until its Pro release ships.
 		for (const contribution of titleActions) {
-			assert.equal(contribution.when, 'view == session-control.sessionExplorer');
+			assert.match(contribution.when ?? '', /^(false && )?view == session-control\.sessionExplorer$/);
 		}
 
 		// The gated command keeps its Command Palette entry and must not appear
@@ -515,6 +530,99 @@ suite('session explorer', () => {
 			itemActions.some((contribution) => contribution.command === PRO_SEARCH_SESSIONS_COMMAND),
 			false,
 		);
+	});
+
+	test('Pro control-file exporter is a per-session context action hidden from the palette', async () => {
+		const manifest = await readPackageManifest();
+		const exportCommand = manifest.contributes.commands.find(
+			(contribution) => contribution.command === PRO_EXPORT_SESSION_TO_CONTROL_FILE_COMMAND,
+		);
+		assert.equal(exportCommand?.title, 'Export Session to AI Control File...');
+
+		const itemActions = (manifest.contributes.menus['view/item/context'] ?? []).filter(
+			(contribution) => contribution.command === PRO_EXPORT_SESSION_TO_CONTROL_FILE_COMMAND,
+		);
+		assert.equal(itemActions.length, 1);
+		assert.equal(
+			itemActions[0]?.when,
+			'view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/',
+		);
+		// Context-menu group, not inline, so the row's inline icons stay unchanged.
+		assert.equal(itemActions[0]?.group?.startsWith('inline'), false);
+
+		// The exporter needs a session argument, so the palette entry is hidden.
+		const paletteEntries = (manifest.contributes.menus.commandPalette ?? []).filter(
+			(contribution) => contribution.command === PRO_EXPORT_SESSION_TO_CONTROL_FILE_COMMAND,
+		);
+		assert.equal(paletteEntries.length, 1);
+		assert.equal(paletteEntries[0]?.when, 'false');
+
+		const titleActions = manifest.contributes.menus['view/title'] ?? [];
+		assert.equal(
+			titleActions.some((contribution) => contribution.command === PRO_EXPORT_SESSION_TO_CONTROL_FILE_COMMAND),
+			false,
+		);
+	});
+
+	test('Pro Git sync push and pull are hidden Saved Sessions title actions until the Pro release ships them', async () => {
+		const manifest = await readPackageManifest();
+		const commandById = new Map(
+			manifest.contributes.commands.map((contribution) => [contribution.command, contribution]),
+		);
+		assert.equal(commandById.get(PRO_GIT_SYNC_PUSH_COMMAND)?.title, 'Push Saved Sessions to Git');
+		assert.equal(commandById.get(PRO_GIT_SYNC_PULL_COMMAND)?.title, 'Pull Saved Sessions from Git');
+
+		const titleActions = manifest.contributes.menus['view/title'] ?? [];
+		const paletteEntries = manifest.contributes.menus.commandPalette ?? [];
+		const itemActions = manifest.contributes.menus['view/item/context'] ?? [];
+		for (const commandId of [PRO_GIT_SYNC_PUSH_COMMAND, PRO_GIT_SYNC_PULL_COMMAND]) {
+			const actions = titleActions.filter((contribution) => contribution.command === commandId);
+			assert.equal(actions.length, 1, commandId);
+			// Hidden until a Pro release registers the commands; drop the `false &&` prefix then.
+			assert.equal(actions[0]?.when, 'false && view == session-control.sessionExplorer', commandId);
+			// Overflow menu, so the toolbar keeps refresh, sort, and search only.
+			assert.equal(actions[0]?.group?.startsWith('navigation'), false, commandId);
+
+			const palette = paletteEntries.filter((contribution) => contribution.command === commandId);
+			assert.equal(palette.length, 1, commandId);
+			assert.equal(palette[0]?.when, 'false', commandId);
+
+			assert.equal(itemActions.some((contribution) => contribution.command === commandId), false, commandId);
+		}
+	});
+
+	test('Pro Git sync settings use machine scope for the remote and resource scope for the workspace key', async () => {
+		const manifest = await readPackageManifest();
+		const properties = manifest.contributes.configuration.properties;
+
+		assert.equal(properties['session-control-pro.gitSync.remoteUrl']?.type, 'string');
+		assert.equal(properties['session-control-pro.gitSync.remoteUrl']?.default, '');
+		assert.equal(properties['session-control-pro.gitSync.remoteUrl']?.scope, 'machine');
+		assert.equal(properties['session-control-pro.gitSync.branch']?.type, 'string');
+		assert.equal(properties['session-control-pro.gitSync.branch']?.default, 'main');
+		assert.equal(properties['session-control-pro.gitSync.branch']?.scope, 'machine');
+		assert.equal(properties['session-control-pro.gitSync.workspaceKey']?.type, 'string');
+		assert.equal(properties['session-control-pro.gitSync.workspaceKey']?.default, '');
+		assert.equal(properties['session-control-pro.gitSync.workspaceKey']?.scope, 'resource');
+	});
+
+	test('Pro AI skills sync is a palette command with no Saved Sessions menu entries', async () => {
+		const manifest = await readPackageManifest();
+		const syncCommand = manifest.contributes.commands.find(
+			(contribution) => contribution.command === PRO_SYNC_AI_SKILLS_COMMAND,
+		);
+		assert.equal(syncCommand?.title, 'Sync AI Skills Across Assistants');
+
+		// Workspace-wide command with no argument, so it stays in the palette.
+		const paletteEntries = (manifest.contributes.menus.commandPalette ?? []).filter(
+			(contribution) => contribution.command === PRO_SYNC_AI_SKILLS_COMMAND,
+		);
+		assert.equal(paletteEntries.length, 1);
+		assert.equal(paletteEntries[0]?.when, undefined);
+
+		for (const menu of [manifest.contributes.menus['view/title'], manifest.contributes.menus['view/item/context']]) {
+			assert.equal((menu ?? []).some((contribution) => contribution.command === PRO_SYNC_AI_SKILLS_COMMAND), false);
+		}
 	});
 
 	test('inline session actions use compact icons and keep delete rightmost', async () => {

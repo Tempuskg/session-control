@@ -95,10 +95,29 @@ and the Pro commands unlock in place.
 | Import and Harvest Word Document... | Import an ordered DOCX source with provenance, then review its extracted knowledge before writing |
 | Harvest This Session | Run the same harvest scoped to one session from the Session Explorer |
 | Search Saved Sessions (All Workspaces) | Full-text quick pick across every saved session, including workspaces that are not open |
+| Export Session to AI Control File... | Right-click one session in Saved Sessions and turn it into a Cursor rule, Claude Code skill, Copilot `*.instructions.md` file, or `AGENTS.md` section, reviewed before anything is written |
+| Sync AI Skills Across Assistants | Keep the same repo guidance matching across Copilot, Cursor, Claude Code, and Codex copies, including edits made to any copy, and ask before overwriting |
+| Push Saved Sessions to Git / Pull Saved Sessions from Git | **Coming in the next Pro release, not available yet.** Sync saved sessions with a private Git repository you own, from the Saved Sessions title-bar menu |
 
-Knowledge Harvesting sends the selected saved-session or document content to the AI model you
-choose, the same way the free **Analyze Saved Chats** command does. Saving, resuming, browsing,
-auto-save, and document extraction stay entirely local.
+How these differ from the free commands:
+
+- **Export Session to AI Control File...** starts from one saved session. The free **Analyze
+  Saved Chats** command reviews a timeframe of sessions and writes an analysis report, not a
+  control file.
+- The free **Import Copilot Guidance as ... Skills** commands copy Copilot guidance into new skill
+  files once and skip copies that already exist. **Sync AI Skills Across Assistants** also updates
+  existing copies in both directions. The free import commands stay free.
+
+Git sync will use three settings: `session-control-pro.gitSync.remoteUrl` (empty by default,
+which leaves sync off) and `session-control-pro.gitSync.branch` (default `main`) are
+machine-scoped, and `session-control-pro.gitSync.workspaceKey` is set per workspace folder. Until
+the Pro release that includes Git sync, the push and pull commands are not available and these
+settings have no effect.
+
+Knowledge Harvesting and **Export Session to AI Control File...** send the selected saved-session
+or document content to the AI model you choose, the same way the free **Analyze Saved Chats**
+command does. Saving, resuming, browsing, auto-save, document extraction, and AI skills sync stay
+entirely local.
 
 Run **Get Session Control Pro** from the Command Palette, or visit
 [sessioncontrol.dev/#pro](https://sessioncontrol.dev/#pro) for pricing and checkout. After

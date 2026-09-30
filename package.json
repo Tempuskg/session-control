@@ -217,6 +217,29 @@
         "title": "Search Saved Sessions (All Workspaces)",
         "category": "Session Control Pro",
         "icon": "$(search)"
+      },
+      {
+        "command": "session-control-pro.exportSessionToControlFile",
+        "title": "Export Session to AI Control File...",
+        "category": "Session Control Pro",
+        "icon": "$(export)"
+      },
+      {
+        "command": "session-control-pro.syncAiSkills",
+        "title": "Sync AI Skills Across Assistants",
+        "category": "Session Control Pro"
+      },
+      {
+        "command": "session-control-pro.gitSyncPush",
+        "title": "Push Saved Sessions to Git",
+        "category": "Session Control Pro",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "session-control-pro.gitSyncPull",
+        "title": "Pull Saved Sessions from Git",
+        "category": "Session Control Pro",
+        "icon": "$(cloud-download)"
       }
     ],
     "configuration": {
@@ -536,6 +559,24 @@
           "default": false,
           "description": "Include tool-call content when searching saved sessions.",
           "scope": "resource"
+        },
+        "session-control-pro.gitSync.remoteUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Clone URL (SSH or HTTPS) of a private Git repository you own that Push and Pull Saved Sessions to Git use. Empty disables Git sync. Machine scope: only your user setting is read, never a workspace value. Do not put credentials in the URL; Git uses your credential manager or SSH agent.",
+          "scope": "machine"
+        },
+        "session-control-pro.gitSync.branch": {
+          "type": "string",
+          "default": "main",
+          "description": "Branch of the Git sync repository that holds saved sessions. Machine scope: only your user setting is read, never a workspace value.",
+          "scope": "machine"
+        },
+        "session-control-pro.gitSync.workspaceKey": {
+          "type": "string",
+          "default": "",
+          "description": "Folder name this workspace uses inside the Git sync repository. When empty, it is derived from the workspace's origin remote, or from the workspace folder name when there is no origin. Set it so the same project maps to the same folder on every machine.",
+          "scope": "resource"
         }
       }
     },
@@ -648,6 +689,21 @@
           "command": "session-control-pro.searchSessions"
         },
         {
+          "command": "session-control-pro.exportSessionToControlFile",
+          "when": "false"
+        },
+        {
+          "command": "session-control-pro.syncAiSkills"
+        },
+        {
+          "command": "session-control-pro.gitSyncPush",
+          "when": "false"
+        },
+        {
+          "command": "session-control-pro.gitSyncPull",
+          "when": "false"
+        },
+        {
           "command": "session-control.analyzeSessionFromExplorer",
           "when": "false"
         },
@@ -671,6 +727,16 @@
           "command": "session-control-pro.searchSessions",
           "when": "view == session-control.sessionExplorer",
           "group": "navigation@3"
+        },
+        {
+          "command": "session-control-pro.gitSyncPush",
+          "when": "false && view == session-control.sessionExplorer",
+          "group": "gitSync@1"
+        },
+        {
+          "command": "session-control-pro.gitSyncPull",
+          "when": "false && view == session-control.sessionExplorer",
+          "group": "gitSync@2"
         }
       ],
       "editor/title": [
@@ -715,6 +781,11 @@
           "command": "session-control.deleteSessionFromExplorer",
           "when": "view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/",
           "group": "inline@4"
+        },
+        {
+          "command": "session-control-pro.exportSessionToControlFile",
+          "when": "view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/",
+          "group": "pro@1"
         }
       ]
     }
