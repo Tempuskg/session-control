@@ -7,9 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-03
+
 ### Added
 
 - **`@session-control` understands requests without a slash command.** Type something like "analyze last week's chats" or "pick up the auth refactor session", and Session Control works out whether you meant `/analyze`, `/resume`, `/list`, or `/implement`. When it is confident it runs that command and shows how it read your request; when it is less sure it offers the command as a one-click suggestion; otherwise chat behaves as before. This uses TypeSafe, so it only runs when TypeSafe is enabled and you have agreed to its first-use notice, and it can be turned off with `session-control.typesafe.features.routing`. Your prompt and the titles, providers, and saved dates of up to 20 candidate saved sessions are sent to the TypeSafe AI provider to make the decision.
+
+### Fixed
+
+- **Push Saved Sessions to Git** and **Pull Saved Sessions from Git** (Pro) no longer report that a sync is "already running" while the previous run's notification is still in the notification center, and **Retry** and **Pull Now** on those notifications now start the next run.
+- **Export Session to AI Control File...** (Pro) no longer offers agent handoffs as the model destination, since the export needs the generated file back to show you before writing. Choose a VS Code language model or an installed Claude Code or Codex CLI.
+
+### Changed
+
+- The privacy prompts before an export and before Knowledge Harvesting (Pro) are shorter and say who receives the content, how much is sent, and what will be written.
+- Requires Session Control Pro 0.7.1 or later for the Pro fixes above.
 
 ## [1.5.0] - 2026-09-30
 
