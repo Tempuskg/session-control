@@ -201,4 +201,24 @@ suite('extension delete flow', () => {
 
 		assert.deepEqual(events, []);
 	});
+
+	test('runDeleteSessionFromExplorerCommand falls back to the quick-pick flow when no item is passed', async () => {
+		const events: string[] = [];
+
+		await runDeleteSessionFromExplorerCommand(undefined, {
+			confirmDelete: async () => {
+				events.push('confirm');
+				return true;
+			},
+			deleteSession: async () => {
+				events.push('delete');
+				return true;
+			},
+			deleteSessionWithoutItem: async () => {
+				events.push('fallback');
+			},
+		});
+
+		assert.deepEqual(events, ['fallback']);
+	});
 });

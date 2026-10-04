@@ -368,6 +368,8 @@ interface DeleteSessionFromExplorerCommandDeps {
 	deleteSession: (storageDirectory: string, fileName: string) => Promise<boolean>;
 	refreshSessionExplorer: () => void;
 	showInformationMessage: (message: string) => Thenable<unknown>;
+	/** Used when the command runs without a tree item (palette, API callers). */
+	deleteSessionWithoutItem?: () => Promise<void>;
 }
 
 interface DeleteSessionCommandDeps extends DeleteSessionFromExplorerCommandDeps {
@@ -1398,13 +1400,26 @@ function createDefaultDeleteSessionFromExplorerCommandDeps(): DeleteSessionFromE
 }
 
 export async function runDeleteSessionFromExplorerCommand(
-	item: SessionExplorerSessionItem,
+	item: SessionExplorerSessionItem | undefined,
 	depsOverrides: Partial<DeleteSessionFromExplorerCommandDeps> = {},
 ): Promise<void> {
 	const deps = {
 		...createDefaultDeleteSessionFromExplorerCommandDeps(),
 		...depsOverrides,
 	};
+
+	if (!item) {
+		// No tree item (e.g. invoked from the command palette): fall back to the quick-pick flow.
+		await (deps.deleteSessionWithoutItem ??
+			(() =>
+				runDeleteSessionCommand({
+					confirmDelete: deps.confirmDelete,
+					deleteSession: deps.deleteSession,
+					refreshSessionExplorer: deps.refreshSessionExplorer,
+					showInformationMessage: deps.showInformationMessage,
+				})))();
+		return;
+	}
 
 	if (!(await deps.confirmDelete(String(item.label)))) {
 		return;

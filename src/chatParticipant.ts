@@ -44,6 +44,7 @@ import {
 	ResumeTarget,
 } from './resumeTarget';
 import { fuzzyMatchSessions } from './utils';
+import { ANALYSIS_TRIAGE_QUESTION_SET_VERSION, triageAnalysisCandidates } from './typesafe/analysisTriage';
 import type { JudgmentService } from './typesafe/judgmentService';
 import {
 	routeSlashlessPrompt,
@@ -797,6 +798,7 @@ export interface AnalyzeSessionsFlowDepsOverrides {
 	writeReport?: AnalyzeSessionsFlowDeps['writeReport'];
 	recordAnalysis?: AnalyzeSessionsFlowDeps['recordAnalysis'];
 	batchCharBudget?: number;
+	triageCandidates?: AnalyzeSessionsFlowDeps['triageCandidates'];
 }
 
 export function createAnalyzeSessionsFlowDeps(overrides: AnalyzeSessionsFlowDepsOverrides): AnalyzeSessionsFlowDeps {
@@ -822,6 +824,7 @@ export function createAnalyzeSessionsFlowDeps(overrides: AnalyzeSessionsFlowDeps
 		writeReport: overrides.writeReport ?? (async (storageDirectory, input) => analysisStore.writeReport(storageDirectory, input)),
 		recordAnalysis: overrides.recordAnalysis ?? (async (storageDirectory, report, sessions) => analysisStore.recordAnalysis(storageDirectory, report, sessions)),
 		batchCharBudget: overrides.batchCharBudget ?? DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET,
+		...(overrides.triageCandidates ? { triageCandidates: overrides.triageCandidates } : {}),
 	};
 }
 
@@ -830,11 +833,28 @@ function createDefaultAnalyzeSessionsFlowDeps(
 	stream: vscode.ChatResponseStream,
 	token: vscode.CancellationToken,
 	selection: import('./types').AnalysisSelection,
+	judgment?: JudgmentService,
+	log?: (message: string) => void,
 ): AnalyzeSessionsFlowDeps {
 	return createAnalyzeSessionsFlowDeps({
 		resolveSelection: async () => selection,
 		runModelPrompt: async (prompt: string, streamOutput: boolean) => collectModelText(model, streamOutput ? stream : undefined, token, prompt),
 		streamMarkdown: (markdown: string) => stream.markdown(markdown),
+		...(judgment
+			? {
+					triageCandidates: async (candidates: AnalysisCandidateSession[]) => triageAnalysisCandidates(candidates, {
+						judgment,
+						token,
+						getCacheTarget: (candidate) => ({
+							store: analysisStore,
+							storageDirectory: candidate.storageDirectory,
+							sessionFingerprint: candidate.fingerprint,
+							questionSetVersion: ANALYSIS_TRIAGE_QUESTION_SET_VERSION,
+						}),
+						...(log ? { log } : {}),
+					}),
+			  }
+			: {}),
 	});
 }
 
@@ -1604,7 +1624,7 @@ export function registerChatParticipant(context: vscode.ExtensionContext, deps: 
 					prompt,
 					workspaceFolders,
 					workspaceSessions,
-					createDefaultAnalyzeSessionsFlowDeps(providerSelection.model, stream, token, selection),
+					createDefaultAnalyzeSessionsFlowDeps(providerSelection.model, stream, token, selection, deps.judgment, deps.log),
 				);
 			}
 

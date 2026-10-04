@@ -21,6 +21,7 @@ import {
 	type AnalysisSelection,
 	type SessionMeta,
 } from './types';
+import type { AnalysisTriageResults } from './typesafe/analysisTriage';
 
 export interface WorkspaceSessionMeta extends SessionMeta {
 	workspaceFolder: vscode.WorkspaceFolder;
@@ -30,6 +31,8 @@ export interface WorkspaceSessionMeta extends SessionMeta {
 
 export interface AnalyzeSessionsFlowResult {
 	metadata: AnalysisReportResultMetadata;
+	/** Raw TypeSafe triage answers by fingerprint; omitted when triage did not run. */
+	triage?: AnalysisTriageResults;
 }
 
 export interface AnalyzeSessionsFlowDeps {
@@ -59,6 +62,8 @@ export interface AnalyzeSessionsFlowDeps {
 	writeReport: (storageDirectory: string, input: AnalysisWriteReportInput) => Promise<PersistedAnalysisReport>;
 	recordAnalysis: (storageDirectory: string, report: AnalysisReportReference, sessions: AnalysisRecordInput[]) => Promise<AnalysisIndex>;
 	batchCharBudget: number;
+	/** Optional TypeSafe triage, run once per candidate before batching; omit to skip triage. */
+	triageCandidates?: (candidates: AnalysisCandidateSession[]) => Promise<AnalysisTriageResults>;
 }
 
 const TOKEN_LIMIT_ERROR_PATTERN = /token limit|context length|too many tokens|maximum context|message exceeds/i;
@@ -465,6 +470,18 @@ async function generateBatchedAnalysis(
 	};
 }
 
+async function runTriage(
+	triageCandidates: NonNullable<AnalyzeSessionsFlowDeps['triageCandidates']>,
+	candidates: AnalysisCandidateSession[],
+): Promise<AnalysisTriageResults | undefined> {
+	try {
+		return await triageCandidates(candidates);
+	} catch {
+		// Triage is advisory; any failure keeps today's analysis behavior.
+		return undefined;
+	}
+}
+
 export async function runAnalyzeSessionsFlow(
 	requestPrompt: string,
 	workspaceFolders: readonly vscode.WorkspaceFolder[],
@@ -501,6 +518,8 @@ export async function runAnalyzeSessionsFlow(
 			: `No saved sessions matched ${selection.label.toLowerCase()}.`);
 		return;
 	}
+
+	const triage = deps.triageCandidates ? await runTriage(deps.triageCandidates, filtered) : undefined;
 
 	const recommendationBaseline = await deps.loadRecommendationBaseline(workspaceFolders, filtered);
 	const effectiveBatchBudget = Math.max(4000, deps.batchCharBudget - recommendationBaseline.length);
@@ -586,5 +605,6 @@ export async function runAnalyzeSessionsFlow(
 			analysisReportPath: persisted.report.reportPath,
 			analysisStorageDirectory: ownerStorageDirectory,
 		},
+		...(triage && triage.size > 0 ? { triage } : {}),
 	};
 }

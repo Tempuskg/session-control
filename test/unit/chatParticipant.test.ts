@@ -351,6 +351,75 @@ suite('chatParticipant selection', () => {
 });
 
 suite('chatParticipant analyze flow', () => {
+	function createFlowMeta() {
+		return [{ ...createMeta(), workspaceFolder: createWorkspaceFolder('workspace', 'e:/workspace', 0), storageDirectory: 'e:/workspace/.chat', displayTitle: '[workspace] Fix auth bug' }];
+	}
+
+	test('runs triage over filtered candidates before batching and returns the answers', async () => {
+		const order: string[] = [];
+		const triaged: string[][] = [];
+		const answers = new Map([['fingerprint-1', { trivial: { type: 'noul', noul: 0.1 } }]]);
+		const result = await runAnalyzeSessionsFlow(
+			'needs analysis',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			createFlowMeta(),
+			createAnalyzeFlowDeps({
+				triageCandidates: async (candidates) => {
+					order.push('triage');
+					triaged.push(candidates.map((candidate) => candidate.fingerprint));
+					return answers as never;
+				},
+				splitIntoBatches: (candidates) => {
+					order.push('batch');
+					return [candidates];
+				},
+			}),
+		);
+
+		assert.deepEqual(order, ['triage', 'batch']);
+		assert.deepEqual(triaged, [['fingerprint-1']]);
+		assert.equal(result?.triage, answers);
+	});
+
+	test('without triage the flow result is unchanged', async () => {
+		const result = await runAnalyzeSessionsFlow(
+			'needs analysis',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			createFlowMeta(),
+			createAnalyzeFlowDeps(),
+		);
+
+		assert.ok(result);
+		assert.equal('triage' in result, false);
+	});
+
+	test('a failing or empty triage keeps the analysis running', async () => {
+		for (const triageCandidates of [
+			async () => {
+				throw new Error('typesafe offline');
+			},
+			async () => new Map(),
+		]) {
+			const prompts: string[] = [];
+			const result = await runAnalyzeSessionsFlow(
+				'needs analysis',
+				[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+				createFlowMeta(),
+				createAnalyzeFlowDeps({
+					triageCandidates,
+					runModelPrompt: async (prompt: string) => {
+						prompts.push(prompt);
+						return '## Findings\n\nReport content';
+					},
+				}),
+			);
+
+			assert.equal(result?.metadata.analysisStatus, 'complete');
+			assert.equal(prompts.length, 1);
+			assert.equal(result !== undefined && 'triage' in result, false);
+		}
+	});
+
 	test('shows guidance when no saved sessions exist', async () => {
 		const messages: string[] = [];
 		const result = await runAnalyzeSessionsFlow(
