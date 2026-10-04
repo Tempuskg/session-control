@@ -44,6 +44,12 @@ import {
 	ResumeTarget,
 } from './resumeTarget';
 import { fuzzyMatchSessions } from './utils';
+import type { JudgmentService } from './typesafe/judgmentService';
+import {
+	routeSlashlessPrompt,
+	toIntentRoutingSuggestionMetadata,
+	type IntentRoutingSuggestionMetadata,
+} from './typesafe/intentRouting';
 
 export { runAnalyzeSessionsFlow } from './analysisOrchestrator';
 export type { AnalyzeSessionsFlowDeps, AnalyzeSessionsFlowResult, WorkspaceSessionMeta } from './analysisOrchestrator';
@@ -1069,7 +1075,9 @@ export async function runImplementationHandoffFlow(
 }
 
 export function buildParticipantFollowups(result: vscode.ChatResult): vscode.ChatFollowup[] {
-	const metadata = result.metadata as Partial<AnalysisReportResultMetadata> | undefined;
+	const metadata = result.metadata as
+		| (Partial<AnalysisReportResultMetadata> & { routingSuggestion?: Partial<IntentRoutingSuggestionMetadata> })
+		| undefined;
 
 	if (metadata?.resultType === 'analysis-report' && metadata.analysisReportPath && metadata.analysisStorageDirectory) {
 		return [{
@@ -1080,7 +1088,25 @@ export function buildParticipantFollowups(result: vscode.ChatResult): vscode.Cha
 		}];
 	}
 
+	const suggestion = metadata?.routingSuggestion;
+	if (suggestion && typeof suggestion.command === 'string' && typeof suggestion.interpretation === 'string') {
+		return [{
+			label: `Run ${suggestion.interpretation}`,
+			prompt: typeof suggestion.prompt === 'string' ? suggestion.prompt : '',
+			participant: CHAT_PARTICIPANT_ID,
+			command: suggestion.command,
+		}];
+	}
+
 	return [];
+}
+
+const PARTICIPANT_COMMANDS: ReadonlySet<string> = new Set(['list', 'analyze', 'implement', 'handoff', 'resume']);
+
+export interface ChatParticipantDeps {
+	/** TypeSafe judgments for routing prompts without a slash command; omit to keep slash-only routing. */
+	readonly judgment?: JudgmentService;
+	readonly log?: (message: string) => void;
 }
 
 export function trimTurnsForResume(turns: SavedTurn[], maxTurns: number, maxContextChars: number): SavedTurn[] {
@@ -1490,7 +1516,7 @@ async function sendModelResponse(
 	}
 }
 
-export function registerChatParticipant(context: vscode.ExtensionContext): void {
+export function registerChatParticipant(context: vscode.ExtensionContext, deps: ChatParticipantDeps = {}): void {
 	const handoffDispatcher = createVSCodeHandoffDispatcher();
 	const participant = vscode.chat.createChatParticipant(CHAT_PARTICIPANT_ID, async (request, chatContext, stream, token) => {
 		const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -1501,206 +1527,252 @@ export function registerChatParticipant(context: vscode.ExtensionContext): void 
 		const workspaceSessions = await listSessionsAcrossWorkspaceFolders(workspaceFolders);
 		const workspaceFolder = pickWorkspaceFolder() ?? workspaceFolders[0];
 
-		if (request.command === 'list') {
-			stream.markdown(renderWorkspaceSessionListMarkdown(workspaceSessions));
-			return;
-		}
-
-		if (request.command === 'analyze') {
-			const selection = await resolveAnalysisSelection(request.prompt);
-			if (!selection) {
+		// `prompt` is the command argument: the user's text for slash commands, or the
+		// rewritten argument (scope alias, session title) when TypeSafe routed the prompt.
+		const handleCommand = async (
+			command: string,
+			prompt: string,
+			preselectedSession?: WorkspaceSessionMeta,
+		): Promise<vscode.ChatResult | undefined> => {
+			if (command === 'list') {
+				stream.markdown(renderWorkspaceSessionListMarkdown(workspaceSessions));
 				return;
 			}
 
-			let availableModels: readonly vscode.LanguageModelChat[];
-			try {
-				availableModels = await vscode.lm.selectChatModels();
-			} catch {
-				availableModels = [request.model];
-			}
-
-			let availableCommands: readonly string[] = [];
-			try {
-				availableCommands = await vscode.commands.getCommands(true);
-			} catch {
-				// Keep the current model available even when command discovery is unavailable.
-			}
-
-			const providerSelection = await pickAnalysisProvider(
-				availableModels,
-				findAvailableAnalysisAgentProviders(availableCommands),
-				request.model,
-			);
-			if (!providerSelection) {
-				stream.markdown('No analysis provider was selected.');
-				return;
-			}
-
-			if (providerSelection.kind === 'agent') {
-				const handoff = await buildAnalysisHandoffPrompt(selection, workspaceFolders, workspaceSessions);
-				if (handoff.infoMessage) {
-					stream.markdown(handoff.infoMessage);
-					return;
-				}
-				if (!handoff.prompt) {
-					stream.markdown('Could not build an analysis handoff prompt.');
+			if (command === 'analyze') {
+				const selection = await resolveAnalysisSelection(prompt);
+				if (!selection) {
 					return;
 				}
 
-				const analysisWorkspaceFolder = workspaceFolder ?? workspaceFolders[0];
-				if (!analysisWorkspaceFolder) {
-					stream.markdown('Open a workspace folder before analyzing saved chats.');
-					return;
+				let availableModels: readonly vscode.LanguageModelChat[];
+				try {
+					availableModels = await vscode.lm.selectChatModels();
+				} catch {
+					availableModels = [request.model];
 				}
-				const providerCommands = vscode.workspace
-					.getConfiguration('session-control', analysisWorkspaceFolder.uri)
-					.get<ResumeProviderCommands>('resume.providerCommands', {});
-				const dispatchResult = await handoffDispatcher.dispatchSelection(
-					handoff.prompt,
-					providerSelection.provider,
-					{
-						configuredProviderCommands: providerCommands,
-						promptLabel: 'analysis handoff prompt',
-					},
+
+				let availableCommands: readonly string[] = [];
+				try {
+					availableCommands = await vscode.commands.getCommands(true);
+				} catch {
+					// Keep the current model available even when command discovery is unavailable.
+				}
+
+				const providerSelection = await pickAnalysisProvider(
+					availableModels,
+					findAvailableAnalysisAgentProviders(availableCommands),
+					request.model,
 				);
-				stream.markdown(dispatchResult.instruction);
-				return;
-			}
+				if (!providerSelection) {
+					stream.markdown('No analysis provider was selected.');
+					return;
+				}
 
-			return runAnalyzeSessionsFlow(
-				request.prompt,
-				workspaceFolders,
-				workspaceSessions,
-				createDefaultAnalyzeSessionsFlowDeps(providerSelection.model, stream, token, selection),
-			);
-		}
-
-		if (request.command === 'implement' || request.command === 'handoff') {
-			return runImplementationHandoffFlow(
-				request.prompt,
-				chatContext.history,
-				createDefaultImplementationHandoffFlowDeps(stream, request.model),
-			);
-		}
-
-		if (request.command === 'resume') {
-			if (!workspaceSessions.length) {
-				stream.markdown('No saved sessions found. Save a session before resuming.');
-				return;
-			}
-
-			const selection = selectSessionForResume(request.prompt, workspaceSessions);
-			if (selection.session) {
-				const reassembled = await loadReassembledSession(selection.session.storageDirectory, selection.session.fileName);
-				const resumed = reassembled.session;
-				const maxTurns = vscode.workspace
-					.getConfiguration('session-control', selection.session.workspaceFolder.uri)
-					.get<number>('resume.maxTurns', 50);
-				const maxContextChars = vscode.workspace
-					.getConfiguration('session-control', selection.session.workspaceFolder.uri)
-					.get<number>('resume.maxContextChars', 80000);
-				const overflowStrategy = vscode.workspace
-					.getConfiguration('session-control', selection.session.workspaceFolder.uri)
-					.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize');
-				const resumeTargetMode = vscode.workspace
-					.getConfiguration('session-control', selection.session.workspaceFolder.uri)
-					.get<ResumeTargetMode>('resume.target', 'origin-agent');
-				const providerCommands = vscode.workspace
-					.getConfiguration('session-control', selection.session.workspaceFolder.uri)
-					.get<ResumeProviderCommands>('resume.providerCommands', {});
-				if (resumeTargetMode === 'origin-agent' && resumed.provider && resumed.provider !== 'copilot') {
-					const openedOriginAgent = await runResumeIntoOriginAgent(
-						resumed,
-						request.prompt,
-						{
-							maxTurns,
-							maxContextChars,
-							overflowStrategy,
-							providerCommands,
-						},
-						createDefaultResumeIntoOriginAgentDeps(stream),
-					);
-					if (openedOriginAgent) {
-						return {
-							metadata: {
-								resumedSessionFile: reassembled.rootFileName,
-								storageDirectory: selection.session.storageDirectory,
-							},
-						};
+				if (providerSelection.kind === 'agent') {
+					const handoff = await buildAnalysisHandoffPrompt(selection, workspaceFolders, workspaceSessions);
+					if (handoff.infoMessage) {
+						stream.markdown(handoff.infoMessage);
+						return;
 					}
-				}
-				const constrained = applyResumeOverflowStrategy(resumed.turns, maxTurns, maxContextChars, overflowStrategy);
-				stream.markdown(
-					[
-						`Loaded **${resumed.title}** (${constrained.turns.length}/${resumed.turns.length} turns).`,
-						'Reply in this thread with @session-control and your follow-up question to continue with this context.',
-					].join('\n\n'),
-				);
+					if (!handoff.prompt) {
+						stream.markdown('Could not build an analysis handoff prompt.');
+						return;
+					}
 
-				return {
-					metadata: {
-						resumedSessionFile: reassembled.rootFileName,
-						storageDirectory: selection.session.storageDirectory,
-					},
-				};
+					const analysisWorkspaceFolder = workspaceFolder ?? workspaceFolders[0];
+					if (!analysisWorkspaceFolder) {
+						stream.markdown('Open a workspace folder before analyzing saved chats.');
+						return;
+					}
+					const providerCommands = vscode.workspace
+						.getConfiguration('session-control', analysisWorkspaceFolder.uri)
+						.get<ResumeProviderCommands>('resume.providerCommands', {});
+					const dispatchResult = await handoffDispatcher.dispatchSelection(
+						handoff.prompt,
+						providerSelection.provider,
+						{
+							configuredProviderCommands: providerCommands,
+							promptLabel: 'analysis handoff prompt',
+						},
+					);
+					stream.markdown(dispatchResult.instruction);
+					return;
+				}
+
+				return runAnalyzeSessionsFlow(
+					prompt,
+					workspaceFolders,
+					workspaceSessions,
+					createDefaultAnalyzeSessionsFlowDeps(providerSelection.model, stream, token, selection),
+				);
 			}
 
-			if (selection.candidates?.length) {
-				stream.markdown(
-					[
-						'Multiple sessions match your query. Try a more specific title or pick one of these:',
-						'',
-						...selection.candidates.map((session) => asWorkspaceMarkdownListItem(session)),
-					].join('\n'),
+			if (command === 'implement' || command === 'handoff') {
+				await runImplementationHandoffFlow(
+					prompt,
+					chatContext.history,
+					createDefaultImplementationHandoffFlowDeps(stream, request.model),
 				);
 				return;
 			}
 
-			stream.markdown(`No saved session matching '${request.prompt}'. Try @session-control /list.`);
+			if (command === 'resume') {
+				if (!workspaceSessions.length) {
+					stream.markdown('No saved sessions found. Save a session before resuming.');
+					return;
+				}
+
+				const selection = preselectedSession
+					? { session: preselectedSession }
+					: selectSessionForResume(prompt, workspaceSessions);
+				if (selection.session) {
+					const reassembled = await loadReassembledSession(selection.session.storageDirectory, selection.session.fileName);
+					const resumed = reassembled.session;
+					const maxTurns = vscode.workspace
+						.getConfiguration('session-control', selection.session.workspaceFolder.uri)
+						.get<number>('resume.maxTurns', 50);
+					const maxContextChars = vscode.workspace
+						.getConfiguration('session-control', selection.session.workspaceFolder.uri)
+						.get<number>('resume.maxContextChars', 80000);
+					const overflowStrategy = vscode.workspace
+						.getConfiguration('session-control', selection.session.workspaceFolder.uri)
+						.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize');
+					const resumeTargetMode = vscode.workspace
+						.getConfiguration('session-control', selection.session.workspaceFolder.uri)
+						.get<ResumeTargetMode>('resume.target', 'origin-agent');
+					const providerCommands = vscode.workspace
+						.getConfiguration('session-control', selection.session.workspaceFolder.uri)
+						.get<ResumeProviderCommands>('resume.providerCommands', {});
+					if (resumeTargetMode === 'origin-agent' && resumed.provider && resumed.provider !== 'copilot') {
+						const openedOriginAgent = await runResumeIntoOriginAgent(
+							resumed,
+							request.prompt,
+							{
+								maxTurns,
+								maxContextChars,
+								overflowStrategy,
+								providerCommands,
+							},
+							createDefaultResumeIntoOriginAgentDeps(stream),
+						);
+						if (openedOriginAgent) {
+							return {
+								metadata: {
+									resumedSessionFile: reassembled.rootFileName,
+									storageDirectory: selection.session.storageDirectory,
+								},
+							};
+						}
+					}
+					const constrained = applyResumeOverflowStrategy(resumed.turns, maxTurns, maxContextChars, overflowStrategy);
+					stream.markdown(
+						[
+							`Loaded **${resumed.title}** (${constrained.turns.length}/${resumed.turns.length} turns).`,
+							'Reply in this thread with @session-control and your follow-up question to continue with this context.',
+						].join('\n\n'),
+					);
+
+					return {
+						metadata: {
+							resumedSessionFile: reassembled.rootFileName,
+							storageDirectory: selection.session.storageDirectory,
+						},
+					};
+				}
+
+				if (selection.candidates?.length) {
+					stream.markdown(
+						[
+							'Multiple sessions match your query. Try a more specific title or pick one of these:',
+							'',
+							...selection.candidates.map((session) => asWorkspaceMarkdownListItem(session)),
+						].join('\n'),
+					);
+					return;
+				}
+
+				stream.markdown(`No saved session matching '${prompt}'. Try @session-control /list.`);
+				return;
+			}
+
 			return;
+		};
+
+		if (request.command && PARTICIPANT_COMMANDS.has(request.command)) {
+			return handleCommand(request.command, request.prompt);
 		}
 
 		const analysisReportMeta = findLatestAnalysisReportMeta(chatContext.history);
-		if (analysisReportMeta) {
-			stream.markdown('Use @session-control /implement to continue from the latest saved analysis report.');
-			return;
-		}
-
 		const resumedSessionMeta = findResumedSessionMeta(chatContext.history);
-		if (!resumedSessionMeta) {
-			stream.markdown('Use @session-control /resume <session name> or @session-control /analyze first, then ask your follow-up.');
-			return;
-		}
+		const runDefaultResponse = async (): Promise<vscode.ChatResult | undefined> => {
+			if (analysisReportMeta) {
+				stream.markdown('Use @session-control /implement to continue from the latest saved analysis report.');
+				return;
+			}
 
-		const reassembled = await loadReassembledSession(
-			resumedSessionMeta.storageDirectory,
-			resumedSessionMeta.fileName,
-		);
-		const resumedSession = reassembled.session;
-		const resumedWorkspaceFolder = findWorkspaceFolderForStorageDirectory(resumedSessionMeta.storageDirectory)
-			?? workspaceFolder
-			?? workspaceFolders[0];
-		if (!resumedWorkspaceFolder) {
-			stream.markdown('Open a workspace folder before using @session-control.');
-			return;
-		}
-		const maxTurns = vscode.workspace
-			.getConfiguration('session-control', resumedWorkspaceFolder.uri)
-			.get<number>('resume.maxTurns', 50);
-		const maxContextChars = vscode.workspace
-			.getConfiguration('session-control', resumedWorkspaceFolder.uri)
-			.get<number>('resume.maxContextChars', 80000);
-		const overflowStrategy = vscode.workspace
-			.getConfiguration('session-control', resumedWorkspaceFolder.uri)
-			.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize');
+			if (!resumedSessionMeta) {
+				stream.markdown('Use @session-control /resume <session name> or @session-control /analyze first, then ask your follow-up.');
+				return;
+			}
 
-		await sendModelResponse(request, stream, token, resumedSession, request.prompt, maxTurns, maxContextChars, overflowStrategy);
-		return {
-			metadata: {
-				resumedSessionFile: reassembled.rootFileName,
-				storageDirectory: resumedSessionMeta.storageDirectory,
-			},
+			const reassembled = await loadReassembledSession(
+				resumedSessionMeta.storageDirectory,
+				resumedSessionMeta.fileName,
+			);
+			const resumedSession = reassembled.session;
+			const resumedWorkspaceFolder = findWorkspaceFolderForStorageDirectory(resumedSessionMeta.storageDirectory)
+				?? workspaceFolder
+				?? workspaceFolders[0];
+			if (!resumedWorkspaceFolder) {
+				stream.markdown('Open a workspace folder before using @session-control.');
+				return;
+			}
+			const maxTurns = vscode.workspace
+				.getConfiguration('session-control', resumedWorkspaceFolder.uri)
+				.get<number>('resume.maxTurns', 50);
+			const maxContextChars = vscode.workspace
+				.getConfiguration('session-control', resumedWorkspaceFolder.uri)
+				.get<number>('resume.maxContextChars', 80000);
+			const overflowStrategy = vscode.workspace
+				.getConfiguration('session-control', resumedWorkspaceFolder.uri)
+				.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize');
+
+			await sendModelResponse(request, stream, token, resumedSession, request.prompt, maxTurns, maxContextChars, overflowStrategy);
+			return {
+				metadata: {
+					resumedSessionFile: reassembled.rootFileName,
+					storageDirectory: resumedSessionMeta.storageDirectory,
+				},
+			};
 		};
+
+		if (request.command) {
+			return runDefaultResponse();
+		}
+
+		// Slash-less prompt: TypeSafe may route it to a command. Low confidence, `none`,
+		// or TypeSafe being off or unavailable all keep the default response.
+		const decision = await routeSlashlessPrompt({
+			prompt: request.prompt,
+			sessions: workspaceSessions,
+			token,
+			threadContext: analysisReportMeta ? 'analysis-report' : resumedSessionMeta ? 'resumed-session' : 'new',
+			...(deps.judgment ? { judgment: deps.judgment } : {}),
+			...(deps.log ? { log: deps.log } : {}),
+		});
+		if (decision.kind === 'run') {
+			stream.markdown(`Treating this as \`${decision.intent.interpretation}\`.\n\n`);
+			return handleCommand(decision.intent.command, decision.intent.prompt, decision.intent.session);
+		}
+		if (decision.kind === 'fallback') {
+			return runDefaultResponse();
+		}
+
+		const routingSuggestion = toIntentRoutingSuggestionMetadata(decision.intent);
+		stream.markdown(`This may be a request for \`${routingSuggestion.interpretation}\`. Use the followup below to run it.\n\n`);
+		const result = await runDefaultResponse();
+		return { ...result, metadata: { ...result?.metadata, routingSuggestion } };
 	});
 	participant.followupProvider = {
 		provideFollowups: (result) => buildParticipantFollowups(result),

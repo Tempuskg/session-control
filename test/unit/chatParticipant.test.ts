@@ -17,8 +17,19 @@ import {
 	buildImplementationHandoffPrompt,
 	createNeedsAnalysisSelection,
 	createPresetAnalysisSelection,
+	parseAnalysisSelectionAlias,
 	type AnalysisCandidateSession,
 } from '../../src/sessionAnalysis';
+import {
+	INTENT_ROUTING_HIGH_CONFIDENCE,
+	INTENT_ROUTING_MAX_SESSION_CANDIDATES,
+	INTENT_ROUTING_MEDIUM_CONFIDENCE,
+	buildIntentRoutingQuestions,
+	routeSlashlessPrompt,
+	selectSessionRefCandidates,
+	toIntentRoutingSuggestionMetadata,
+} from '../../src/typesafe/intentRouting';
+import { createFakeJudgmentService } from '../../src/typesafe/judgmentService';
 import {
 	type HandoffDispatchResult,
 	type HandoffSelectionId,
@@ -869,5 +880,218 @@ suite('chatParticipant implementation followups', () => {
 		assert.deepEqual(messages, [
 			'Opened Codex and pasted the implementation prompt. Review it and send it when ready.',
 		]);
+	});
+});
+
+suite('chatParticipant slash-less intent routing', () => {
+	function createRoutingSessions(count: number): SessionMeta[] {
+		return Array.from({ length: count }, (_, index) => createMeta({
+			id: String(index + 1),
+			title: `Session ${index + 1}`,
+			savedAt: new Date(Date.UTC(2026, 8, 1 + index)).toISOString(),
+			fileName: `session-${index + 1}.json`,
+		}));
+	}
+
+	function choiceAnswer(choice: string, confidence: number): { type: 'choice'; choice: string; confidence: number; probabilities: Record<string, number> } {
+		return { type: 'choice', choice, confidence, probabilities: { [choice]: confidence } };
+	}
+
+	function createCancelledToken(): vscode.CancellationToken {
+		return {
+			isCancellationRequested: true,
+			onCancellationRequested: () => ({ dispose: () => undefined }),
+		} as unknown as vscode.CancellationToken;
+	}
+
+	test('falls back without a TypeSafe call when TypeSafe is disabled', async () => {
+		const judgment = createFakeJudgmentService({ enabled: false, answers: { intent: choiceAnswer('list', 0.99) } });
+		const decision = await routeSlashlessPrompt({ prompt: 'show my chats', sessions: [], judgment });
+
+		assert.deepEqual(decision, { kind: 'fallback' });
+		assert.equal(judgment.calls.length, 0);
+	});
+
+	test('falls back without a TypeSafe call when the routing feature is off', async () => {
+		const judgment = createFakeJudgmentService({ features: { routing: false }, answers: { intent: choiceAnswer('list', 0.99) } });
+		const decision = await routeSlashlessPrompt({ prompt: 'show my chats', sessions: [], judgment });
+
+		assert.deepEqual(decision, { kind: 'fallback' });
+		assert.equal(judgment.calls.length, 0);
+	});
+
+	test('falls back when no judgment service is wired or the prompt is empty', async () => {
+		const judgment = createFakeJudgmentService({ answers: { intent: choiceAnswer('list', 0.99) } });
+
+		assert.deepEqual(await routeSlashlessPrompt({ prompt: 'show my chats', sessions: [] }), { kind: 'fallback' });
+		assert.deepEqual(await routeSlashlessPrompt({ prompt: '   ', sessions: [], judgment }), { kind: 'fallback' });
+		assert.equal(judgment.calls.length, 0);
+	});
+
+	test('falls back when TypeSafe fails or the request is cancelled', async () => {
+		const failing = createFakeJudgmentService({ error: new Error('offline') });
+		assert.deepEqual(await routeSlashlessPrompt({ prompt: 'show my chats', sessions: [], judgment: failing }), { kind: 'fallback' });
+
+		const answering = createFakeJudgmentService({ answers: { intent: choiceAnswer('list', 0.99) } });
+		const cancelled = await routeSlashlessPrompt({
+			prompt: 'show my chats',
+			sessions: [],
+			judgment: answering,
+			token: createCancelledToken(),
+		});
+		assert.deepEqual(cancelled, { kind: 'fallback' });
+	});
+
+	test('keeps existing behavior for a none intent even at high confidence', async () => {
+		const judgment = createFakeJudgmentService({ answers: { intent: choiceAnswer('none', 0.97) } });
+		const decision = await routeSlashlessPrompt({
+			prompt: 'what did we decide about the token refresh?',
+			sessions: createRoutingSessions(2),
+			judgment,
+			threadContext: 'resumed-session',
+		});
+
+		assert.deepEqual(decision, { kind: 'fallback' });
+		assert.deepEqual(judgment.calls[0]?.state, { prompt: 'what did we decide about the token refresh?', thread: 'resumed-session' });
+	});
+
+	test('keeps existing behavior for a low-confidence intent', async () => {
+		const judgment = createFakeJudgmentService({
+			answers: { intent: choiceAnswer('analyze', INTENT_ROUTING_MEDIUM_CONFIDENCE - 0.01) },
+		});
+		const decision = await routeSlashlessPrompt({ prompt: 'hmm', sessions: [], judgment });
+
+		assert.deepEqual(decision, { kind: 'fallback' });
+	});
+
+	test('ignores malformed or unknown intent answers', async () => {
+		const judgment = createFakeJudgmentService({ answers: { intent: { choice: 'delete', confidence: 0.99 } } });
+		assert.deepEqual(await routeSlashlessPrompt({ prompt: 'delete everything', sessions: [], judgment }), { kind: 'fallback' });
+
+		judgment.setAnswers({ intent: { choice: 'list' } });
+		assert.deepEqual(await routeSlashlessPrompt({ prompt: 'show my chats', sessions: [], judgment }), { kind: 'fallback' });
+	});
+
+	test('runs /analyze with the speculative timeframe at high confidence', async () => {
+		const judgment = createFakeJudgmentService({
+			answers: {
+				intent: choiceAnswer('analyze', 0.92),
+				timeframe: choiceAnswer('last7Days', 0.88),
+			},
+		});
+		const decision = await routeSlashlessPrompt({ prompt: 'review what went wrong in my chats this week', sessions: [], judgment });
+
+		assert.ok(decision.kind === 'run');
+		assert.equal(decision.intent.command, 'analyze');
+		assert.equal(decision.intent.prompt, 'last 7 days');
+		assert.equal(decision.intent.interpretation, '/analyze last 7 days');
+		assert.equal(parseAnalysisSelectionAlias(decision.intent.prompt)?.mode, 'last7Days');
+		assert.equal(judgment.calls[0]?.options, 'routing');
+	});
+
+	test('maps every timeframe to an alias the analysis parser accepts', async () => {
+		for (const timeframe of ['last24Hours', 'last7Days', 'last30Days', 'needsAnalysis']) {
+			const judgment = createFakeJudgmentService({
+				answers: { intent: choiceAnswer('analyze', 0.95), timeframe: choiceAnswer(timeframe, 0.95) },
+			});
+			const decision = await routeSlashlessPrompt({ prompt: 'analyze my chats', sessions: [], judgment });
+			assert.ok(decision.kind === 'run');
+			assert.equal(parseAnalysisSelectionAlias(decision.intent.prompt)?.mode, timeframe);
+		}
+	});
+
+	test('leaves the analysis scope to the picker when the timeframe is unspecified or unsure', async () => {
+		for (const timeframe of [choiceAnswer('unspecified', 0.9), choiceAnswer('last30Days', 0.2)]) {
+			const judgment = createFakeJudgmentService({ answers: { intent: choiceAnswer('analyze', 0.9), timeframe } });
+			const decision = await routeSlashlessPrompt({ prompt: 'analyze my chats', sessions: [], judgment });
+
+			assert.ok(decision.kind === 'run');
+			assert.equal(decision.intent.prompt, '');
+			assert.equal(decision.intent.interpretation, '/analyze');
+		}
+	});
+
+	test('runs /resume with the session picked by the sessionRef judgment', async () => {
+		const sessions = createRoutingSessions(3);
+		const judgment = createFakeJudgmentService({
+			answers: {
+				intent: choiceAnswer('resume', 0.9),
+				sessionRef: choiceAnswer('session-2', 0.85),
+			},
+		});
+		const decision = await routeSlashlessPrompt({ prompt: 'pick up where I left off', sessions, judgment });
+
+		assert.ok(decision.kind === 'run');
+		const questions = judgment.calls[0]?.questions as Record<string, { criteria: Record<string, string> }>;
+		const candidateCount = Object.keys(questions.sessionRef?.criteria ?? {}).length - 1;
+		const expected = selectSessionRefCandidates('pick up where I left off', sessions)[1];
+		assert.equal(candidateCount, 3);
+		assert.equal(decision.intent.command, 'resume');
+		assert.equal(decision.intent.session, expected);
+		assert.equal(decision.intent.prompt, expected?.title);
+		assert.equal(decision.intent.interpretation, `/resume ${expected?.title ?? ''}`);
+	});
+
+	test('runs /resume with fuzzy matching on the prompt when sessionRef is none', async () => {
+		const judgment = createFakeJudgmentService({
+			answers: { intent: choiceAnswer('resume', 0.9), sessionRef: choiceAnswer('none', 0.9) },
+		});
+		const decision = await routeSlashlessPrompt({ prompt: 'resume auth', sessions: createRoutingSessions(2), judgment });
+
+		assert.ok(decision.kind === 'run');
+		assert.equal(decision.intent.session, undefined);
+		assert.equal(decision.intent.prompt, 'resume auth');
+	});
+
+	test('asks one fan-out request with at most 20 session candidates plus none', async () => {
+		const judgment = createFakeJudgmentService({ answers: { intent: choiceAnswer('none', 0.9) } });
+		await routeSlashlessPrompt({ prompt: 'continue the latest one', sessions: createRoutingSessions(30), judgment });
+
+		assert.equal(judgment.calls.length, 1);
+		const questions = judgment.calls[0]?.questions as Record<string, { type: string; criteria: Record<string, string> }>;
+		assert.deepEqual(Object.keys(questions), ['intent', 'timeframe', 'sessionRef']);
+		assert.deepEqual(Object.keys(questions.intent?.criteria ?? {}), ['resume', 'list', 'analyze', 'implement', 'none']);
+		const sessionLabels = Object.keys(questions.sessionRef?.criteria ?? {});
+		assert.equal(sessionLabels.length, INTENT_ROUTING_MAX_SESSION_CANDIDATES + 1);
+		assert.equal(sessionLabels.at(-1), 'none');
+		// No fuzzy match for a free-form prompt: the most recent sessions are offered.
+		assert.match(questions.sessionRef?.criteria['session-1'] ?? '', /"Session 30"/);
+	});
+
+	test('prefers fuzzy matches for sessionRef candidates and omits sessionRef without sessions', () => {
+		const sessions = [
+			createMeta({ id: '1', title: 'Fix auth bug', fileName: 'fix-auth-bug.json', savedAt: '2026-09-01T00:00:00.000Z' }),
+			createMeta({ id: '2', title: 'Write release notes', fileName: 'release-notes.json', savedAt: '2026-09-02T00:00:00.000Z' }),
+		];
+		assert.deepEqual(selectSessionRefCandidates('auth', sessions).map((session) => session.title), ['Fix auth bug']);
+		assert.deepEqual(Object.keys(buildIntentRoutingQuestions([])), ['intent', 'timeframe']);
+	});
+
+	test('offers a followup instead of running at medium confidence', async () => {
+		const judgment = createFakeJudgmentService({ answers: { intent: choiceAnswer('list', 0.6) } });
+		const decision = await routeSlashlessPrompt({ prompt: 'which chats do I have?', sessions: [], judgment });
+
+		assert.ok(decision.kind === 'suggest');
+		const followups = buildParticipantFollowups({
+			metadata: { routingSuggestion: toIntentRoutingSuggestionMetadata(decision.intent) },
+		} as vscode.ChatResult);
+		assert.deepEqual(followups, [{
+			label: 'Run /list',
+			prompt: '',
+			participant: 'session-control.resume',
+			command: 'list',
+		}]);
+	});
+
+	test('routes at the high-confidence boundary and suggests just below it', async () => {
+		const judgment = createFakeJudgmentService({ answers: { intent: choiceAnswer('implement', INTENT_ROUTING_HIGH_CONFIDENCE) } });
+		const atBoundary = await routeSlashlessPrompt({ prompt: 'apply the recommendations', sessions: [], judgment });
+		assert.ok(atBoundary.kind === 'run');
+		assert.equal(atBoundary.intent.prompt, 'apply the recommendations');
+		assert.equal(atBoundary.intent.interpretation, '/implement');
+
+		judgment.setAnswers({ intent: choiceAnswer('implement', INTENT_ROUTING_HIGH_CONFIDENCE - 0.01) });
+		const below = await routeSlashlessPrompt({ prompt: 'apply the recommendations', sessions: [], judgment });
+		assert.equal(below.kind, 'suggest');
 	});
 });

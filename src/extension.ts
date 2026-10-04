@@ -2923,7 +2923,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		);
 	}
 
-	registerChatParticipant(context);
+	// Slash-less @session-control prompts are a typed user action, so routing may show
+	// the first-use consent prompt and the API-key re-prompt.
+	registerChatParticipant(context, {
+		judgment: createJudgmentService({
+			secrets: context.secrets,
+			consent: typeSafeConsentGate,
+			log: (message) => output.appendLine(`[chat-routing] ${message}`),
+		}),
+		log: (message) => output.appendLine(`[chat-routing] ${message}`),
+	});
 }
 
 export function deactivate(): void {

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`@session-control` understands requests without a slash command.** Type something like "analyze last week's chats" or "pick up the auth refactor session", and Session Control works out whether you meant `/analyze`, `/resume`, `/list`, or `/implement`. When it is confident it runs that command and shows how it read your request; when it is less sure it offers the command as a one-click suggestion; otherwise chat behaves as before. This uses TypeSafe, so it only runs when TypeSafe is enabled and you have agreed to its first-use notice, and it can be turned off with `session-control.typesafe.features.routing`. Your prompt and the titles, providers, and saved dates of up to 20 candidate saved sessions are sent to the TypeSafe AI provider to make the decision.
+
 ## [1.5.0] - 2026-09-30
 
 ### Added
