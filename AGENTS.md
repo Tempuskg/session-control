@@ -30,12 +30,14 @@ For `/implement`, `/proceed`, direct implementation requests, or generated imple
 - Start with `git status --short`, then a scoped `git diff -- <candidate files>` before broader diagnostics.
 - Common owner files for session-control and chat-command work are `src/chatParticipant.ts`, `src/analysisStore.ts`, `src/sessionAnalysis.ts`, `src/analysisOrchestrator.ts`, `src/extension.ts`, `src/types.ts`, `package.json`, and the nearest unit tests.
 - `src/chatParticipant.ts` is a hotspot; interactive chat or command changes need a Development Host smoke test.
+- Manual tests run against the installed extension, not the workspace build. Before asking the user to retest or concluding a fix failed, confirm the running build has the change (a new log line in Output > Session Control, or a new string in the installed `~/.vscode/extensions/darrenjmcleod.session-control-*/dist/extension.js`). If not, package with `npx @vscode/vsce package --no-git-tag-version`, install with `code --install-extension <vsix> --force`, and ask for Developer: Reload Window.
 - Validate in this order when applicable: touched-file diagnostics, `npm run compile-tests`, `npm run compile`, focused relevant tests, `npm test`, `npm run lint`, then a Development Host smoke test.
 - Check both the current implementation handoff command surface and command-palette surfaces for drift before closing rename or command work.
 - For plan-only or AI-control-only requests, update only plan/control files and explicitly state that implementation code did not change.
 - Use plain relative file paths in summaries and handoffs.
 - Strict optional-property typing is active in this repo, so omit optional keys rather than passing `undefined`.
 - Plain chat participants are not coding agents unless tool and workspace access are explicitly wired.
+- `/analyze` needs a model that answers direct `vscode.lm` requests: pick a vendor `copilot` model or an installed agent provider. Copilot CLI agent-host models (`copilotcli`, e.g. "Auto" or `agent-host-copilotcli:*`) return empty or unsized responses and are excluded from the provider picker; an empty analysis result is a model-selection problem first.
 - Repo type: VS Code extension. For patch version bumps, prefer `npm run version:build`. For explicit version sets, use the documented exact `npm version` path without automatic git tag or commit creation.
 - Shipping model: one customer-facing `session-control` extension install. Do not tell users to install, configure, or look for a standalone `session-control-pro` extension. Treat private Pro or license-layer work as companion package functionality that loads through this extension.
 - Release-relevant files are `package.json`, `package-lock.json`, `README.md`, and `scripts/bump-package-version.cjs`. Verify only the expected release files for versioning tasks.

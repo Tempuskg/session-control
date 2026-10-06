@@ -10,6 +10,7 @@ import {
 	type HandoffSelectionId,
 } from './handoffDispatcher';
 import {
+	estimateMaxPromptChars,
 	runAnalyzeSessionsFlow,
 	type AnalyzeSessionsFlowDeps,
 	type WorkspaceSessionMeta,
@@ -485,15 +486,21 @@ export function findAvailableAnalysisAgentProviders(commands: readonly string[])
 	return detectHandoffAgentProviders(commands);
 }
 
+/** Copilot CLI agent-host models return empty or unsized responses to direct sendRequest calls. */
+export function isDirectRequestModel(model: Pick<vscode.LanguageModelChat, 'id' | 'vendor'>): boolean {
+	return !`${model.vendor} ${model.id}`.toLowerCase().includes('copilotcli');
+}
+
 export async function pickAnalysisProvider(
 	models: readonly vscode.LanguageModelChat[],
 	agentProviders: readonly AnalysisAgentProviderId[],
 	fallbackModel?: vscode.LanguageModelChat,
 	purpose: ProviderSelectionPurpose = 'analysis',
 ): Promise<AnalysisProviderSelection | undefined> {
-	const availableModels = [...models];
+	const availableModels = models.filter(isDirectRequestModel);
 	if (
 		fallbackModel
+		&& isDirectRequestModel(fallbackModel)
 		&& !availableModels.some((model) => model.id === fallbackModel.id && model.vendor === fallbackModel.vendor)
 	) {
 		availableModels.push(fallbackModel);
@@ -716,7 +723,14 @@ export async function buildAnalysisHandoffPrompt(
 	};
 }
 
-async function collectModelTextFromModel(
+export function buildEmptyModelResponseMessage(model: Pick<vscode.LanguageModelChat, 'name' | 'id' | 'vendor'>, nonTextPartCount: number): string {
+	const modelName = model.name.trim() || model.id.trim() || 'Unnamed model';
+	const vendor = model.vendor.trim() || 'unknown provider';
+	const partDetail = nonTextPartCount > 0 ? ` (received ${nonTextPartCount} non-text response part${nonTextPartCount === 1 ? '' : 's'})` : '';
+	return `The selected model "${modelName}" (${vendor}) returned no text${partDetail}. Choose a different model for analysis.`;
+}
+
+export async function collectModelTextFromModel(
 	model: vscode.LanguageModelChat,
 	streamText: ((markdown: string) => void) | undefined,
 	token: vscode.CancellationToken,
@@ -729,16 +743,24 @@ async function collectModelTextFromModel(
 	);
 
 	let text = '';
+	let nonTextPartCount = 0;
 	for await (const part of modelResponse.stream) {
 		if (part instanceof vscode.LanguageModelTextPart) {
 			text += part.value;
 			if (streamText) {
 				streamText(part.value);
 			}
+		} else {
+			nonTextPartCount += 1;
 		}
 	}
 
-	return text.trim();
+	const trimmed = text.trim();
+	if (!trimmed.length && !token.isCancellationRequested) {
+		throw new Error(buildEmptyModelResponseMessage(model, nonTextPartCount));
+	}
+
+	return trimmed;
 }
 
 async function collectModelText(
@@ -783,6 +805,37 @@ function findLatestAnalysisReportMeta(history: readonly (vscode.ChatRequestTurn 
 	return null;
 }
 
+export function getModelPromptLimit(
+	model: Pick<vscode.LanguageModelChat, 'maxInputTokens' | 'countTokens' | 'name' | 'vendor'>,
+	token?: vscode.CancellationToken,
+	log?: (message: string) => void,
+): { maxPromptChars?: number; promptExceedsModelInput?: (prompt: string) => Promise<boolean> } {
+	const modelLabel = `${model.name} (${model.vendor})`;
+	const maxPromptChars = estimateMaxPromptChars(model.maxInputTokens);
+	if (maxPromptChars === undefined) {
+		log?.(`analyze: ${modelLabel} reports no input token limit (${String(model.maxInputTokens)}); prompt size pre-check disabled`);
+		return {};
+	}
+
+	return {
+		maxPromptChars,
+		promptExceedsModelInput: async (prompt: string) => {
+			let promptTokens: number;
+			try {
+				promptTokens = await model.countTokens(prompt, token);
+			} catch (error) {
+				const exceeds = prompt.length > maxPromptChars;
+				log?.(`analyze: ${modelLabel} could not count tokens (${error instanceof Error ? error.message : String(error)}); estimated ${prompt.length} chars against ${maxPromptChars}${exceeds ? '; using smaller evidence' : ''}`);
+				return exceeds;
+			}
+
+			const exceeds = promptTokens > model.maxInputTokens;
+			log?.(`analyze: ${modelLabel} prompt ${prompt.length} chars = ${promptTokens} tokens, limit ${model.maxInputTokens}${exceeds ? '; using smaller evidence' : ''}`);
+			return exceeds;
+		},
+	};
+}
+
 export interface AnalyzeSessionsFlowDepsOverrides {
 	resolveSelection?: AnalyzeSessionsFlowDeps['resolveSelection'];
 	createCandidates?: AnalyzeSessionsFlowDeps['createCandidates'];
@@ -798,6 +851,8 @@ export interface AnalyzeSessionsFlowDepsOverrides {
 	writeReport?: AnalyzeSessionsFlowDeps['writeReport'];
 	recordAnalysis?: AnalyzeSessionsFlowDeps['recordAnalysis'];
 	batchCharBudget?: number;
+	maxPromptChars?: number;
+	promptExceedsModelInput?: AnalyzeSessionsFlowDeps['promptExceedsModelInput'];
 	triageCandidates?: AnalyzeSessionsFlowDeps['triageCandidates'];
 }
 
@@ -824,6 +879,8 @@ export function createAnalyzeSessionsFlowDeps(overrides: AnalyzeSessionsFlowDeps
 		writeReport: overrides.writeReport ?? (async (storageDirectory, input) => analysisStore.writeReport(storageDirectory, input)),
 		recordAnalysis: overrides.recordAnalysis ?? (async (storageDirectory, report, sessions) => analysisStore.recordAnalysis(storageDirectory, report, sessions)),
 		batchCharBudget: overrides.batchCharBudget ?? DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET,
+		...(overrides.maxPromptChars !== undefined ? { maxPromptChars: overrides.maxPromptChars } : {}),
+		...(overrides.promptExceedsModelInput ? { promptExceedsModelInput: overrides.promptExceedsModelInput } : {}),
 		...(overrides.triageCandidates ? { triageCandidates: overrides.triageCandidates } : {}),
 	};
 }
@@ -840,6 +897,7 @@ function createDefaultAnalyzeSessionsFlowDeps(
 		resolveSelection: async () => selection,
 		runModelPrompt: async (prompt: string, streamOutput: boolean) => collectModelText(model, streamOutput ? stream : undefined, token, prompt),
 		streamMarkdown: (markdown: string) => stream.markdown(markdown),
+		...getModelPromptLimit(model, token, log),
 		...(judgment
 			? {
 					triageCandidates: async (candidates: AnalysisCandidateSession[]) => triageAnalysisCandidates(candidates, {

@@ -62,12 +62,26 @@ export interface AnalyzeSessionsFlowDeps {
 	writeReport: (storageDirectory: string, input: AnalysisWriteReportInput) => Promise<PersistedAnalysisReport>;
 	recordAnalysis: (storageDirectory: string, report: AnalysisReportReference, sessions: AnalysisRecordInput[]) => Promise<AnalysisIndex>;
 	batchCharBudget: number;
+	/** Estimated prompt size the selected model accepts; prompts above it skip straight to smaller evidence or batches. */
+	maxPromptChars?: number;
+	/** Exact check against the selected model's input limit; takes precedence over the maxPromptChars estimate. */
+	promptExceedsModelInput?: (prompt: string) => Promise<boolean>;
 	/** Optional TypeSafe triage, run once per candidate before batching; omit to skip triage. */
 	triageCandidates?: (candidates: AnalysisCandidateSession[]) => Promise<AnalysisTriageResults>;
 }
 
 const TOKEN_LIMIT_ERROR_PATTERN = /token limit|context length|too many tokens|maximum context|message exceeds/i;
 const MAX_SYNTHESIS_SPLIT_DEPTH = 12;
+/** Conservative characters-per-token ratio so the estimate errs toward smaller prompts. */
+const ESTIMATED_CHARS_PER_TOKEN = 3;
+
+export function estimateMaxPromptChars(maxInputTokens: number | undefined): number | undefined {
+	if (typeof maxInputTokens !== 'number' || !Number.isFinite(maxInputTokens) || maxInputTokens <= 0) {
+		return undefined;
+	}
+
+	return Math.floor(maxInputTokens * ESTIMATED_CHARS_PER_TOKEN);
+}
 
 interface CompletedAnalysisBatch {
 	batchLabel: string;
@@ -171,6 +185,11 @@ function buildEvidenceRetryMessage(nextDetailLevel: AnalysisEvidenceDetailLevel,
 	return `_${subject} still exceeded the model token limit with condensed evidence. Retrying with summary-only evidence..._\n\n`;
 }
 
+function buildEvidenceFitMessage(nextDetailLevel: AnalysisEvidenceDetailLevel, batchLabel?: string): string {
+	const subject = batchLabel ? `Batch ${batchLabel}` : 'The saved session';
+	return `_${subject} is too large for the model's input limit. Using ${nextDetailLevel === 'compact' ? 'condensed' : 'summary-only'} session evidence..._\n\n`;
+}
+
 async function runAnalysisPromptWithSingleSessionFallbacks(
 	selection: AnalysisSelection,
 	candidates: AnalysisCandidateSession[],
@@ -188,6 +207,22 @@ async function runAnalysisPromptWithSingleSessionFallbacks(
 				deps.buildPrompt(selection, candidates, recommendationBaseline, detailLevel),
 				...(extraInstruction ? ['', extraInstruction] : []),
 			].join('\n');
+			const exceedsModelInput = deps.promptExceedsModelInput
+				? await deps.promptExceedsModelInput(prompt)
+				: deps.maxPromptChars !== undefined && prompt.length > deps.maxPromptChars;
+			if (exceedsModelInput) {
+				if (candidates.length > 1) {
+					throw new Error('The analysis prompt would exceed the model token limit.');
+				}
+
+				const fitDetailLevel = getNextEvidenceDetailLevel(detailLevel);
+				if (fitDetailLevel) {
+					deps.streamMarkdown(buildEvidenceFitMessage(fitDetailLevel, batchLabel));
+					detailLevel = fitDetailLevel;
+					continue;
+				}
+			}
+
 			return await deps.runModelPrompt(prompt, streamOutput);
 		} catch (error) {
 			const message = getErrorMessage(error);
@@ -522,7 +557,8 @@ export async function runAnalyzeSessionsFlow(
 	const triage = deps.triageCandidates ? await runTriage(deps.triageCandidates, filtered) : undefined;
 
 	const recommendationBaseline = await deps.loadRecommendationBaseline(workspaceFolders, filtered);
-	const effectiveBatchBudget = Math.max(4000, deps.batchCharBudget - recommendationBaseline.length);
+	const batchCharBudget = Math.min(deps.batchCharBudget, deps.maxPromptChars ?? Number.POSITIVE_INFINITY);
+	const effectiveBatchBudget = Math.max(4000, batchCharBudget - recommendationBaseline.length);
 	const batches = deps.splitIntoBatches(filtered, effectiveBatchBudget);
 	const generation = batches.length <= 1
 		? await generateSingleBatchAnalysis(selection, filtered, recommendationBaseline, deps)

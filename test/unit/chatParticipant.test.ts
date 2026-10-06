@@ -2,10 +2,13 @@ import * as assert from 'node:assert';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import {
+	buildEmptyModelResponseMessage,
 	buildParticipantFollowups,
 	createAnalysisModelPickItems,
 	createAnalysisProviderPickItems,
 	findAvailableAnalysisAgentProviders,
+	getModelPromptLimit,
+	isDirectRequestModel,
 	renderSessionListMarkdown,
 	resolveSummarizeNoteWithFallback,
 	runAnalyzeSessionsFlow,
@@ -200,6 +203,25 @@ suite('chatParticipant selection', () => {
 				description: 'Provider: copilot',
 				detail: 'gpt-4.1 · copilot-gpt-4.1',
 			}],
+		);
+	});
+
+	test('excludes Copilot CLI agent-host models from direct-request pickers', () => {
+		assert.equal(isDirectRequestModel({ vendor: 'copilot', id: 'copilot-gpt-4.1' }), true);
+		assert.equal(isDirectRequestModel({ vendor: 'copilotcli', id: 'auto' }), false);
+		assert.equal(isDirectRequestModel({ vendor: '', id: 'agent-host-copilotcli:hydrafusion' }), false);
+	});
+
+	test('names the model when it returns no text', () => {
+		const model = { name: 'Auto', vendor: 'copilotcli', id: 'auto' };
+
+		assert.equal(
+			buildEmptyModelResponseMessage(model, 0),
+			'The selected model "Auto" (copilotcli) returned no text. Choose a different model for analysis.',
+		);
+		assert.equal(
+			buildEmptyModelResponseMessage(model, 2),
+			'The selected model "Auto" (copilotcli) returned no text (received 2 non-text response parts). Choose a different model for analysis.',
 		);
 	});
 
@@ -768,6 +790,102 @@ suite('chatParticipant analyze flow', () => {
 		]);
 		assert.equal(messages.some((message) => message.includes('condensed session evidence')), true);
 		assert.equal(messages.some((message) => message.includes('summary-only evidence')), true);
+	});
+
+	test('skips full evidence without a model call when the prompt exceeds the model input limit', async () => {
+		const promptLengths: number[] = [];
+		const messages: string[] = [];
+		const detailSizes = { full: 300, compact: 200, summaryOnly: 100 };
+
+		const result = await runAnalyzeSessionsFlow(
+			'7d',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			[{ ...createMeta(), workspaceFolder: createWorkspaceFolder('workspace', 'e:/workspace', 0), storageDirectory: 'e:/workspace/.chat', displayTitle: '[workspace] Fix auth bug' }],
+			createAnalyzeFlowDeps({
+				resolveSelection: async () => createPresetAnalysisSelection('last7Days', new Date('2026-05-17T12:00:00.000Z')),
+				createCandidates: async () => [
+					createAnalysisCandidate({
+						fingerprint: 'fingerprint-a',
+						storageDirectory: 'e:/workspace/.chat',
+						session: createChatSession({ id: 'a', title: 'Oversized Session' }),
+					}),
+				],
+				buildPrompt: (_selection, _candidates, _baseline, detailLevel) => 'x'.repeat(detailSizes[detailLevel ?? 'full']),
+				runModelPrompt: async (prompt: string) => {
+					promptLengths.push(prompt.length);
+					return '## Findings\n\nReport';
+				},
+				streamMarkdown: (markdown: string) => {
+					messages.push(markdown);
+				},
+				maxPromptChars: 250,
+			}),
+		);
+
+		assert.equal(result?.metadata.analysisStatus, 'complete');
+		assert.deepEqual(promptLengths, [200]);
+		assert.equal(messages.some((message) => message.includes("too large for the model's input limit. Using condensed session evidence")), true);
+		assert.equal(messages.some((message) => message.includes('exceeded the model token limit')), false);
+	});
+
+	test('splits a multi-session batch without a model call when the prompt exceeds the model input limit', async () => {
+		const promptLengths: number[] = [];
+
+		const result = await runAnalyzeSessionsFlow(
+			'7d',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			[{ ...createMeta(), workspaceFolder: createWorkspaceFolder('workspace', 'e:/workspace', 0), storageDirectory: 'e:/workspace/.chat', displayTitle: '[workspace] Fix auth bug' }],
+			createAnalyzeFlowDeps({
+				resolveSelection: async () => createPresetAnalysisSelection('last7Days', new Date('2026-05-17T12:00:00.000Z')),
+				createCandidates: async () => [
+					createAnalysisCandidate({
+						fingerprint: 'fingerprint-a',
+						storageDirectory: 'e:/workspace/.chat',
+						session: createChatSession({ id: 'a', title: 'Session A' }),
+					}),
+					createAnalysisCandidate({
+						fingerprint: 'fingerprint-b',
+						storageDirectory: 'e:/workspace/.chat',
+						session: createChatSession({ id: 'b', title: 'Session B' }),
+					}),
+				],
+				splitIntoBatches: (candidates: AnalysisCandidateSession[]) => [candidates],
+				buildPrompt: (_selection, candidates) => 'x'.repeat(candidates.length * 200),
+				buildSynthesisPrompt: () => 'synthesis',
+				runModelPrompt: async (prompt: string) => {
+					promptLengths.push(prompt.length);
+					return prompt === 'synthesis' ? '## Findings\n\nReport' : 'summary';
+				},
+				streamMarkdown: () => undefined,
+				maxPromptChars: 350,
+			}),
+		);
+
+		assert.equal(result?.metadata.analysisStatus, 'complete');
+		assert.equal(promptLengths.some((length) => length >= 400), false);
+		assert.equal(promptLengths.length, 3);
+	});
+
+	test('checks prompts against the model input limit with exact token counts', async () => {
+		const logs: string[] = [];
+		const model = {
+			name: 'GPT-4.1',
+			vendor: 'copilot',
+			maxInputTokens: 1000,
+			countTokens: async (text: string | vscode.LanguageModelChatMessage) => (typeof text === 'string' ? text.length : 0),
+		};
+		const limit = getModelPromptLimit(model, undefined, (message) => logs.push(message));
+
+		assert.equal(limit.maxPromptChars, 3000);
+		assert.equal(await limit.promptExceedsModelInput?.('x'.repeat(1000)), false);
+		assert.equal(await limit.promptExceedsModelInput?.('x'.repeat(1001)), true);
+		assert.equal(logs[1], 'analyze: GPT-4.1 (copilot) prompt 1001 chars = 1001 tokens, limit 1000; using smaller evidence');
+		assert.deepEqual(getModelPromptLimit({ ...model, maxInputTokens: 0 }, undefined, (message) => logs.push(message)), {});
+		assert.equal(logs.at(-1), 'analyze: GPT-4.1 (copilot) reports no input token limit (0); prompt size pre-check disabled');
+
+		const failingCount = getModelPromptLimit({ ...model, countTokens: async () => { throw new Error('unsupported'); } }, undefined, (message) => logs.push(message));
+		assert.equal(await failingCount.promptExceedsModelInput?.('x'.repeat(3001)), true);
+		assert.equal(logs.at(-1), 'analyze: GPT-4.1 (copilot) could not count tokens (unsupported); estimated 3001 chars against 3000; using smaller evidence');
 	});
 
 	test('retries synthesis in smaller groups when combined batch summaries exceed the token limit', async () => {

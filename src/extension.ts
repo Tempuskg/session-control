@@ -25,8 +25,10 @@ import { migrateLegacyAutoSaveProviderSettings } from './autoSaveConfigurationMi
 import { createAutoSaveWorkspaceLifecycle } from './autoSaveWorkspaceManager';
 import {
 	buildAnalysisHandoffPrompt,
+	collectModelTextFromModel,
 	createAnalyzeSessionsFlowDeps,
 	findAvailableAnalysisAgentProviders,
+	getModelPromptLimit,
 	pickAnalysisProvider as pickAnalysisProviderFromChat,
 	registerChatParticipant,
 	resolveAnalysisSelection,
@@ -931,19 +933,9 @@ function createDefaultAnalyzeSavedChatsCommandDeps(): AnalyzeSavedChatsCommandDe
 				workspaceSessions,
 				createAnalyzeSessionsFlowDeps({
 					resolveSelection: async () => selection,
-					runModelPrompt: async (prompt: string) => {
-						const response = await model.sendRequest([vscode.LanguageModelChatMessage.User(prompt)], {}, token);
-
-						let text = '';
-						for await (const part of response.stream) {
-							if (part instanceof vscode.LanguageModelTextPart) {
-								text += part.value;
-							}
-						}
-
-						return text.trim();
-					},
+					runModelPrompt: async (prompt: string) => collectModelTextFromModel(model, undefined, token, prompt),
 					streamMarkdown: (markdown: string) => onStatus(markdown),
+					...getModelPromptLimit(model, token),
 				}),
 			),
 		withProgress: <T>(
