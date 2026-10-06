@@ -15,6 +15,9 @@ import {
 
 export const DEFAULT_PRO_PACKAGE_NAME = '@tempuskg/session-control-pro';
 
+/** Context key gating Pro menu entries; set only after the companion registrar loads. */
+export const PRO_FEATURES_LOADED_CONTEXT_KEY = 'session-control.proFeaturesLoaded';
+
 interface LoadProFeatureRegistrarDeps {
 	moduleSpecifier: string;
 	resolveModule: (specifier: string) => string;
@@ -23,6 +26,7 @@ interface LoadProFeatureRegistrarDeps {
 
 interface ActivateProFeaturesDeps extends LoadProFeatureRegistrarDeps {
 	createHandoffDispatcher: () => Pick<HandoffDispatcher, 'dispatchSelection'>;
+	setContext: (key: string, value: unknown) => Thenable<unknown>;
 }
 
 interface AvailableProFeatureLoadResult {
@@ -169,6 +173,10 @@ export async function activateProFeatures(
 		for (const disposable of registrations) {
 			context.registerDisposable(disposable);
 		}
+
+		const setContext = deps.setContext
+			?? ((key: string, value: unknown) => vscode.commands.executeCommand('setContext', key, value));
+		await setContext(PRO_FEATURES_LOADED_CONTEXT_KEY, true);
 
 		context.log(`Loaded Pro features from '${loadResult.moduleSpecifier}'.`);
 		return loadResult;

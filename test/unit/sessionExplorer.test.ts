@@ -513,14 +513,14 @@ suite('session explorer', () => {
 			(contribution) => contribution.command === PRO_SEARCH_SESSIONS_COMMAND,
 		);
 		assert.equal(searchActions.length, 1);
-		assert.equal(searchActions[0]?.when, 'view == session-control.sessionExplorer');
+		assert.equal(searchActions[0]?.when, 'view == session-control.sessionExplorer && session-control.proFeaturesLoaded');
 		assert.equal(searchActions[0]?.group, 'navigation@3');
 
 		// Every other view/title action stays pinned to the Saved Sessions view,
 		// so no other view's title bar gains the Pro search button.
 		// A `false && ` prefix hides an action until its Pro release ships.
 		for (const contribution of titleActions) {
-			assert.match(contribution.when ?? '', /^(false && )?view == session-control\.sessionExplorer$/);
+			assert.match(contribution.when ?? '', /^(false && )?view == session-control\.sessionExplorer( && session-control\.proFeaturesLoaded)?$/);
 		}
 
 		// The gated command keeps its Command Palette entry and must not appear
@@ -545,7 +545,7 @@ suite('session explorer', () => {
 		assert.equal(itemActions.length, 1);
 		assert.equal(
 			itemActions[0]?.when,
-			'view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/',
+			'view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/ && session-control.proFeaturesLoaded',
 		);
 		// Context-menu group, not inline, so the row's inline icons stay unchanged.
 		assert.equal(itemActions[0]?.group?.startsWith('inline'), false);
@@ -578,7 +578,7 @@ suite('session explorer', () => {
 		for (const commandId of [PRO_GIT_SYNC_PUSH_COMMAND, PRO_GIT_SYNC_PULL_COMMAND]) {
 			const actions = titleActions.filter((contribution) => contribution.command === commandId);
 			assert.equal(actions.length, 1, commandId);
-			assert.equal(actions[0]?.when, 'view == session-control.sessionExplorer', commandId);
+			assert.equal(actions[0]?.when, 'view == session-control.sessionExplorer && session-control.proFeaturesLoaded', commandId);
 			// Overflow menu, so the toolbar keeps refresh, sort, and search only.
 			assert.equal(actions[0]?.group?.startsWith('navigation'), false, commandId);
 

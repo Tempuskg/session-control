@@ -1,10 +1,13 @@
 import * as assert from 'node:assert';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import * as vscode from 'vscode';
 import {
 	activateProFeatures,
 	hasProLicense,
 	loadProFeatureRegistrar,
 	openProPurchasePage,
+	PRO_FEATURES_LOADED_CONTEXT_KEY,
 	PRO_PURCHASE_URL,
 	PRO_UPGRADE_PROMPT_LABEL,
 	SHARED_HANDOFF_CAPABILITY_VERSION,
@@ -94,6 +97,100 @@ suite('pro boundary', () => {
 		assert.equal(invoked, true);
 		assert.equal(registrations.length, 1);
 		assert.ok(logs.some((message) => message.includes('Loaded Pro features')));
+	});
+
+	test('activateProFeatures sets the proFeaturesLoaded context key after the registrar loads', async () => {
+		const contextCalls: Array<[string, unknown]> = [];
+		let registered = false;
+
+		const result = await activateProFeatures(
+			createRegistrationContext([], []),
+			{
+				moduleSpecifier: 'session-control-pro-test',
+				resolveModule: () => 'C:/temp/pro/index.js',
+				requireModule: () => ({
+					registerProFeatures: async () => {
+						registered = true;
+					},
+				}),
+				setContext: async (key, value) => {
+					assert.equal(registered, true, 'context key must be set after registration');
+					contextCalls.push([key, value]);
+				},
+			},
+		);
+
+		assert.equal(result.kind, 'available');
+		assert.deepEqual(contextCalls, [[PRO_FEATURES_LOADED_CONTEXT_KEY, true]]);
+		assert.equal(PRO_FEATURES_LOADED_CONTEXT_KEY, 'session-control.proFeaturesLoaded');
+	});
+
+	test('activateProFeatures leaves proFeaturesLoaded unset when the companion package is not installed', async () => {
+		const contextCalls: Array<[string, unknown]> = [];
+
+		const result = await activateProFeatures(
+			createRegistrationContext([], []),
+			{
+				moduleSpecifier: '@tempuskg/session-control-pro',
+				resolveModule: () => {
+					throw createModuleNotFoundError('@tempuskg/session-control-pro');
+				},
+				setContext: async (key, value) => {
+					contextCalls.push([key, value]);
+				},
+			},
+		);
+
+		assert.equal(result.kind, 'unavailable');
+		assert.deepEqual(contextCalls, []);
+	});
+
+	test('activateProFeatures leaves proFeaturesLoaded unset when registration fails', async () => {
+		const contextCalls: Array<[string, unknown]> = [];
+
+		const result = await activateProFeatures(
+			createRegistrationContext([], []),
+			{
+				moduleSpecifier: 'session-control-pro-test',
+				resolveModule: () => 'C:/temp/pro/index.js',
+				requireModule: () => ({
+					registerProFeatures: async () => {
+						throw new Error('boom');
+					},
+				}),
+				setContext: async (key, value) => {
+					contextCalls.push([key, value]);
+				},
+			},
+		);
+
+		assert.equal(result.kind, 'unavailable');
+		assert.deepEqual(contextCalls, []);
+	});
+
+	test('package.json gates Pro view menu entries on proFeaturesLoaded', async () => {
+		const manifestPath = path.resolve(__dirname, '..', '..', '..', 'package.json');
+		const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+			contributes: { menus: Record<string, Array<{ command: string; when?: string }>> };
+		};
+		const proViewEntries = [
+			...manifest.contributes.menus['view/title'] ?? [],
+			...manifest.contributes.menus['view/item/context'] ?? [],
+		].filter((entry) => entry.command.startsWith('session-control-pro.'));
+
+		assert.deepEqual(
+			proViewEntries.map((entry) => entry.command).sort(),
+			[
+				'session-control-pro.exportSessionToControlFile',
+				'session-control-pro.gitSyncPull',
+				'session-control-pro.gitSyncPush',
+				'session-control-pro.harvestSessionFromExplorer',
+				'session-control-pro.searchSessions',
+			],
+		);
+		for (const entry of proViewEntries) {
+			assert.match(entry.when ?? '', /&& session-control\.proFeaturesLoaded$/, entry.command);
+		}
 	});
 
 	test('activateProFeatures advertises the versioned shared handoff capability', async () => {

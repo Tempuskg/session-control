@@ -56,7 +56,8 @@
       {
         "command": "session-control.saveSessionFromProvider",
         "title": "Save Session...",
-        "category": "Session Control"
+        "category": "Session Control",
+        "icon": "$(save)"
       },
       {
         "command": "session-control.listSessions",
@@ -708,9 +709,34 @@
         {
           "command": "session-control.reanalyzeSessionFromExplorer",
           "when": "false"
+        },
+        {
+          "command": "session-control.openSessionFromExplorer",
+          "when": "false"
+        },
+        {
+          "command": "session-control.deleteSessionFromExplorer",
+          "when": "false"
+        },
+        {
+          "command": "session-control.viewSessionFile",
+          "when": "(resourceExtname == .json || resourceExtname == .jsonl) && session-control.isSessionFile"
+        },
+        {
+          "command": "session-control.resumeSessionFromViewer",
+          "when": "activeWebviewPanelId == 'session-control.sessionViewer'"
+        },
+        {
+          "command": "session-control.continueSessionWithProvider",
+          "when": "activeWebviewPanelId == 'session-control.sessionViewer'"
         }
       ],
       "view/title": [
+        {
+          "command": "session-control.saveSessionFromProvider",
+          "when": "view == session-control.sessionExplorer",
+          "group": "navigation@0"
+        },
         {
           "command": "session-control.refreshSessionExplorer",
           "when": "view == session-control.sessionExplorer",
@@ -723,17 +749,27 @@
         },
         {
           "command": "session-control-pro.searchSessions",
-          "when": "view == session-control.sessionExplorer",
+          "when": "view == session-control.sessionExplorer && session-control.proFeaturesLoaded",
           "group": "navigation@3"
         },
         {
-          "command": "session-control-pro.gitSyncPush",
+          "command": "session-control.analyzeSavedChats",
           "when": "view == session-control.sessionExplorer",
+          "group": "2_analysis@1"
+        },
+        {
+          "command": "session-control.implementLatestAnalysis",
+          "when": "view == session-control.sessionExplorer",
+          "group": "2_analysis@2"
+        },
+        {
+          "command": "session-control-pro.gitSyncPush",
+          "when": "view == session-control.sessionExplorer && session-control.proFeaturesLoaded",
           "group": "gitSync@1"
         },
         {
           "command": "session-control-pro.gitSyncPull",
-          "when": "view == session-control.sessionExplorer",
+          "when": "view == session-control.sessionExplorer && session-control.proFeaturesLoaded",
           "group": "gitSync@2"
         }
       ],
@@ -772,7 +808,7 @@
         },
         {
           "command": "session-control-pro.harvestSessionFromExplorer",
-          "when": "view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/",
+          "when": "view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/ && session-control.proFeaturesLoaded",
           "group": "inline@3"
         },
         {
@@ -782,7 +818,7 @@
         },
         {
           "command": "session-control-pro.exportSessionToControlFile",
-          "when": "view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/",
+          "when": "view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/ && session-control.proFeaturesLoaded",
           "group": "pro@1"
         }
       ]
