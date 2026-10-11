@@ -1,8 +1,8 @@
 {
   "name": "session-control",
   "displayName": "Session Control",
-  "description": "Save Cursor, Claude Code, Codex, and Copilot chat history into your own repo, linked to the commit it produced. Local-first AI session manager for Cursor, Windsurf, VSCodium, and VS Code.",
-  "version": "1.6.0",
+  "description": "Save Cursor, Claude Code, Codex, and Copilot chat history in your repo, linked to commits. Free, local-first. Paid Pro add-on: search, knowledge harvesting, control-file export, skills and Git sync.",
+  "version": "1.7.0",
   "publisher": "darrenjmcleod",
   "icon": "media/session-control.png",
   "license": "MIT",

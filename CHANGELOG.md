@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-10
+
+### Added
+
+- **TypeSafe triage for `/analyze`.** When TypeSafe is enabled, `/analyze` first asks TypeSafe to score each candidate session for signs of friction, such as repeated tool failures, and whether an AI control file change could have prevented them. The scores are advisory, and if triage fails the analysis runs as before. For each candidate session, the title, provider, turn count, a summary of its evidence, and the first and last turns (each clipped to 1,200 characters, with tool names) are sent to the TypeSafe AI provider. Turn it off with the `triage` entry in `session-control.typesafe.features`.
+- **Save and analyze from the Saved Sessions title bar.** Save a session from a provider and Analyze Saved Chats are now one click away in the Session Explorer.
+
+### Changed
+
+- **Clearer listing and privacy wording.** The extension description now says the core is free and names the paid Pro add-on. The README no longer says chats are never uploaded: it now says content leaves your machine only when you run a feature that sends it to an AI provider you choose, or push to a Git repository you own. The Pro privacy notes now cover TypeSafe search reranking and where Git sync pushes.
+
+### Fixed
+
+- **`/analyze` fits the selected model's input limit.** Each analysis prompt is checked against the model's input limit before sending, and Session Control steps down to condensed evidence or smaller batches instead of failing and retrying. An empty model response now fails with a message naming the model, and Copilot CLI agent models, which return empty responses to direct requests, are no longer offered in the model picker.
+- **Pro menu entries appear only once Pro has loaded.** Pro commands no longer show in Saved Sessions menus before the bundled Pro features finish loading, or when they cannot load.
+
 ## [1.6.0] - 2026-10-03
 
 ### Added

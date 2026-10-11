@@ -13,9 +13,10 @@ Agent, Claude Code, Codex, or Copilot can be captured as a structured JSON file 
 linked to the branch and commit it belongs to, and resumed later as context in a new chat —
 through the `@session-control` chat participant.
 
-Session Control has no cloud of its own — it reads your chats locally and never uploads them
-anywhere. Saved sessions are plain files in your repo, next to the code they produced, in
-source control you already trust. Works inside Cursor, Windsurf, VSCodium, and other
+Session Control has no cloud of its own. Chats are read locally and saved as plain files in
+your repo, next to the code they produced, in source control you already trust. Content leaves
+your machine only when you run a feature that sends it to an AI provider you choose, or push to
+a Git repository you own. Works inside Cursor, Windsurf, VSCodium, and other
 VS-Code-compatible editors via the Open VSX Registry, and inside stock VS Code.
 
 ![Animated demo: save a Copilot chat session, browse it in the Session Explorer, and resume it as context in a new chat.](https://raw.githubusercontent.com/tempuskg/session-control/main/media/screenshots/demo.gif)
@@ -116,8 +117,11 @@ credentials (SSH agent or credential manager); Session Control never stores them
 
 Knowledge Harvesting and **Export Session to AI Control File...** send the selected saved-session
 or document content to the AI model you choose, the same way the free **Analyze Saved Chats**
-command does. Saving, resuming, browsing, auto-save, document extraction, and AI skills sync stay
-entirely local.
+command does. When TypeSafe is enabled, **Search Saved Sessions (All Workspaces)** can rerank its
+top 10 matches, which sends your query and the title, provider, workspace, date, and snippet of
+each of those matches to the TypeSafe AI provider. Git sync pushes only to the repository in
+`session-control-pro.gitSync.remoteUrl`. Saving, resuming, browsing, auto-save, document
+extraction, and AI skills sync stay entirely local.
 
 Run **Get Session Control Pro** from the Command Palette, or visit
 [sessioncontrol.dev/#pro](https://sessioncontrol.dev/#pro) for pricing and checkout. After
