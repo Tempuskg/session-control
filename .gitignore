@@ -15,9 +15,11 @@ coverage/
 *.tmp
 *.temp
 
-# Chat session logs (contain local paths — not for public repos)
+# Chat session logs (contain local paths — not for public repos) and private knowledge pages
 .chat/
-knowledge/
+knowledge/decisions/launch-with-a-capped-founders-lifetime-offer.md
+knowledge/playbooks/sequence-a-solo-developer-tool-monetization-launch.md
+knowledge/sessions/9d0009f2-dca3-408f-a679-f633dd6ae0b8.md
 Monetization_research..md
 
 # Local planning artifacts

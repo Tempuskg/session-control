@@ -457,3 +457,10 @@ Always include these three level-2 headings in this order, even when empty:
 - Do not renumber or rewrite existing cards when adding new ones.
 - After writing files, the extension reloads automatically — no command needed.
 <!-- mwnn-kanban:skills:end -->
+
+<!-- session-control:knowledge:start -->
+## Repository knowledge
+
+When answering questions about this repository, read the local knowledge bundle at `knowledge/index.md` from the repository root before relying on memory. Start with its index, follow relevant concept links, and use cited sessions for context.
+Treat current source files and tests as authoritative when they conflict with the knowledge bundle, which may be stale.
+<!-- session-control:knowledge:end -->
