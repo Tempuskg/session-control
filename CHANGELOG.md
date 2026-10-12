@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-10-11
+
+### Changed
+
+- **Analyze and Implement ask for a chat or agent, not a model.** Analyze Saved Chats, Implement Latest Analysis, `@session-control /analyze`, and `@session-control /implement` now show one picker with the in-editor Chat plus whichever of Codex, Claude Code, and Cursor are installed. Each row says what will happen, and the chosen chat or agent uses its own model. When you pick Chat for analysis, Session Control still runs the analysis and saves the report: `/analyze` uses the chat's current model, and the command uses the first Copilot model that answers direct requests (Copilot CLI models are skipped). If no chat or agent is available, a warning says what to install.
+- **Pro: Knowledge Harvesting and Export Session to AI Control File... use the same picker.** Harvest Knowledge, Import and Harvest Word Document..., harvesting a saved session, and Export Session to AI Control File... now show the same Chat and installed-agent rows, plus a CLI row for an installed Claude Code or Codex CLI. Export does not offer agents, because it needs the generated file back to show you before writing.
+
 ## [1.7.0] - 2026-10-10
 
 ### Added
