@@ -42,8 +42,55 @@ export interface SharedHandoffCapabilityV1 {
 	) => Promise<SharedHandoffDispatchResult>;
 }
 
+export const PROVIDER_PICKER_CAPABILITY_VERSION = 1 as const;
+
+export type ProviderPickerAgentId = Exclude<SharedHandoffSelectionId, 'chat'>;
+
+/** A caller-supplied picker row; its `id` comes back unchanged when picked. */
+export interface ProviderPickerExtraItem<TId extends string = string> {
+	readonly id: TId;
+	readonly label: string;
+	readonly description?: string;
+	readonly detail?: string;
+}
+
+export interface ProviderPickerOptions<TId extends string = string> {
+	readonly placeHolder?: string;
+	readonly title?: string;
+	/** Detail for the in-editor Chat row; defaults to running with the first available Copilot model. */
+	readonly chatDetail?: string;
+	/** Detail for each agent row; receives the agent's display label. */
+	readonly agentDetail?: (label: string) => string;
+	/** Hide installed-agent rows, e.g. when the caller cannot hand work off. */
+	readonly excludeAgents?: boolean;
+	/** Rows appended after Chat and the agents. */
+	readonly extraItems?: readonly ProviderPickerExtraItem<TId>[];
+}
+
+export type ProviderPickerSelection<TId extends string = string> =
+	| { readonly kind: 'chat' }
+	| { readonly kind: 'agent'; readonly provider: ProviderPickerAgentId }
+	| { readonly kind: 'extra'; readonly id: TId };
+
+/** The `/analyze` provider picker and in-editor model rules, shared with the Pro companion. */
+export interface ProviderPickerCapabilityV1 {
+	readonly version: typeof PROVIDER_PICKER_CAPABILITY_VERSION;
+	/** Shows Chat plus installed agents (no per-model rows); resolves `undefined` when dismissed or empty. */
+	readonly pick: <TId extends string = string>(
+		options?: ProviderPickerOptions<TId>,
+	) => Promise<ProviderPickerSelection<TId> | undefined>;
+	/**
+	 * Resolves the model in-editor Chat should use: `currentModel` when it answers direct requests,
+	 * otherwise the first vendor `copilot` model. Copilot CLI agent-host models are always skipped.
+	 */
+	readonly resolveChatModel: (
+		currentModel?: vscode.LanguageModelChat,
+	) => Promise<vscode.LanguageModelChat | undefined>;
+}
+
 export interface ProFeatureCapabilities {
 	readonly sharedHandoff?: SharedHandoffCapabilityV1;
+	readonly providerPicker?: ProviderPickerCapabilityV1;
 }
 
 export interface ProServices {

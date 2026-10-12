@@ -10,8 +10,10 @@ import {
 	type ProFeatureRegistrar,
 	type ProFeatureRegistrationContext,
 	type ProFeatureRegistrationResult,
+	type ProviderPickerCapabilityV1,
 	type SharedHandoffCapabilityV1,
 } from './contracts';
+import { createProviderPickerCapability } from './providerPicker';
 
 export const DEFAULT_PRO_PACKAGE_NAME = '@tempuskg/session-control-pro';
 
@@ -26,6 +28,7 @@ interface LoadProFeatureRegistrarDeps {
 
 interface ActivateProFeaturesDeps extends LoadProFeatureRegistrarDeps {
 	createHandoffDispatcher: () => Pick<HandoffDispatcher, 'dispatchSelection'>;
+	createProviderPicker: () => ProviderPickerCapabilityV1;
 	setContext: (key: string, value: unknown) => Thenable<unknown>;
 }
 
@@ -165,6 +168,7 @@ export async function activateProFeatures(
 			capabilities: {
 				...context.capabilities,
 				sharedHandoff: createSharedHandoffCapability(dispatcher),
+				providerPicker: (deps.createProviderPicker ?? createProviderPickerCapability)(),
 			},
 		};
 		const registrations = normalizeRegistrationResult(

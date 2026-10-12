@@ -57,6 +57,8 @@ function createCopilotSource(title: string): CopilotSession {
 	};
 }
 
+const copilotModel = { name: 'GPT-4.1', vendor: 'copilot', family: 'gpt-4.1', id: 'copilot-gpt-4.1' } as vscode.LanguageModelChat;
+
 function createExplorerItem(workspaceFolder: vscode.WorkspaceFolder): SessionExplorerSessionItem {
 	const session = createSessionMeta('Alpha Session', 'alpha.json');
 	const group: SessionExplorerGroup = {
@@ -79,12 +81,9 @@ suite('runAnalyzeSessionFromExplorerCommand', () => {
 
 		await runAnalyzeSessionFromExplorerCommand(item, {
 			getWorkspaceFolders: () => [alpha],
-			selectChatModels: async () => [{} as vscode.LanguageModelChat],
+			selectChatModels: async () => [copilotModel],
 			getCommands: async () => [],
-			pickAnalysisProvider: async (models) => {
-				const model = models[0];
-				return model ? { kind: 'model', model } : undefined;
-			},
+			pickAnalysisProvider: async () => ({ kind: 'chat' }),
 			runAnalyzeFlow: async (_workspaceFolders, workspaceSessions, selection) => {
 				flowSessions = workspaceSessions;
 				flowSelection = selection;
@@ -157,12 +156,9 @@ suite('runAnalyzeSessionFromExplorerCommand', () => {
 
 			await runAnalyzeSessionFromExplorerCommand(item, {
 				getWorkspaceFolders: () => [workspaceFolder],
-				selectChatModels: async () => [{} as vscode.LanguageModelChat],
+				selectChatModels: async () => [copilotModel],
 				getCommands: async () => [],
-				pickAnalysisProvider: async (models) => {
-					const model = models[0];
-					return model ? { kind: 'model', model } : undefined;
-				},
+				pickAnalysisProvider: async () => ({ kind: 'chat' }),
 				// Mirrors the production runAnalyzeFlow wiring, with the model call
 				// stubbed and the owner workspace pinned to the temp folder so the
 				// report and index are written to real files under it.
@@ -256,12 +252,9 @@ suite('runAnalyzeSessionFromExplorerCommand', () => {
 
 		await runAnalyzeSessionFromExplorerCommand(item, {
 			getWorkspaceFolders: () => [alpha],
-			selectChatModels: async () => [{} as vscode.LanguageModelChat],
+			selectChatModels: async () => [copilotModel],
 			getCommands: async () => [],
-			pickAnalysisProvider: async (models) => {
-				const model = models[0];
-				return model ? { kind: 'model', model } : undefined;
-			},
+			pickAnalysisProvider: async () => ({ kind: 'chat' }),
 			runAnalyzeFlow: async (_workspaceFolders, _workspaceSessions, _selection, _model, _token, onStatus) => {
 				onStatus('No usable saved sessions found. Some saved sessions could not be read.');
 				return undefined;

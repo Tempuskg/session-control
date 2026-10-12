@@ -2,13 +2,18 @@ import * as assert from 'node:assert';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import {
+	ANALYSIS_CHAT_DETAIL_CURRENT_MODEL,
 	buildEmptyModelResponseMessage,
 	buildParticipantFollowups,
-	createAnalysisModelPickItems,
 	createAnalysisProviderPickItems,
 	findAvailableAnalysisAgentProviders,
 	getModelPromptLimit,
+	IMPLEMENTATION_CHAT_DETAIL,
 	isDirectRequestModel,
+	isInEditorChatAvailable,
+	resolveChatAnalysisModel,
+	selectDefaultAnalysisModel,
+	type AnalysisProviderChoices,
 	renderSessionListMarkdown,
 	resolveSummarizeNoteWithFallback,
 	runAnalyzeSessionsFlow,
@@ -154,23 +159,19 @@ function createAnalyzeFlowDeps(overrides: Partial<Parameters<typeof runAnalyzeSe
 	};
 }
 
-function createHandoffFlowDeps(overrides: Partial<Parameters<typeof runImplementationHandoffFlow>[2]> = {}) {
-	const model = {
-		name: 'GPT-4.1',
-		vendor: 'copilot',
-		family: 'gpt-4.1',
-		id: 'copilot-gpt-4.1',
-	} as vscode.LanguageModelChat;
+function createModel(name: string, vendor: string, id: string): vscode.LanguageModelChat {
+	return { name, vendor, family: id, id } as vscode.LanguageModelChat;
+}
 
+function createHandoffFlowDeps(overrides: Partial<Parameters<typeof runImplementationHandoffFlow>[2]> = {}) {
 	return {
 		findAnalysisReportMeta: () => ({
 			analysisReportPath: 'analysis/reports/report-1.md',
 			analysisStorageDirectory: 'e:/workspace/.chat',
 		}),
 		buildPrompt: (reportFilePath: string, userPrompt: string) => buildImplementationHandoffPrompt(reportFilePath, userPrompt),
-		selectChatModels: async () => [model],
 		getCommands: async () => [],
-		pickProvider: async (): Promise<{ kind: 'model'; model: vscode.LanguageModelChat }> => ({ kind: 'model', model }),
+		pickProvider: async (): Promise<{ kind: 'chat' }> => ({ kind: 'chat' }),
 		dispatchHandoff: async (_prompt: string, target: HandoffSelectionId): Promise<HandoffDispatchResult> => ({
 			selectedTarget: target === 'cursor' ? 'agentSession' : target,
 			deliveredTo: target === 'cursor' ? 'agentSession' : target,
@@ -184,25 +185,100 @@ function createHandoffFlowDeps(overrides: Partial<Parameters<typeof runImplement
 }
 
 suite('chatParticipant selection', () => {
-	test('offers analysis models with their provider identity', () => {
-		const model = {
-			name: 'GPT-4.1',
-			vendor: 'copilot',
-			family: 'gpt-4.1',
-			id: 'copilot-gpt-4.1',
-		} as vscode.LanguageModelChat;
+	test('lists only the in-editor chat and installed agents, each with what will happen', () => {
+		const items = createAnalysisProviderPickItems({
+			purpose: 'analysis',
+			chatDetail: ANALYSIS_CHAT_DETAIL_CURRENT_MODEL,
+			agentProviders: ['cursor', 'codex', 'claude-code'],
+		});
 
 		assert.deepEqual(
-			createAnalysisModelPickItems([model]).map((item) => ({
-				label: item.label,
-				description: item.description,
-				detail: item.detail,
-			})),
-			[{
-				label: 'GPT-4.1',
-				description: 'Provider: copilot',
-				detail: 'gpt-4.1 · copilot-gpt-4.1',
-			}],
+			items.map((item) => ({ label: item.label, description: item.description, detail: item.detail, selection: item.selection })),
+			[
+				{ label: 'Chat', description: 'In-editor chat', detail: ANALYSIS_CHAT_DETAIL_CURRENT_MODEL, selection: { kind: 'chat' } },
+				{
+					label: 'Cursor',
+					description: 'Agent',
+					detail: 'Hands the analysis prompt to Cursor, which analyzes the saved chats with its own model',
+					selection: { kind: 'agent', provider: 'cursor' },
+				},
+				{
+					label: 'Codex',
+					description: 'Agent',
+					detail: 'Hands the analysis prompt to Codex, which analyzes the saved chats with its own model',
+					selection: { kind: 'agent', provider: 'codex' },
+				},
+				{
+					label: 'Claude Code',
+					description: 'Agent',
+					detail: 'Hands the analysis prompt to Claude Code, which analyzes the saved chats with its own model',
+					selection: { kind: 'agent', provider: 'claude-code' },
+				},
+			],
+		);
+	});
+
+	test('offers no model rows for implementation and omits an unavailable in-editor chat', () => {
+		const implementationItems = createAnalysisProviderPickItems({
+			purpose: 'implementation',
+			chatDetail: IMPLEMENTATION_CHAT_DETAIL,
+			agentProviders: ['codex'],
+		});
+		assert.deepEqual(implementationItems.map((item) => item.selection.kind), ['chat', 'agent']);
+		assert.equal(implementationItems[0]?.detail, IMPLEMENTATION_CHAT_DETAIL);
+		assert.equal(
+			implementationItems[1]?.detail,
+			'Hands the implementation prompt to Codex, which applies the recommendations with its own model',
+		);
+
+		const agentsOnly = createAnalysisProviderPickItems({ purpose: 'analysis', agentProviders: ['claude-code'] });
+		assert.deepEqual(agentsOnly.map((item) => item.label), ['Claude Code']);
+		assert.deepEqual(createAnalysisProviderPickItems({ purpose: 'analysis', agentProviders: [] }), []);
+	});
+
+	test('treats the in-editor chat as available when it has models or an open-chat command', () => {
+		const model = createModel('GPT-4.1', 'copilot', 'copilot-gpt-4.1');
+		assert.equal(isInEditorChatAvailable([model], []), true);
+		assert.equal(isInEditorChatAvailable([], ['workbench.action.chat.open']), true);
+		assert.equal(isInEditorChatAvailable([], ['chatgpt.openSidebar']), false);
+	});
+
+	test('defaults command analysis to the first Copilot model that answers direct requests', () => {
+		const cliModel = createModel('Auto', 'copilotcli', 'auto');
+		const agentHostModel = createModel('Hydra', 'copilot', 'agent-host-copilotcli:hydrafusion');
+		const otherVendorModel = createModel('Local', 'ollama', 'llama');
+		const first = createModel('GPT-4.1', 'copilot', 'copilot-gpt-4.1');
+		const second = createModel('Claude', 'copilot', 'copilot-claude');
+
+		assert.equal(selectDefaultAnalysisModel([cliModel, agentHostModel, otherVendorModel, first, second]), first);
+		assert.equal(selectDefaultAnalysisModel([cliModel, otherVendorModel]), undefined);
+		assert.equal(selectDefaultAnalysisModel([]), undefined);
+	});
+
+	test('uses the chat\'s current model for /analyze and never asks for a model', async () => {
+		const current = createModel('Claude Sonnet', 'copilot', 'claude-sonnet');
+		let modelsListed = false;
+
+		const resolved = await resolveChatAnalysisModel(current, async () => {
+			modelsListed = true;
+			return [];
+		});
+
+		assert.equal(resolved, current);
+		assert.equal(modelsListed, false);
+	});
+
+	test('falls back to the default Copilot model when the chat\'s current model is a Copilot CLI model', async () => {
+		const current = createModel('Auto', 'copilotcli', 'auto');
+		const fallback = createModel('GPT-4.1', 'copilot', 'copilot-gpt-4.1');
+
+		assert.equal(await resolveChatAnalysisModel(current, async () => [current, fallback]), fallback);
+		assert.equal(await resolveChatAnalysisModel(current, async () => [current]), undefined);
+		assert.equal(
+			await resolveChatAnalysisModel(current, async () => {
+				throw new Error('model discovery failed');
+			}),
+			undefined,
 		);
 	});
 
@@ -223,25 +299,6 @@ suite('chatParticipant selection', () => {
 			buildEmptyModelResponseMessage(model, 2),
 			'The selected model "Auto" (copilotcli) returned no text (received 2 non-text response parts). Choose a different model for analysis.',
 		);
-	});
-
-	test('adds installed Codex and Claude Code agents to the analysis provider picker', () => {
-		const model = {
-			name: 'GPT-4.1',
-			vendor: 'copilot',
-			family: 'gpt-4.1',
-			id: 'copilot-gpt-4.1',
-		} as vscode.LanguageModelChat;
-
-		const items = createAnalysisProviderPickItems([model], ['codex', 'claude-code']);
-		assert.deepEqual(items.map((item) => item.label), ['GPT-4.1', 'Codex', 'Claude Code']);
-		assert.deepEqual(items.slice(1).map((item) => item.selection), [
-			{ kind: 'agent', provider: 'codex' },
-			{ kind: 'agent', provider: 'claude-code' },
-		]);
-
-		const implementationItems = createAnalysisProviderPickItems([], ['codex'], 'implementation');
-		assert.equal(implementationItems[0]?.description, 'Use the installed codex agent to implement the saved analysis recommendations');
 	});
 
 	test('detects installed analysis agents from their contributed commands', () => {
@@ -999,15 +1056,21 @@ suite('chatParticipant implementation followups', () => {
 		assert.deepEqual(messages, ['Use @session-control /analyze first, then ask me to implement the recommendations.']);
 	});
 
-	test('routes a selected model provider through the shared dispatcher', async () => {
+	test('opens the in-editor chat with the implementation prompt when Chat is picked', async () => {
 		let dispatchedPrompt: string | undefined;
 		let dispatchedTarget: HandoffSelectionId | undefined;
+		let offered: AnalysisProviderChoices | undefined;
 		const messages: string[] = [];
 
 		await runImplementationHandoffFlow(
 			'Implement the highest-priority recommendation.',
 			[],
 			createHandoffFlowDeps({
+				getCommands: async () => ['workbench.action.chat.open', 'chatgpt.openSidebar'],
+				pickProvider: async (choices) => {
+					offered = choices;
+					return { kind: 'chat' };
+				},
 				dispatchHandoff: async (prompt, target) => {
 					dispatchedPrompt = prompt;
 					dispatchedTarget = target;
@@ -1026,12 +1089,41 @@ suite('chatParticipant implementation followups', () => {
 		);
 
 		const expectedReportPath = path.join('e:/workspace/.chat', 'analysis/reports/report-1.md');
+		assert.deepEqual(offered, {
+			purpose: 'implementation',
+			chatDetail: IMPLEMENTATION_CHAT_DETAIL,
+			agentProviders: ['codex'],
+		});
 		assert.equal(dispatchedTarget, 'chat');
 		assert.equal(dispatchedPrompt?.includes(expectedReportPath), true);
 		assert.equal(dispatchedPrompt?.includes('User request: Implement the highest-priority recommendation.'), true);
 		assert.deepEqual(messages, [
-			'Opened Chat with the implementation prompt prefilled. Review it and send it when ready. Selected implementation provider: GPT-4.1.',
+			'Opened Chat with the implementation prompt prefilled. Review it and send it when ready.',
 		]);
+	});
+
+	test('runs nothing when the implementation picker is cancelled', async () => {
+		const messages: string[] = [];
+		let dispatched = false;
+
+		await runImplementationHandoffFlow(
+			'Implement the highest-priority recommendation.',
+			[],
+			createHandoffFlowDeps({
+				getCommands: async () => ['chatgpt.openSidebar'],
+				pickProvider: async () => undefined,
+				dispatchHandoff: async () => {
+					dispatched = true;
+					throw new Error('dispatchHandoff should not be called after cancelling.');
+				},
+				streamMarkdown: (markdown: string) => {
+					messages.push(markdown);
+				},
+			}),
+		);
+
+		assert.equal(dispatched, false);
+		assert.deepEqual(messages, []);
 	});
 
 	test('routes the selected agent provider through the shared dispatcher', async () => {

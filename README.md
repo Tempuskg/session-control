@@ -214,11 +214,13 @@ such as `24h`, `7d`, `30d`, or `needs analysis`. For a date-based range, Session
 whether to analyze only chats in that range that have not been analyzed yet, or re-analyze
 everything in that range.
 
-Then pick which available provider performs the analysis. Direct language-model providers run
-inside Session Control; installed Codex, Claude Code, or Cursor agent providers open their chat
-and receive a workspace-aware analysis handoff. The analysis itself always includes all eligible
-saved sessions from every provider in the workspace's `.chat` folder — the provider choice only
-selects who generates the report.
+Then pick which chat or agent performs the analysis: the in-editor **Chat**, or whichever of
+Codex, Claude Code, and Cursor are installed. With Chat, Session Control runs the analysis itself
+using the chat's current model (the **Analyze Saved Chats** command uses the first Copilot model
+that answers direct requests). An agent opens its own chat, receives a workspace-aware analysis
+handoff, and uses its own model. The analysis itself always includes all eligible saved sessions
+from every provider in the workspace's `.chat` folder — the choice only selects who generates the
+report.
 
 The participant streams a report back into chat and writes a markdown report under
 `.chat/analysis/reports/`, keeping an analysis index in `.chat/analysis/index.json` so **Needs
@@ -235,14 +237,13 @@ recommend creating new AI skill files such as `SKILL.md`, `*.instructions.md`, `
 `@session-control /implement` generates a compact implementation prompt that points a coding
 agent at the saved analysis report and keeps the next step focused on those AI control files.
 When the report recommends a new reusable AI skill, the generated prompt tells the next step to
-create that skill file and any supporting instruction assets. It uses the same provider selector
-as analysis: an available VS Code language model, Codex, Claude Code, or Cursor. External
-providers receive the handoff directly; a VS Code language-model choice opens the prompt in chat
-for review and sending.
+create that skill file and any supporting instruction assets. It uses the same chat-or-agent
+picker as analysis. An agent (Codex, Claude Code, or Cursor) receives the handoff directly and
+uses its own model; choosing Chat opens the prompt in the in-editor chat for review and sending.
 
 **Session Control: Implement Latest Analysis** does the same from the Command Palette — it looks
 across the open workspace folders, finds the newest saved analysis report still on disk, and
-opens the same provider-selection flow.
+opens the same chat-or-agent picker.
 
 ### Import Copilot guidance as Cursor, Codex, or Claude Code skills
 

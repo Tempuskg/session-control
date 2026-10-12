@@ -19,6 +19,15 @@ import {
 	resolveManualWorkspaceFolder,
 	validateStoragePath,
 } from '../../src/extension';
+import {
+	ANALYSIS_CHAT_DETAIL_DEFAULT_MODEL,
+	ANALYSIS_CHAT_DETAIL_HANDOFF,
+	createAnalysisProviderPickItems,
+	formatNoProviderAvailableMessage,
+	IMPLEMENTATION_CHAT_DETAIL,
+	NO_ANALYSIS_MODEL_MESSAGE,
+	type AnalysisProviderChoices,
+} from '../../src/chatParticipant';
 import { type HandoffSelectionId } from '../../src/handoffDispatcher';
 import { ANALYSIS_PROMPT_VERSION } from '../../src/sessionAnalysis';
 import { SessionViewerPanel } from '../../src/sessionViewer';
@@ -702,7 +711,7 @@ suite('runImplementLatestAnalysisCommand', () => {
 			buildPrompt: (reportFilePath: string) => `IMPLEMENT ${reportFilePath}`,
 			selectChatModels: async () => [model],
 			getCommands: async () => [],
-			pickProvider: async (): Promise<{ kind: 'model'; model: vscode.LanguageModelChat }> => ({ kind: 'model', model }),
+			pickProvider: async () => ({ kind: 'chat' }),
 			dispatchHandoff: async (prompt, target) => {
 				dispatchedPrompt = prompt;
 				dispatchedTarget = target;
@@ -778,7 +787,107 @@ suite('runImplementLatestAnalysisCommand', () => {
 			'Opened Codex and pasted the implementation prompt. Review it and send it when ready. Source analysis workspace: repo.',
 		]);
 	});
+
+	test('offers the in-editor chat and installed agents without any model choices', async () => {
+		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
+		let offered: AnalysisProviderChoices | undefined;
+
+		await runImplementLatestAnalysisCommand({
+			...createImplementCommandBaseDeps(workspaceFolder),
+			selectChatModels: async () => [
+				{ name: 'GPT-4.1', vendor: 'copilot', family: 'gpt-4.1', id: 'copilot-gpt-4.1' } as vscode.LanguageModelChat,
+				{ name: 'Claude', vendor: 'copilot', family: 'claude', id: 'copilot-claude' } as vscode.LanguageModelChat,
+			],
+			getCommands: async () => ['chatgpt.openSidebar', 'claude-vscode.sidebar.open'],
+			pickProvider: async (choices) => {
+				offered = choices;
+				return undefined;
+			},
+		});
+
+		assert.deepEqual(offered, {
+			purpose: 'implementation',
+			chatDetail: IMPLEMENTATION_CHAT_DETAIL,
+			agentProviders: ['codex', 'claude-code'],
+		});
+		assert.deepEqual(
+			createAnalysisProviderPickItems(offered as AnalysisProviderChoices).map((item) => item.label),
+			['Chat', 'Codex', 'Claude Code'],
+		);
+	});
+
+	test('warns about what to install and runs nothing when no chat or agent is available', async () => {
+		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
+		const warningMessages: string[] = [];
+		let pickerShown = false;
+		let dispatched = false;
+
+		await runImplementLatestAnalysisCommand({
+			...createImplementCommandBaseDeps(workspaceFolder),
+			selectChatModels: async () => [],
+			getCommands: async () => [],
+			pickProvider: async () => {
+				pickerShown = true;
+				return undefined;
+			},
+			dispatchHandoff: async () => {
+				dispatched = true;
+				throw new Error('dispatchHandoff should not be called.');
+			},
+			showWarningMessage: async (message: string) => {
+				warningMessages.push(message);
+				return undefined;
+			},
+		});
+
+		assert.equal(pickerShown, false);
+		assert.equal(dispatched, false);
+		assert.deepEqual(warningMessages, [formatNoProviderAvailableMessage('implementation')]);
+		assert.equal(warningMessages[0]?.includes('Install GitHub Copilot Chat, Codex, or Claude Code'), true);
+	});
+
+	test('runs nothing when the picker is cancelled', async () => {
+		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
+		const messages: string[] = [];
+		let dispatched = false;
+
+		await runImplementLatestAnalysisCommand({
+			...createImplementCommandBaseDeps(workspaceFolder),
+			selectChatModels: async () => [],
+			getCommands: async () => ['workbench.action.chat.open', 'chatgpt.openSidebar'],
+			pickProvider: async () => undefined,
+			dispatchHandoff: async () => {
+				dispatched = true;
+				throw new Error('dispatchHandoff should not be called.');
+			},
+			showInformationMessage: async (message: string) => {
+				messages.push(message);
+				return undefined;
+			},
+			showWarningMessage: async (message: string) => {
+				messages.push(message);
+				return undefined;
+			},
+		});
+
+		assert.equal(dispatched, false);
+		assert.deepEqual(messages, []);
+	});
 });
+
+function createImplementCommandBaseDeps(
+	workspaceFolder: vscode.WorkspaceFolder,
+): Partial<Parameters<typeof runImplementLatestAnalysisCommand>[0]> {
+	return {
+		getWorkspaceFolders: () => [workspaceFolder],
+		getStoragePath: () => path.join(workspaceFolder.uri.fsPath, '.chat'),
+		readIndex: async () => ({ reports: [createAnalysisReportReference()] }),
+		readReport: async () => '# Chat Analysis Report',
+		buildPrompt: (reportFilePath: string) => `IMPLEMENT ${reportFilePath}`,
+		showInformationMessage: async () => undefined,
+		showWarningMessage: async () => undefined,
+	};
+}
 
 suite('runAnalyzeSavedChatsCommand', () => {
 	test('shows guidance when no workspace is open', async () => {
@@ -796,7 +905,44 @@ suite('runAnalyzeSavedChatsCommand', () => {
 		assert.deepEqual(infoMessages, ['Open a workspace folder before analyzing saved chats.']);
 	});
 
-	test('warns when no host chat model is available outside Cursor', async () => {
+	test('warns about what to install and runs nothing when no chat or agent is available', async () => {
+		const warningMessages: string[] = [];
+		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
+		let pickerShown = false;
+
+		await runAnalyzeSavedChatsCommand('', {
+			getWorkspaceFolders: () => [workspaceFolder],
+			listSessionsAcrossWorkspaceFolders: async () => [createWorkspaceSessionMeta(workspaceFolder, 'Session 1')],
+			resolveSelection: async () => ({
+				mode: 'needsAnalysis',
+				label: 'Needs Analysis',
+				range: null,
+			}),
+			selectChatModels: async () => [],
+			getCommands: async () => [],
+			getAppName: () => 'Visual Studio Code',
+			pickAnalysisProvider: async () => {
+				pickerShown = true;
+				return undefined;
+			},
+			runAnalyzeFlow: async () => {
+				throw new Error('runAnalyzeFlow should not be called without a provider.');
+			},
+			dispatchHandoff: async () => {
+				throw new Error('dispatchHandoff should not be called without a provider.');
+			},
+			showInformationMessage: async () => undefined,
+			showWarningMessage: async (message: string) => {
+				warningMessages.push(message);
+				return undefined;
+			},
+		});
+
+		assert.equal(pickerShown, false);
+		assert.deepEqual(warningMessages, [formatNoProviderAvailableMessage('analysis')]);
+	});
+
+	test('warns and runs nothing when the in-editor chat is picked but no usable Copilot model exists', async () => {
 		const warningMessages: string[] = [];
 		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
 
@@ -808,14 +954,18 @@ suite('runAnalyzeSavedChatsCommand', () => {
 				label: 'Needs Analysis',
 				range: null,
 			}),
-			selectChatModels: async () => [],
+			selectChatModels: async () => [
+				{ name: 'Auto', vendor: 'copilotcli', family: 'auto', id: 'auto' } as vscode.LanguageModelChat,
+			],
+			getCommands: async () => ['workbench.action.chat.open'],
 			getAppName: () => 'Visual Studio Code',
+			pickAnalysisProvider: async () => ({ kind: 'chat' }),
 			runAnalyzeFlow: async () => {
-				throw new Error('runAnalyzeFlow should not be called without a model.');
+				throw new Error('runAnalyzeFlow should not be called without a usable model.');
 			},
-			withProgress: async (_options, task) => task({ report: () => undefined }, new vscode.CancellationTokenSource().token),
-			openTextDocument: async (uri: vscode.Uri) => ({ uri } as vscode.TextDocument),
-			showTextDocument: async (_document: vscode.TextDocument) => ({}) as vscode.TextEditor,
+			dispatchHandoff: async () => {
+				throw new Error('dispatchHandoff should not be called outside Cursor.');
+			},
 			showInformationMessage: async () => undefined,
 			showWarningMessage: async (message: string) => {
 				warningMessages.push(message);
@@ -823,9 +973,45 @@ suite('runAnalyzeSavedChatsCommand', () => {
 			},
 		});
 
-		assert.deepEqual(warningMessages, [
-			'No host chat model or installed analysis agent is available. Sign in, enable a chat model, or install Codex/Claude Code, then try again.',
-		]);
+		assert.deepEqual(warningMessages, [NO_ANALYSIS_MODEL_MESSAGE]);
+	});
+
+	test('runs nothing when the picker is cancelled', async () => {
+		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
+		const messages: string[] = [];
+
+		await runAnalyzeSavedChatsCommand('', {
+			getWorkspaceFolders: () => [workspaceFolder],
+			listSessionsAcrossWorkspaceFolders: async () => [createWorkspaceSessionMeta(workspaceFolder, 'Session 1')],
+			resolveSelection: async () => ({
+				mode: 'needsAnalysis',
+				label: 'Needs Analysis',
+				range: null,
+			}),
+			selectChatModels: async () => [],
+			getCommands: async () => ['chatgpt.openSidebar'],
+			getAppName: () => 'Cursor',
+			pickAnalysisProvider: async () => undefined,
+			buildAgentHandoffPrompt: async () => {
+				throw new Error('buildAgentHandoffPrompt should not be called after cancelling.');
+			},
+			runAnalyzeFlow: async () => {
+				throw new Error('runAnalyzeFlow should not be called after cancelling.');
+			},
+			dispatchHandoff: async () => {
+				throw new Error('dispatchHandoff should not be called after cancelling.');
+			},
+			showInformationMessage: async (message: string) => {
+				messages.push(message);
+				return undefined;
+			},
+			showWarningMessage: async (message: string) => {
+				messages.push(message);
+				return undefined;
+			},
+		});
+
+		assert.deepEqual(messages, []);
 	});
 
 	test('routes a self-contained analysis handoff through the dispatcher when Cursor has no extension-callable model', async () => {
@@ -833,6 +1019,7 @@ suite('runAnalyzeSavedChatsCommand', () => {
 		const warningMessages: string[] = [];
 		let dispatchedPrompt: string | undefined;
 		let dispatchedTarget: HandoffSelectionId | undefined;
+		let offered: AnalysisProviderChoices | undefined;
 		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-cursor-handoff-'));
 		const store = createSessionStore();
 
@@ -860,7 +1047,12 @@ suite('runAnalyzeSavedChatsCommand', () => {
 					onlyUnanalyzed: true,
 				}),
 				selectChatModels: async () => [],
+				getCommands: async () => ['composer.newAgentChat'],
 				getAppName: () => 'Cursor',
+				pickAnalysisProvider: async (choices) => {
+					offered = choices;
+					return { kind: 'chat' };
+				},
 				dispatchHandoff: async (prompt, target) => {
 					dispatchedPrompt = prompt;
 					dispatchedTarget = target;
@@ -908,6 +1100,11 @@ suite('runAnalyzeSavedChatsCommand', () => {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}
 
+		assert.deepEqual(offered, {
+			purpose: 'analysis',
+			chatDetail: ANALYSIS_CHAT_DETAIL_HANDOFF,
+			agentProviders: ['cursor'],
+		});
 		assert.deepEqual(infoMessages, [
 			'Cursor does not currently expose extension-callable chat models. Opened Chat with the analysis handoff prompt prefilled. Review it and send it when ready.',
 		]);
@@ -932,10 +1129,14 @@ suite('runAnalyzeSavedChatsCommand', () => {
 			}),
 			selectChatModels: async () => [],
 			getCommands: async () => ['chatgpt.openSidebar'],
+			getAppName: () => 'Visual Studio Code',
 			pickAnalysisProvider: async () => ({
 				kind: 'agent',
 				provider: 'codex',
 			}),
+			runAnalyzeFlow: async () => {
+				throw new Error('runAnalyzeFlow should not be called for an agent handoff.');
+			},
 			buildAgentHandoffPrompt: async () => ({
 				prompt: 'ANALYZE SAVED CHATS',
 			}),
@@ -964,11 +1165,17 @@ suite('runAnalyzeSavedChatsCommand', () => {
 		]);
 	});
 
-	test('opens the saved analysis report after a successful run', async () => {
+	test('runs the in-editor chat analysis with the first direct-request Copilot model and opens the saved report', async () => {
 		const infoMessages: string[] = [];
 		const workspaceFolder = createWorkspaceFolder('C:/repo', 'repo', 0);
 		let openedDocumentPath: string | undefined;
 		let shownDocumentPath: string | undefined;
+		let offered: AnalysisProviderChoices | undefined;
+		let usedModel: vscode.LanguageModelChat | undefined;
+		const cliModel = { name: 'Auto', vendor: 'copilotcli', family: 'auto', id: 'auto' } as vscode.LanguageModelChat;
+		const otherVendorModel = { name: 'Local', vendor: 'ollama', family: 'llama', id: 'llama' } as vscode.LanguageModelChat;
+		const defaultModel = { name: 'GPT-4.1', vendor: 'copilot', family: 'gpt-4.1', id: 'copilot-gpt-4.1' } as vscode.LanguageModelChat;
+		const secondCopilotModel = { name: 'Claude', vendor: 'copilot', family: 'claude', id: 'copilot-claude' } as vscode.LanguageModelChat;
 
 		await runAnalyzeSavedChatsCommand('', {
 			getWorkspaceFolders: () => [workspaceFolder],
@@ -978,12 +1185,15 @@ suite('runAnalyzeSavedChatsCommand', () => {
 				label: 'Needs Analysis',
 				range: null,
 			}),
-			selectChatModels: async () => [{} as vscode.LanguageModelChat],
-			pickAnalysisProvider: async (models) => {
-				const model = models[0];
-				return model ? { kind: 'model', model } : undefined;
+			selectChatModels: async () => [cliModel, otherVendorModel, defaultModel, secondCopilotModel],
+			getCommands: async () => [],
+			getAppName: () => 'Visual Studio Code',
+			pickAnalysisProvider: async (choices) => {
+				offered = choices;
+				return { kind: 'chat' };
 			},
-			runAnalyzeFlow: async (_workspaceFolders, _workspaceSessions, _selection, _model, _token, onStatus) => {
+			runAnalyzeFlow: async (_workspaceFolders, _workspaceSessions, _selection, model, _token, onStatus) => {
+				usedModel = model;
 				onStatus('Saved analysis report.');
 				return {
 					metadata: {
@@ -1010,6 +1220,12 @@ suite('runAnalyzeSavedChatsCommand', () => {
 			showWarningMessage: async () => undefined,
 		});
 
+		assert.deepEqual(offered, {
+			purpose: 'analysis',
+			chatDetail: ANALYSIS_CHAT_DETAIL_DEFAULT_MODEL,
+			agentProviders: [],
+		});
+		assert.equal(usedModel, defaultModel);
 		const expectedPath = path.join('C:/repo/.chat', 'analysis/reports/report-1.md');
 		assert.equal(openedDocumentPath?.toLowerCase(), expectedPath.toLowerCase());
 		assert.equal(shownDocumentPath?.toLowerCase(), expectedPath.toLowerCase());
@@ -1030,11 +1246,12 @@ suite('runAnalyzeSavedChatsCommand', () => {
 				label: 'Needs Analysis',
 				range: null,
 			}),
-			selectChatModels: async () => [{} as vscode.LanguageModelChat],
-			pickAnalysisProvider: async (models) => {
-				const model = models[0];
-				return model ? { kind: 'model', model } : undefined;
-			},
+			selectChatModels: async () => [
+				{ name: 'GPT-4.1', vendor: 'copilot', family: 'gpt-4.1', id: 'copilot-gpt-4.1' } as vscode.LanguageModelChat,
+			],
+			getCommands: async () => [],
+			getAppName: () => 'Visual Studio Code',
+			pickAnalysisProvider: async () => ({ kind: 'chat' }),
 			runAnalyzeFlow: async (_workspaceFolders, _workspaceSessions, _selection, _model, _token, onStatus) => {
 				onStatus('No saved sessions currently need analysis.');
 				return undefined;

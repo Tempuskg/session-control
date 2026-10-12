@@ -24,17 +24,24 @@ import {
 import { migrateLegacyAutoSaveProviderSettings } from './autoSaveConfigurationMigration';
 import { createAutoSaveWorkspaceLifecycle } from './autoSaveWorkspaceManager';
 import {
+	ANALYSIS_CHAT_DETAIL_DEFAULT_MODEL,
+	ANALYSIS_CHAT_DETAIL_HANDOFF,
 	buildAnalysisHandoffPrompt,
 	collectModelTextFromModel,
 	createAnalyzeSessionsFlowDeps,
 	findAvailableAnalysisAgentProviders,
+	formatNoProviderAvailableMessage,
 	getModelPromptLimit,
+	IMPLEMENTATION_CHAT_DETAIL,
+	isInEditorChatAvailable,
+	NO_ANALYSIS_MODEL_MESSAGE,
 	pickAnalysisProvider as pickAnalysisProviderFromChat,
 	registerChatParticipant,
 	resolveAnalysisSelection,
 	runAnalyzeSessionsFlow,
 	runResumeIntoOriginAgent,
-	type AnalysisAgentProviderId,
+	selectDefaultAnalysisModel,
+	type AnalysisProviderChoices,
 	type AnalysisProviderSelection,
 	type ResumeIntoOriginAgentDeps,
 	type ResumeOverflowStrategy,
@@ -401,10 +408,7 @@ interface ImplementLatestAnalysisDeps {
 	buildPrompt: (reportFilePath: string, userPrompt: string) => string;
 	selectChatModels: () => Promise<readonly vscode.LanguageModelChat[]>;
 	getCommands: () => Promise<readonly string[]>;
-	pickProvider: (
-		models: readonly vscode.LanguageModelChat[],
-		agentProviders: readonly AnalysisAgentProviderId[],
-	) => Promise<AnalysisProviderSelection | undefined>;
+	pickProvider: (choices: AnalysisProviderChoices) => Promise<AnalysisProviderSelection | undefined>;
 	dispatchHandoff: (prompt: string, target: HandoffSelectionId) => Promise<HandoffDispatchResult>;
 	showInformationMessage: (message: string) => Thenable<unknown>;
 	showWarningMessage: (message: string) => Thenable<unknown>;
@@ -418,10 +422,7 @@ interface AnalyzeSavedChatsCommandDeps {
 	resolveSelection: (requestPrompt: string) => Promise<AnalysisSelection | undefined>;
 	selectChatModels: () => Promise<readonly vscode.LanguageModelChat[]>;
 	getCommands: () => Promise<readonly string[]>;
-	pickAnalysisProvider: (
-		models: readonly vscode.LanguageModelChat[],
-		agentProviders: readonly AnalysisAgentProviderId[],
-	) => Promise<AnalysisProviderSelection | undefined>;
+	pickAnalysisProvider: (choices: AnalysisProviderChoices) => Promise<AnalysisProviderSelection | undefined>;
 	getAppName: () => string;
 	runAnalyzeFlow: (
 		workspaceFolders: readonly vscode.WorkspaceFolder[],
@@ -886,8 +887,7 @@ function createDefaultImplementLatestAnalysisDeps(): ImplementLatestAnalysisDeps
 			buildImplementationHandoffPrompt(reportFilePath, userPrompt),
 		selectChatModels: async () => vscode.lm.selectChatModels(),
 		getCommands: async () => vscode.commands.getCommands(true),
-		pickProvider: async (models, agentProviders) =>
-			pickAnalysisProviderFromChat(models, agentProviders, undefined, 'implementation'),
+		pickProvider: pickAnalysisProviderFromChat,
 		dispatchHandoff: async (prompt: string, target: HandoffSelectionId) => {
 			const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
 			const providerCommands = workspaceFolder
@@ -921,10 +921,7 @@ function createDefaultAnalyzeSavedChatsCommandDeps(): AnalyzeSavedChatsCommandDe
 		resolveSelection: async (requestPrompt: string) => resolveAnalysisSelection(requestPrompt),
 		selectChatModels: async () => vscode.lm.selectChatModels(),
 		getCommands: async () => vscode.commands.getCommands(true),
-		pickAnalysisProvider: async (
-			models: readonly vscode.LanguageModelChat[],
-			agentProviders: readonly AnalysisAgentProviderId[],
-		) => pickAnalysisProviderFromChat(models, agentProviders),
+		pickAnalysisProvider: pickAnalysisProviderFromChat,
 		getAppName: () => vscode.env.appName,
 		runAnalyzeFlow: async (workspaceFolders, workspaceSessions, selection, model, token, onStatus) =>
 			runAnalyzeSessionsFlow(
@@ -1640,17 +1637,22 @@ export async function runImplementLatestAnalysisCommand(
 	try {
 		availableCommands = await deps.getCommands();
 	} catch {
-		// Direct host chat remains available when command discovery fails.
+		// The in-editor chat stays available through its models when command discovery fails.
 	}
 
 	const agentProviders = findAvailableAnalysisAgentProviders(availableCommands);
-	const providerSelection = await deps.pickProvider(models, agentProviders);
+	const chatAvailable = isInEditorChatAvailable(models, availableCommands);
+	if (!chatAvailable && agentProviders.length === 0) {
+		await deps.showWarningMessage(formatNoProviderAvailableMessage('implementation'));
+		return;
+	}
+
+	const providerSelection = await deps.pickProvider({
+		purpose: 'implementation',
+		...(chatAvailable ? { chatDetail: IMPLEMENTATION_CHAT_DETAIL } : {}),
+		agentProviders,
+	});
 	if (!providerSelection) {
-		if (models.length === 0 && agentProviders.length === 0) {
-			await deps.showWarningMessage(
-				'No implementation provider is available. Sign in or install Codex, Claude Code, or Cursor, then try again.',
-			);
-		}
 		return;
 	}
 
@@ -1707,72 +1709,78 @@ export async function runAnalyzeSavedChatsCommand(
 		return;
 	}
 
-	let models: readonly vscode.LanguageModelChat[];
+	let models: readonly vscode.LanguageModelChat[] = [];
 	try {
 		models = await deps.selectChatModels();
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		await deps.showWarningMessage(`Failed to access a chat model for analysis: ${message}`);
-		return;
+	} catch {
+		// Agents stay available when host model discovery fails.
 	}
 
 	let availableCommands: readonly string[] = [];
 	try {
 		availableCommands = await deps.getCommands();
 	} catch {
-		// Keep direct language-model analysis available even when command discovery fails.
+		// The in-editor chat stays available through its models when command discovery fails.
 	}
 
-	const providerSelection = await deps.pickAnalysisProvider(
-		models,
-		findAvailableAnalysisAgentProviders(availableCommands),
-	);
+	const defaultModel = selectDefaultAnalysisModel(models);
+	// Cursor exposes no extension-callable Copilot model, so its in-editor chat receives the analysis prompt instead.
+	const useCursorChatHandoff = !defaultModel && /cursor/i.test(deps.getAppName());
+	const chatAvailable = useCursorChatHandoff || isInEditorChatAvailable(models, availableCommands);
+	const agentProviders = findAvailableAnalysisAgentProviders(availableCommands);
+	if (!chatAvailable && agentProviders.length === 0) {
+		await deps.showWarningMessage(formatNoProviderAvailableMessage('analysis'));
+		return;
+	}
+
+	const providerSelection = await deps.pickAnalysisProvider({
+		purpose: 'analysis',
+		...(chatAvailable
+			? { chatDetail: useCursorChatHandoff ? ANALYSIS_CHAT_DETAIL_HANDOFF : ANALYSIS_CHAT_DETAIL_DEFAULT_MODEL }
+			: {}),
+		agentProviders,
+	});
 	if (!providerSelection) {
-		if (models.length === 0 && /cursor/i.test(deps.getAppName())) {
-			let handoff: { prompt?: string; infoMessage?: string };
-			try {
-				handoff = await deps.buildAgentHandoffPrompt(workspaceFolders, workspaceSessions, selection);
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				await deps.showWarningMessage(
-					`Cursor does not currently expose extension-callable chat models, and Session Control could not build an analysis handoff prompt: ${message}`,
-				);
-				return;
-			}
+		return;
+	}
 
-			if (handoff.infoMessage) {
-				await deps.showInformationMessage(handoff.infoMessage);
-				return;
-			}
-
-			if (!handoff.prompt) {
-				await deps.showWarningMessage(
-					'Cursor does not currently expose extension-callable chat models, and no analysis handoff prompt could be generated.',
-				);
-				return;
-			}
-
-			try {
-				const dispatchResult = await deps.dispatchHandoff(handoff.prompt, 'chat');
-				const message = `Cursor does not currently expose extension-callable chat models. ${dispatchResult.instruction}`;
-				if (dispatchResult.method === 'failed') {
-					await deps.showWarningMessage(message);
-					return;
-				}
-
-				await deps.showInformationMessage(message);
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				await deps.showWarningMessage(
-					`Cursor does not currently expose extension-callable chat models, and opening chat with the analysis handoff prompt failed: ${message}`,
-				);
-			}
+	if (providerSelection.kind === 'chat' && useCursorChatHandoff) {
+		let handoff: { prompt?: string; infoMessage?: string };
+		try {
+			handoff = await deps.buildAgentHandoffPrompt(workspaceFolders, workspaceSessions, selection);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await deps.showWarningMessage(
+				`Cursor does not currently expose extension-callable chat models, and Session Control could not build an analysis handoff prompt: ${message}`,
+			);
 			return;
 		}
 
-		if (models.length === 0) {
+		if (handoff.infoMessage) {
+			await deps.showInformationMessage(handoff.infoMessage);
+			return;
+		}
+
+		if (!handoff.prompt) {
 			await deps.showWarningMessage(
-				'No host chat model or installed analysis agent is available. Sign in, enable a chat model, or install Codex/Claude Code, then try again.',
+				'Cursor does not currently expose extension-callable chat models, and no analysis handoff prompt could be generated.',
+			);
+			return;
+		}
+
+		try {
+			const dispatchResult = await deps.dispatchHandoff(handoff.prompt, 'chat');
+			const message = `Cursor does not currently expose extension-callable chat models. ${dispatchResult.instruction}`;
+			if (dispatchResult.method === 'failed') {
+				await deps.showWarningMessage(message);
+				return;
+			}
+
+			await deps.showInformationMessage(message);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await deps.showWarningMessage(
+				`Cursor does not currently expose extension-callable chat models, and opening chat with the analysis handoff prompt failed: ${message}`,
 			);
 		}
 		return;
@@ -1818,7 +1826,11 @@ export async function runAnalyzeSavedChatsCommand(
 		return;
 	}
 
-	const model = providerSelection.model;
+	if (!defaultModel) {
+		await deps.showWarningMessage(NO_ANALYSIS_MODEL_MESSAGE);
+		return;
+	}
+	const model = defaultModel;
 
 	let lastStatusMessage = '';
 	const result = await deps.withProgress(

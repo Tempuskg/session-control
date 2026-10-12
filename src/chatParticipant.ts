@@ -206,14 +206,8 @@ export interface ImplementationHandoffFlowDeps {
 		analysisStorageDirectory: string;
 	} | null;
 	buildPrompt: (reportFilePath: string, userPrompt: string) => string;
-	selectChatModels: () => Promise<readonly vscode.LanguageModelChat[]>;
 	getCommands: () => Promise<readonly string[]>;
-	pickProvider: (
-		models: readonly vscode.LanguageModelChat[],
-		agentProviders: readonly AnalysisAgentProviderId[],
-		fallbackModel?: vscode.LanguageModelChat,
-	) => Promise<AnalysisProviderSelection | undefined>;
-	fallbackModel?: vscode.LanguageModelChat;
+	pickProvider: (choices: AnalysisProviderChoices) => Promise<AnalysisProviderSelection | undefined>;
 	dispatchHandoff: (
 		prompt: string,
 		target: HandoffSelectionId,
@@ -434,56 +428,76 @@ async function promptDateRangeAnalysisMode(): Promise<boolean | undefined> {
 export type AnalysisAgentProviderId = HandoffAgentProviderId;
 
 export type AnalysisProviderSelection =
-	| { kind: 'model'; model: vscode.LanguageModelChat }
+	| { kind: 'chat' }
 	| { kind: 'agent'; provider: AnalysisAgentProviderId };
 
 export type ProviderSelectionPurpose = 'analysis' | 'implementation';
 
-interface AnalysisModelPickItem extends vscode.QuickPickItem {
-	model: vscode.LanguageModelChat;
+export interface AnalysisProviderChoices {
+	purpose: ProviderSelectionPurpose;
+	/** What picking the in-editor chat will do; omit it when no in-editor chat is available. */
+	chatDetail?: string;
+	agentProviders: readonly AnalysisAgentProviderId[];
+	/** Overrides the purpose-based agent row detail; receives the agent's display label. */
+	agentDetail?: (label: string) => string;
 }
 
-interface AnalysisProviderPickItem extends vscode.QuickPickItem {
+export interface AnalysisProviderPickItem extends vscode.QuickPickItem {
 	selection: AnalysisProviderSelection;
 }
 
-export function createAnalysisModelPickItems(models: readonly vscode.LanguageModelChat[]): AnalysisModelPickItem[] {
-	return models.map((model) => {
-		const modelName = model.name.trim() || model.id.trim() || 'Unnamed model';
-		const providerName = model.vendor.trim() || 'Unknown provider';
-		const detailParts = [model.family.trim(), model.id.trim()].filter((value) => value.length > 0);
+export const IN_EDITOR_CHAT_OPEN_COMMAND = 'workbench.action.chat.open';
+export const ANALYSIS_CHAT_DETAIL_CURRENT_MODEL =
+	'Session Control analyzes the saved chats with this chat\'s current model and saves the report';
+export const ANALYSIS_CHAT_DETAIL_DEFAULT_MODEL =
+	'Session Control analyzes the saved chats with the first available Copilot model and saves the report';
+export const ANALYSIS_CHAT_DETAIL_HANDOFF = 'Opens Chat with the analysis prompt to review and send';
+export const IMPLEMENTATION_CHAT_DETAIL = 'Opens Chat with the implementation prompt to review and send';
+export const NO_ANALYSIS_MODEL_MESSAGE =
+	'The analysis did not run: no GitHub Copilot model that answers direct requests is available (Copilot CLI models are skipped). Sign in to GitHub Copilot, or pick Codex, Claude Code, or Cursor instead.';
 
-		return {
-			label: modelName,
-			description: `Provider: ${providerName}`,
-			...(detailParts.length > 0 ? { detail: detailParts.join(' · ') } : {}),
-			model,
-		};
-	});
+export function formatNoProviderAvailableMessage(purpose: ProviderSelectionPurpose): string {
+	const action = purpose === 'analysis' ? 'analyze saved chats' : 'implement the analysis';
+	return `No chat or agent is available to ${action}. Install GitHub Copilot Chat, Codex, or Claude Code, then try again.`;
 }
 
-export function createAnalysisProviderPickItems(
-	models: readonly vscode.LanguageModelChat[],
-	agentProviders: readonly AnalysisAgentProviderId[],
-	purpose: ProviderSelectionPurpose = 'analysis',
-): AnalysisProviderPickItem[] {
-	const modelItems: AnalysisProviderPickItem[] = createAnalysisModelPickItems(models).map((item) => ({
-		...item,
-		selection: { kind: 'model', model: item.model },
-	}));
-	const agentItems: AnalysisProviderPickItem[] = agentProviders.map((provider) => ({
-		label: provider === 'claude-code' ? 'Claude Code' : provider[0]?.toUpperCase() + provider.slice(1),
-		description: purpose === 'analysis'
-			? `Use the installed ${provider === 'claude-code' ? 'Claude Code' : provider} agent to analyze all saved sessions`
-			: `Use the installed ${provider === 'claude-code' ? 'Claude Code' : provider} agent to implement the saved analysis recommendations`,
-		selection: { kind: 'agent', provider },
-	}));
+export function createAnalysisProviderPickItems(choices: AnalysisProviderChoices): AnalysisProviderPickItem[] {
+	const items: AnalysisProviderPickItem[] = [];
+	if (choices.chatDetail) {
+		items.push({
+			label: 'Chat',
+			description: 'In-editor chat',
+			detail: choices.chatDetail,
+			selection: { kind: 'chat' },
+		});
+	}
 
-	return [...modelItems, ...agentItems];
+	for (const provider of choices.agentProviders) {
+		const label = formatProviderLabel(provider);
+		items.push({
+			label,
+			description: 'Agent',
+			detail: choices.agentDetail
+				? choices.agentDetail(label)
+				: choices.purpose === 'analysis'
+				? `Hands the analysis prompt to ${label}, which analyzes the saved chats with its own model`
+				: `Hands the implementation prompt to ${label}, which applies the recommendations with its own model`,
+			selection: { kind: 'agent', provider },
+		});
+	}
+
+	return items;
 }
 
 export function findAvailableAnalysisAgentProviders(commands: readonly string[]): AnalysisAgentProviderId[] {
 	return detectHandoffAgentProviders(commands);
+}
+
+export function isInEditorChatAvailable(
+	models: readonly vscode.LanguageModelChat[],
+	commands: readonly string[],
+): boolean {
+	return models.length > 0 || commands.includes(IN_EDITOR_CHAT_OPEN_COMMAND);
 }
 
 /** Copilot CLI agent-host models return empty or unsized responses to direct sendRequest calls. */
@@ -491,30 +505,38 @@ export function isDirectRequestModel(model: Pick<vscode.LanguageModelChat, 'id' 
 	return !`${model.vendor} ${model.id}`.toLowerCase().includes('copilotcli');
 }
 
-export async function pickAnalysisProvider(
+export function selectDefaultAnalysisModel(
 	models: readonly vscode.LanguageModelChat[],
-	agentProviders: readonly AnalysisAgentProviderId[],
-	fallbackModel?: vscode.LanguageModelChat,
-	purpose: ProviderSelectionPurpose = 'analysis',
-): Promise<AnalysisProviderSelection | undefined> {
-	const availableModels = models.filter(isDirectRequestModel);
-	if (
-		fallbackModel
-		&& isDirectRequestModel(fallbackModel)
-		&& !availableModels.some((model) => model.id === fallbackModel.id && model.vendor === fallbackModel.vendor)
-	) {
-		availableModels.push(fallbackModel);
+): vscode.LanguageModelChat | undefined {
+	return models.find((model) => model.vendor.trim().toLowerCase() === 'copilot' && isDirectRequestModel(model));
+}
+
+export async function resolveChatAnalysisModel(
+	currentModel: vscode.LanguageModelChat,
+	selectChatModels: () => Promise<readonly vscode.LanguageModelChat[]>,
+): Promise<vscode.LanguageModelChat | undefined> {
+	if (isDirectRequestModel(currentModel)) {
+		return currentModel;
 	}
 
-	const items = createAnalysisProviderPickItems(availableModels, agentProviders, purpose);
+	try {
+		return selectDefaultAnalysisModel(await selectChatModels());
+	} catch {
+		return undefined;
+	}
+}
+
+export async function pickAnalysisProvider(choices: AnalysisProviderChoices): Promise<AnalysisProviderSelection | undefined> {
+	const items = createAnalysisProviderPickItems(choices);
 	if (items.length === 0) {
 		return undefined;
 	}
 
-	const pick = await vscode.window.showQuickPick<AnalysisProviderPickItem>(
-		items,
-		{ title: `Choose the provider for ${purpose === 'analysis' ? 'chat analysis' : 'implementation'}` },
-	);
+	const pick = await vscode.window.showQuickPick<AnalysisProviderPickItem>(items, {
+		placeHolder: choices.purpose === 'analysis'
+			? 'Analyze the saved chats with which chat or agent?'
+			: 'Implement the analysis with which chat or agent?',
+	});
 
 	return pick?.selection;
 }
@@ -1046,16 +1068,13 @@ export async function runResumeIntoOriginAgent(
 
 function createDefaultImplementationHandoffFlowDeps(
 	stream: vscode.ChatResponseStream,
-	fallbackModel: vscode.LanguageModelChat,
 ): ImplementationHandoffFlowDeps {
 	const handoffDispatcher = createVSCodeHandoffDispatcher();
 	return {
 		findAnalysisReportMeta: (history) => findLatestAnalysisReportMeta(history),
 		buildPrompt: (reportFilePath: string, userPrompt: string) => buildImplementationHandoffPrompt(reportFilePath, userPrompt),
-		selectChatModels: async () => vscode.lm.selectChatModels(),
 		getCommands: async () => vscode.commands.getCommands(true),
-		pickProvider: async (models, agentProviders, fallback) => pickAnalysisProvider(models, agentProviders, fallback, 'implementation'),
-		fallbackModel,
+		pickProvider: pickAnalysisProvider,
 		dispatchHandoff: async (prompt: string, target: HandoffSelectionId) => {
 			const workspaceFolder = pickWorkspaceFolder() ?? vscode.workspace.workspaceFolders?.[0];
 			const providerCommands = workspaceFolder
@@ -1082,7 +1101,6 @@ export async function runImplementationHandoffFlow(
 	const deps: ImplementationHandoffFlowDeps = {
 		findAnalysisReportMeta: () => null,
 		buildPrompt: (reportFilePath: string, userPrompt: string) => buildImplementationHandoffPrompt(reportFilePath, userPrompt),
-		selectChatModels: async () => [],
 		getCommands: async () => [],
 		pickProvider: async () => undefined,
 		dispatchHandoff: async () => ({
@@ -1104,26 +1122,20 @@ export async function runImplementationHandoffFlow(
 
 	const reportFilePath = path.join(analysisMeta.analysisStorageDirectory, analysisMeta.analysisReportPath);
 	const prompt = deps.buildPrompt(reportFilePath, requestPrompt);
-	let models: readonly vscode.LanguageModelChat[] = [];
-	try {
-		models = await deps.selectChatModels();
-	} catch {
-		// Agent providers remain available when host model discovery fails.
-	}
-
 	let availableCommands: readonly string[] = [];
 	try {
 		availableCommands = await deps.getCommands();
 	} catch {
-		// Direct host chat remains available when command discovery fails.
+		// The in-editor chat stays available when command discovery fails.
 	}
 
-	const agentProviders = findAvailableAnalysisAgentProviders(availableCommands);
-	const providerSelection = await deps.pickProvider(models, agentProviders, deps.fallbackModel);
+	// This flow runs inside the chat participant, so the in-editor chat is always available.
+	const providerSelection = await deps.pickProvider({
+		purpose: 'implementation',
+		chatDetail: IMPLEMENTATION_CHAT_DETAIL,
+		agentProviders: findAvailableAnalysisAgentProviders(availableCommands),
+	});
 	if (!providerSelection) {
-		if (models.length === 0 && agentProviders.length === 0) {
-			deps.streamMarkdown('No implementation provider is available. Sign in or install Codex, Claude Code, or Cursor, then try again.');
-		}
 		return;
 	}
 
@@ -1132,14 +1144,6 @@ export async function runImplementationHandoffFlow(
 			? providerSelection.provider
 			: 'chat';
 		const result = await deps.dispatchHandoff(prompt, target);
-		if (providerSelection.kind === 'model') {
-			const modelLabel = providerSelection.model.name.trim()
-				|| providerSelection.model.vendor.trim()
-				|| 'the selected model';
-			deps.streamMarkdown(`${result.instruction} Selected implementation provider: ${modelLabel}.`);
-			return;
-		}
-
 		deps.streamMarkdown(result.instruction);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -1623,25 +1627,18 @@ export function registerChatParticipant(context: vscode.ExtensionContext, deps: 
 					return;
 				}
 
-				let availableModels: readonly vscode.LanguageModelChat[];
-				try {
-					availableModels = await vscode.lm.selectChatModels();
-				} catch {
-					availableModels = [request.model];
-				}
-
 				let availableCommands: readonly string[] = [];
 				try {
 					availableCommands = await vscode.commands.getCommands(true);
 				} catch {
-					// Keep the current model available even when command discovery is unavailable.
+					// The in-editor chat stays available when command discovery fails.
 				}
 
-				const providerSelection = await pickAnalysisProvider(
-					availableModels,
-					findAvailableAnalysisAgentProviders(availableCommands),
-					request.model,
-				);
+				const providerSelection = await pickAnalysisProvider({
+					purpose: 'analysis',
+					chatDetail: ANALYSIS_CHAT_DETAIL_CURRENT_MODEL,
+					agentProviders: findAvailableAnalysisAgentProviders(availableCommands),
+				});
 				if (!providerSelection) {
 					stream.markdown('No analysis provider was selected.');
 					return;
@@ -1678,11 +1675,17 @@ export function registerChatParticipant(context: vscode.ExtensionContext, deps: 
 					return;
 				}
 
+				const analysisModel = await resolveChatAnalysisModel(request.model, async () => vscode.lm.selectChatModels());
+				if (!analysisModel) {
+					stream.markdown(NO_ANALYSIS_MODEL_MESSAGE);
+					return;
+				}
+
 				return runAnalyzeSessionsFlow(
 					prompt,
 					workspaceFolders,
 					workspaceSessions,
-					createDefaultAnalyzeSessionsFlowDeps(providerSelection.model, stream, token, selection, deps.judgment, deps.log),
+					createDefaultAnalyzeSessionsFlowDeps(analysisModel, stream, token, selection, deps.judgment, deps.log),
 				);
 			}
 
@@ -1690,7 +1693,7 @@ export function registerChatParticipant(context: vscode.ExtensionContext, deps: 
 				await runImplementationHandoffFlow(
 					prompt,
 					chatContext.history,
-					createDefaultImplementationHandoffFlowDeps(stream, request.model),
+					createDefaultImplementationHandoffFlowDeps(stream),
 				);
 				return;
 			}
