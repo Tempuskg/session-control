@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-18
+
+### Changed
+
+- **Pro: the Knowledge Harvesting review panel prepares on its own.** After you pick what to harvest, the panel opens and starts preparing right away, and the Prepare button is gone. Toggling Include prepares again and refreshes the result. Write stays disabled until preparation is ready, then writes only the files shown. Write, Cancel, and Retry sit in a bar that stays in view with the status, and the final changes appear as line diffs inside the panel. This ships as `@tempuskg/session-control-pro` 0.9.0.
+
 ## [1.8.0] - 2026-10-11
 
 ### Changed
