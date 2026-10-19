@@ -480,6 +480,26 @@ suite('session explorer', () => {
 		);
 	});
 
+	test('Implement Analysis is a right-click only action on analyzed sessions', async () => {
+		const manifest = await readPackageManifest();
+		const command = 'session-control.implementAnalysisFromExplorer';
+		const contribution = manifest.contributes.commands.find((candidate) => candidate.command === command);
+		assert.equal(contribution?.title, 'Implement Analysis');
+
+		const actions = (manifest.contributes.menus['view/item/context'] ?? []).filter(
+			(candidate) => candidate.command === command,
+		);
+		assert.equal(actions.length, 1);
+		assert.equal(
+			actions[0]?.when,
+			'view == session-control.sessionExplorer && viewItem == session-control.session.analyzed',
+		);
+		assert.equal(actions[0]?.group?.startsWith('inline'), false);
+
+		const hidden = (manifest.contributes.menus.commandPalette ?? []).find((candidate) => candidate.command === command);
+		assert.equal(hidden?.when, 'false');
+	});
+
 	test('sort action is contributed to the Saved Sessions toolbar', async () => {
 		const manifest = await readPackageManifest();
 		const sortCommand = manifest.contributes.commands.find(

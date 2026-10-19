@@ -81,6 +81,7 @@ import {
 	SORT_SESSION_EXPLORER_COMMAND,
 	SessionExplorerProvider,
 	SessionExplorerSessionItem,
+	findAnalyzedEntry,
 	isSessionExplorerSortOrder,
 	registerSessionExplorerAnalysisCommands,
 	registerSessionExplorerVisibilityRefresh,
@@ -98,6 +99,7 @@ import {
 	showUpgradePrompt,
 } from './pro';
 import {
+	type AnalysisIndexEntry,
 	type AnalysisReportReference,
 	type AnalysisSelection,
 	isChatSession,
@@ -403,7 +405,9 @@ interface ViewSessionFileDeps {
 interface ImplementLatestAnalysisDeps {
 	getWorkspaceFolders: () => readonly vscode.WorkspaceFolder[] | undefined;
 	getStoragePath: (workspaceFolder: vscode.WorkspaceFolder) => string;
-	readIndex: (storageDirectory: string) => Promise<{ reports: AnalysisReportReference[] }>;
+	readIndex: (
+		storageDirectory: string,
+	) => Promise<{ reports: AnalysisReportReference[]; analyzedSessions?: AnalysisIndexEntry[] }>;
 	readReport: (storageDirectory: string, reportPath: string) => Promise<string>;
 	buildPrompt: (reportFilePath: string, userPrompt: string) => string;
 	selectChatModels: () => Promise<readonly vscode.LanguageModelChat[]>;
@@ -1625,7 +1629,58 @@ export async function runImplementLatestAnalysisCommand(
 		return;
 	}
 
-	const prompt = deps.buildPrompt(path.join(latest.report.storageDirectory, latest.report.reportPath), '');
+	await dispatchImplementationForReport(latest.report, deps);
+}
+
+export async function runImplementAnalysisFromExplorerCommand(
+	item: SessionExplorerSessionItem | undefined,
+	depsOverrides: Partial<ImplementLatestAnalysisDeps> = {},
+): Promise<void> {
+	const deps = {
+		...createDefaultImplementLatestAnalysisDeps(),
+		...depsOverrides,
+	};
+
+	if (!item) {
+		await deps.showInformationMessage('Select an analyzed session in the Session Control explorer to implement its analysis.');
+		return;
+	}
+
+	let report: LatestAnalysisReportTarget | undefined;
+	try {
+		const index = await deps.readIndex(item.storageDirectory);
+		const entry = findAnalyzedEntry(index.analyzedSessions ?? [], item.session);
+		if (!entry) {
+			await deps.showWarningMessage(`No saved analysis was found for "${item.session.title}".`);
+			return;
+		}
+
+		// Fail loudly rather than falling back to another report when this one is gone.
+		await deps.readReport(item.storageDirectory, entry.reportPath);
+		const reference = index.reports.find(
+			(candidate) => candidate.id === entry.reportId || candidate.reportPath === entry.reportPath,
+		);
+		report = {
+			storageDirectory: item.storageDirectory,
+			reportPath: entry.reportPath,
+			createdAt: entry.analyzedAt,
+			selectionLabel: reference?.selection.label ?? item.session.title,
+			workspaceFolder: item.workspaceFolder,
+		};
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		await deps.showWarningMessage(`Could not read the saved analysis for "${item.session.title}": ${message}`);
+		return;
+	}
+
+	await dispatchImplementationForReport(report, deps);
+}
+
+async function dispatchImplementationForReport(
+	report: LatestAnalysisReportTarget,
+	deps: ImplementLatestAnalysisDeps,
+): Promise<void> {
+	const prompt = deps.buildPrompt(path.join(report.storageDirectory, report.reportPath), '');
 	let models: readonly vscode.LanguageModelChat[] = [];
 	try {
 		models = await deps.selectChatModels();
@@ -1661,8 +1716,8 @@ export async function runImplementLatestAnalysisCommand(
 		const result = await deps.dispatchHandoff(prompt, target);
 		const contextMessage =
 			providerSelection.kind === 'agent'
-				? ` Source analysis workspace: ${latest.report.workspaceFolder.name}.`
-				: ` Analysis: ${latest.report.selectionLabel}.`;
+				? ` Source analysis workspace: ${report.workspaceFolder.name}.`
+				: ` Analysis: ${report.selectionLabel}.`;
 		const message = `${result.instruction}${contextMessage}`;
 		if (result.method === 'failed') {
 			await deps.showWarningMessage(message);
@@ -2821,6 +2876,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		vscode.commands.registerCommand('session-control.implementLatestAnalysis', async () => {
 			await runImplementLatestAnalysisCommand();
 		}),
+		vscode.commands.registerCommand(
+			'session-control.implementAnalysisFromExplorer',
+			async (item: SessionExplorerSessionItem | undefined) => {
+				await runImplementAnalysisFromExplorerCommand(item);
+			},
+		),
 		vscode.commands.registerCommand('session-control.importCopilotSkillsToCursor', async () => {
 			await runImportCopilotSkillsToCursorCommand();
 		}),

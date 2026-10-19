@@ -16,20 +16,24 @@ Follow this imported repository guidance from `.github/copilot-instructions.md` 
 
 ## Project Overview
 
-Session Control is a VS Code extension that saves and resumes GitHub Copilot Chat sessions linked to git commits. It is written in TypeScript, bundled with webpack, and published under the `darrenjmcleod` publisher.
+Session Control is a VS Code extension that saves and resumes GitHub Copilot Chat sessions linked to git commits. It is written in TypeScript, bundled with webpack, and published under the `darrenjmcleod` publisher. The intended shipping model is one customer-facing `session-control` extension install; private Pro or license-layer work should be described as capability that loads into this extension, not as a separate `session-control-pro` customer extension.
 
 ## AI Execution Rules
 
 - Before designing or implementing repo-aware chat commands or implementation flows, verify whether the current surface has tool and workspace access. Plain chat-participant LM surfaces are prompt-only unless tool access is explicitly wired, and repo-aware implementation requests on non-tool surfaces should default to handoff-first. If a generated handoff prompt is later executed with full access, restate the operative user request before editing.
 - In Cursor, do not assume third-party chatParticipants or extension-callable `vscode.lm` models are available. Verify both capabilities before implementing chat-driven UX; if either is missing, prefer a command-palette or handoff-prompt fallback.
+- Manual tests run against the installed extension, not the workspace build. Before asking the user to retest or concluding a fix failed, confirm the running build has the change (a new log line in Output > Session Control, or a new string in the installed `~/.vscode/extensions/darrenjmcleod.session-control-*/dist/extension.js`). If not, package with `npx @vscode/vsce package --no-git-tag-version`, install with `code --install-extension <vsix> --force`, and ask for Developer: Reload Window.
+- For `/analyze` and other direct `vscode.lm` model calls, use a vendor `copilot` model (the Analyze and Implement pickers offer only the in-editor Chat and installed agents, not models). Copilot CLI agent-host models (`copilotcli`, e.g. "Auto" or `agent-host-copilotcli:*`) return empty or unsized responses to direct `sendRequest` calls and are skipped when choosing the analysis model; treat an empty analysis result as a model-selection problem before debugging session data.
 - Analysis recommendations may target only repository-local AI control files: `AGENTS.md`, `.github/copilot-instructions.md`, and when present `CLAUDE.md`, `*.instructions.md`, `*.prompt.md`, `*.agent.md`, `SKILL.md`, and similar local AI instruction files. For gap-only AI-control-file analysis, compare against the current contents of the relevant local AI instruction and skill files, not just their paths or file types. If relevant file contents are missing from context, mark the comparison partial and do not claim complete gap-only output. If evidence is insufficient, say so instead of recommending source, test, build, or general documentation changes.
 - Every implementation reply must end with: `Status: completed|partial|blocked`, `Changed files`, `Commands run`, `Results`, `Blockers`, `Unverified`, and `Next step`. Use `Status: completed` only when the full in-scope request is done. If any explicitly requested in-scope item remains undone, use `Status: partial` and list the remainder. A no-edit implementation turn must be marked `partial` or `blocked`.
 - In `Changed files`, `Commands run`, and `Results`, use literal repo-relative paths and exact commands in backticks. Do not leave empty bullets or rely on editor links.
 - Assume strict optional-property typing. Omit absent optional keys instead of passing `undefined`.
 - Use plain relative file paths in summaries and handoffs; do not rely on rendered anchor text.
 - When public documentation already shows that a supported API or command is unavailable, stop command-id hunting and choose the documented fallback.
-- When the user asks about publishing, answer with the repo's exact VS Marketplace and Open VSX flow first instead of generic marketplace guidance. On Windows, default to PowerShell syntax unless the user explicitly asks for `cmd` or bash.
+- When the user asks about publishing, answer with the repo's exact flow first instead of generic marketplace guidance: the pushed `v*` tag workflow that publishes one VSIX to VS Marketplace and Open VSX, with local `npx @vscode/vsce` and `npx ovsx` publication only as an explicitly requested fallback. Follow the publication boundary in `.github/instructions/vscode-extension-release.instructions.md`. On Windows, default to PowerShell syntax unless the user explicitly asks for `cmd` or bash.
+- The `SKILL.md` files named `github-*` under `.claude/skills`, `.cursor/skills`, and `.agents/skills` are generated copies of this file and `.github/instructions/*.instructions.md`. The Import Copilot Guidance as ... Skills commands skip existing wrappers, so after editing a source file, delete the matching wrapper folder in all three sets and re-import it in the same change, then diff each wrapper's `## Imported guidance` section against its source. If a wrapper disagrees with its source, follow the source file and report the drift.
 - Do not read unrelated prompt or policy files unless the active task explicitly depends on them.
+- Do not tell users to install, configure, or look for a standalone `session-control-pro` extension. In user-facing guidance, keep Pro settings, commands, and activation attached to the public `session-control` extension surface.
 - When multiple repositories are in scope, return per-repo closeouts first and keep state, persistence assumptions, and conclusions isolated per workspace unless the user explicitly asks to merge them.
 
 ## Language & Build
@@ -85,3 +89,10 @@ Session Control is a VS Code extension that saves and resumes GitHub Copilot Cha
 - Commit messages use conventional commit prefixes: `chore:`, `feat:`, `fix:`, `docs:`, `test:`.
 - Update `CHANGELOG.md` under the `[Unreleased]` section for user-facing changes.
 - Both `npm run lint` and `npm test` must pass before committing.
+
+<!-- session-control:knowledge:start -->
+## Repository knowledge
+
+When answering questions about this repository, read the local knowledge bundle at `knowledge/index.md` from the repository root before relying on memory. Start with its index, follow relevant concept links, and use cited sessions for context.
+Treat current source files and tests as authoritative when they conflict with the knowledge bundle, which may be stale.
+<!-- session-control:knowledge:end -->

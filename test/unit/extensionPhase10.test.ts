@@ -12,6 +12,7 @@ import {
 	resolveImplicitSaveProviderForHost,
 	resolveSaveProviderForHost,
 	runAnalyzeSavedChatsCommand,
+	runImplementAnalysisFromExplorerCommand,
 	runImplementLatestAnalysisCommand,
 	runOpenSavedSessionCommand,
 	runResumeSessionFromViewerCommand,
@@ -34,6 +35,7 @@ import { SessionViewerPanel } from '../../src/sessionViewer';
 import { createSessionStore } from '../../src/sessionStore';
 import { createChatSession } from '../../src/sessionWriter';
 import { CopilotSession } from '../../src/sessionReader';
+import { SessionExplorerSessionItem } from '../../src/sessionExplorer';
 import { AnalysisReportReference } from '../../src/types';
 
 function createWorkspaceFolder(rootPath: string, name: string, index: number): vscode.WorkspaceFolder {
@@ -872,6 +874,165 @@ suite('runImplementLatestAnalysisCommand', () => {
 
 		assert.equal(dispatched, false);
 		assert.deepEqual(messages, []);
+	});
+});
+
+suite('runImplementAnalysisFromExplorerCommand', () => {
+	function createItem(): SessionExplorerSessionItem {
+		const workspaceFolder = createWorkspaceFolder('C:/repo-a', 'alpha', 0);
+		const storageDirectory = path.join('C:/repo-a', '.chat');
+		const session = {
+			id: 'session-1',
+			title: 'Clicked Session',
+			savedAt: '2026-05-17T10:00:00.000Z',
+			fileName: 'clicked.json',
+			turnCount: 2,
+			git: null,
+		};
+		return new SessionExplorerSessionItem(
+			{
+				workspaceFolder,
+				storageDirectory,
+				sessions: [session],
+				analyzedSessions: [],
+				harvestedSessions: [],
+			},
+			session,
+		);
+	}
+
+	function createDeps(item: SessionExplorerSessionItem, overrides: Record<string, unknown> = {}) {
+		return {
+			readIndex: async () => ({
+				reports: [
+					createAnalysisReportReference({
+						id: 'clicked-report',
+						reportPath: 'analysis/reports/clicked.md',
+						selection: { mode: 'last7Days', label: 'Clicked report', range: null },
+					}),
+					createAnalysisReportReference({
+						id: 'newer-report',
+						createdAt: '2026-06-01T00:00:00.000Z',
+						reportPath: 'analysis/reports/newer.md',
+					}),
+				],
+				analyzedSessions: [
+					{
+						fingerprint: 'f1',
+						sessionId: 'session-1',
+						title: 'Clicked Session',
+						savedAt: '2026-05-17T10:00:00.000Z',
+						analyzedAt: '2026-05-17T18:00:00.000Z',
+						reportPath: 'analysis/reports/clicked.md',
+						reportId: 'clicked-report',
+					},
+					{
+						fingerprint: 'f2',
+						sessionId: 'other-session',
+						title: 'Other Session',
+						savedAt: '2026-05-30T10:00:00.000Z',
+						analyzedAt: '2026-06-01T00:00:00.000Z',
+						reportPath: 'analysis/reports/newer.md',
+						reportId: 'newer-report',
+					},
+				],
+			}),
+			readReport: async () => '# report',
+			buildPrompt: (reportFilePath: string) => `IMPLEMENT ${reportFilePath}`,
+			selectChatModels: async () => [],
+			getCommands: async () => ['workbench.action.chat.open', 'chatgpt.openSidebar'],
+			showInformationMessage: async () => undefined,
+			showWarningMessage: async () => undefined,
+			...overrides,
+		};
+	}
+
+	test('implements the clicked session report rather than a newer unrelated report', async () => {
+		const item = createItem();
+		const messages: string[] = [];
+		let dispatchedPrompt: string | undefined;
+		let dispatchedTarget: HandoffSelectionId | undefined;
+
+		await runImplementAnalysisFromExplorerCommand(item, createDeps(item, {
+			pickProvider: async () => ({ kind: 'chat' }),
+			dispatchHandoff: async (prompt: string, target: HandoffSelectionId) => {
+				dispatchedPrompt = prompt;
+				dispatchedTarget = target;
+				return { method: 'clipboard', instruction: 'Prompt ready.' };
+			},
+			showInformationMessage: async (message: string) => {
+				messages.push(message);
+				return undefined;
+			},
+		}));
+
+		assert.equal(dispatchedPrompt, `IMPLEMENT ${path.join(item.storageDirectory, 'analysis/reports/clicked.md')}`);
+		assert.equal(dispatchedTarget, 'chat');
+		assert.deepEqual(messages, ['Prompt ready. Analysis: Clicked report.']);
+	});
+
+	test('warns and dispatches nothing when the session report is missing', async () => {
+		const item = createItem();
+		const warnings: string[] = [];
+		let dispatched = false;
+		let pickerShown = false;
+
+		await runImplementAnalysisFromExplorerCommand(item, createDeps(item, {
+			readReport: async () => {
+				throw new Error('ENOENT: clicked.md');
+			},
+			pickProvider: async () => {
+				pickerShown = true;
+				return undefined;
+			},
+			dispatchHandoff: async () => {
+				dispatched = true;
+				throw new Error('should not dispatch');
+			},
+			showWarningMessage: async (message: string) => {
+				warnings.push(message);
+				return undefined;
+			},
+		}));
+
+		assert.equal(dispatched, false);
+		assert.equal(pickerShown, false);
+		assert.equal(warnings.length, 1);
+		assert.equal(warnings[0]?.includes('ENOENT: clicked.md'), true);
+	});
+
+	test('shows a message and dispatches nothing when there is no tree item', async () => {
+		const messages: string[] = [];
+		let dispatched = false;
+
+		await runImplementAnalysisFromExplorerCommand(undefined, {
+			dispatchHandoff: async () => {
+				dispatched = true;
+				throw new Error('should not dispatch');
+			},
+			showInformationMessage: async (message: string) => {
+				messages.push(message);
+				return undefined;
+			},
+		});
+
+		assert.equal(dispatched, false);
+		assert.equal(messages.length, 1);
+	});
+
+	test('dispatches nothing when the picker is cancelled', async () => {
+		const item = createItem();
+		let dispatched = false;
+
+		await runImplementAnalysisFromExplorerCommand(item, createDeps(item, {
+			pickProvider: async () => undefined,
+			dispatchHandoff: async () => {
+				dispatched = true;
+				throw new Error('should not dispatch');
+			},
+		}));
+
+		assert.equal(dispatched, false);
 	});
 });
 

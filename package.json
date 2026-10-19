@@ -151,6 +151,11 @@
         "icon": "$(search-sparkle)"
       },
       {
+        "command": "session-control.implementAnalysisFromExplorer",
+        "title": "Implement Analysis",
+        "category": "Session Control"
+      },
+      {
         "command": "session-control.toggleAutoSave",
         "title": "Toggle Auto-Save on Chat Response",
         "category": "Session Control"
@@ -711,6 +716,10 @@
           "when": "false"
         },
         {
+          "command": "session-control.implementAnalysisFromExplorer",
+          "when": "false"
+        },
+        {
           "command": "session-control.openSessionFromExplorer",
           "when": "false"
         },
@@ -805,6 +814,11 @@
           "command": "session-control.reanalyzeSessionFromExplorer",
           "when": "view == session-control.sessionExplorer && viewItem == session-control.session.analyzed",
           "group": "inline@2"
+        },
+        {
+          "command": "session-control.implementAnalysisFromExplorer",
+          "when": "view == session-control.sessionExplorer && viewItem == session-control.session.analyzed",
+          "group": "2_analysis@1"
         },
         {
           "command": "session-control-pro.harvestSessionFromExplorer",
