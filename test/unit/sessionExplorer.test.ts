@@ -56,7 +56,9 @@ interface PackageManifest {
 			commandPalette?: MenuContribution[];
 			'view/title'?: MenuContribution[];
 			'view/item/context'?: MenuContribution[];
+			'explorer/context'?: MenuContribution[];
 		};
+		viewsWelcome?: { view: string; contents: string; when?: string }[];
 	};
 }
 
@@ -480,6 +482,32 @@ suite('session explorer', () => {
 		);
 	});
 
+	test('empty Saved Sessions view shows welcome links with a license-gated upgrade line', async () => {
+		const manifest = await readPackageManifest();
+		const welcome = (manifest.contributes.viewsWelcome ?? []).filter(
+			(entry) => entry.view === 'session-control.sessionExplorer',
+		);
+		const registered = new Set(manifest.contributes.commands.map((contribution) => contribution.command));
+		const linkedCommands = welcome.flatMap((entry) =>
+			[...entry.contents.matchAll(/\(command:([^)]+)\)/g)].map((match) => match[1]),
+		);
+		assert.deepEqual(linkedCommands, [
+			'session-control.saveSessionFromProvider',
+			'session-control.toggleAutoSave',
+			'session-control.upgradeToPro',
+		]);
+		for (const command of linkedCommands) {
+			assert.ok(registered.has(command as string), `${command} is not a contributed command`);
+		}
+
+		const upgradeEntries = welcome.filter((entry) => entry.contents.includes('command:session-control.upgradeToPro'));
+		assert.equal(upgradeEntries.length, 1);
+		assert.equal(upgradeEntries[0]?.when, '!session-control.hasProLicense');
+		assert.ok(
+			welcome.filter((entry) => entry !== upgradeEntries[0]).every((entry) => entry.when === undefined),
+		);
+	});
+
 	test('Implement Analysis is a right-click only action on analyzed sessions', async () => {
 		const manifest = await readPackageManifest();
 		const command = 'session-control.implementAnalysisFromExplorer';
@@ -540,7 +568,7 @@ suite('session explorer', () => {
 		// so no other view's title bar gains the Pro search button.
 		// A `false && ` prefix hides an action until its Pro release ships.
 		for (const contribution of titleActions) {
-			assert.match(contribution.when ?? '', /^(false && )?view == session-control\.sessionExplorer( && session-control\.proFeaturesLoaded)?$/);
+			assert.match(contribution.when ?? '', /^(false && )?view == session-control\.sessionExplorer( && session-control\.proFeaturesLoaded| && !session-control\.hasProLicense)?$/);
 		}
 
 		// The gated command keeps its Command Palette entry and must not appear
@@ -625,23 +653,66 @@ suite('session explorer', () => {
 		assert.equal(properties['session-control-pro.gitSync.workspaceKey']?.scope, 'resource');
 	});
 
-	test('Pro AI skills sync is a palette command with no Saved Sessions menu entries', async () => {
+	test('Pro AI skills sync is a palette command and a Saved Sessions overflow action', async () => {
 		const manifest = await readPackageManifest();
 		const syncCommand = manifest.contributes.commands.find(
 			(contribution) => contribution.command === PRO_SYNC_AI_SKILLS_COMMAND,
 		);
 		assert.equal(syncCommand?.title, 'Sync AI Skills Across Assistants');
 
-		// Workspace-wide command with no argument, so it stays in the palette.
 		const paletteEntries = (manifest.contributes.menus.commandPalette ?? []).filter(
 			(contribution) => contribution.command === PRO_SYNC_AI_SKILLS_COMMAND,
 		);
 		assert.equal(paletteEntries.length, 1);
 		assert.equal(paletteEntries[0]?.when, undefined);
 
-		for (const menu of [manifest.contributes.menus['view/title'], manifest.contributes.menus['view/item/context']]) {
-			assert.equal((menu ?? []).some((contribution) => contribution.command === PRO_SYNC_AI_SKILLS_COMMAND), false);
-		}
+		const titleActions = (manifest.contributes.menus['view/title'] ?? []).filter(
+			(contribution) => contribution.command === PRO_SYNC_AI_SKILLS_COMMAND,
+		);
+		assert.equal(titleActions.length, 1);
+		assert.equal(titleActions[0]?.when, 'view == session-control.sessionExplorer && session-control.proFeaturesLoaded');
+		assert.equal(titleActions[0]?.group, '4_knowledge@2');
+
+		const itemActions = manifest.contributes.menus['view/item/context'] ?? [];
+		assert.equal(itemActions.some((contribution) => contribution.command === PRO_SYNC_AI_SKILLS_COMMAND), false);
+	});
+
+	test('Saved Sessions overflow menu orders analysis, auto-save, knowledge, Git sync, then Pro purchase groups', async () => {
+		const manifest = await readPackageManifest();
+		const titleActions = manifest.contributes.menus['view/title'] ?? [];
+		const overflow = titleActions
+			.filter((contribution) => !contribution.group?.startsWith('navigation'))
+			.map((contribution) => ({ command: contribution.command, group: contribution.group ?? '', when: contribution.when }))
+			.sort((left, right) => {
+				const [leftGroup = '', leftOrder = '0'] = left.group.split('@');
+				const [rightGroup = '', rightOrder = '0'] = right.group.split('@');
+				return leftGroup.localeCompare(rightGroup) || Number(leftOrder) - Number(rightOrder);
+			});
+
+		const proLoaded = 'view == session-control.sessionExplorer && session-control.proFeaturesLoaded';
+		const unlicensed = 'view == session-control.sessionExplorer && !session-control.hasProLicense';
+		assert.deepEqual(overflow, [
+			{ command: 'session-control.analyzeSavedChats', group: '2_analysis@1', when: 'view == session-control.sessionExplorer' },
+			{ command: 'session-control.implementLatestAnalysis', group: '2_analysis@2', when: 'view == session-control.sessionExplorer' },
+			{ command: 'session-control.diagnoseAutoSave', group: '3_autosave@2', when: 'view == session-control.sessionExplorer' },
+			{ command: 'session-control.cleanupOrphanedParts', group: '3_autosave@3', when: 'view == session-control.sessionExplorer' },
+			{ command: 'session-control-pro.harvestKnowledge', group: '4_knowledge@1', when: proLoaded },
+			{ command: PRO_SYNC_AI_SKILLS_COMMAND, group: '4_knowledge@2', when: proLoaded },
+			{ command: PRO_GIT_SYNC_PUSH_COMMAND, group: '5_gitSync@1', when: proLoaded },
+			{ command: PRO_GIT_SYNC_PULL_COMMAND, group: '5_gitSync@2', when: proLoaded },
+			{ command: 'session-control.upgradeToPro', group: '9_pro@1', when: unlicensed },
+			{ command: 'session-control.enterProLicenseKey', group: '9_pro@2', when: unlicensed },
+		]);
+	});
+
+	test('Word document harvest is an Explorer context action on .docx files when Pro is loaded', async () => {
+		const manifest = await readPackageManifest();
+		const explorerActions = (manifest.contributes.menus['explorer/context'] ?? []).filter(
+			(contribution) => contribution.command === 'session-control-pro.harvestDocument',
+		);
+		assert.equal(explorerActions.length, 1);
+		assert.equal(explorerActions[0]?.when, 'resourceExtname == .docx && session-control.proFeaturesLoaded');
+		assert.equal(explorerActions[0]?.group, '7_session-control@1');
 	});
 
 	test('inline session actions use compact icons and keep delete rightmost', async () => {
@@ -649,7 +720,9 @@ suite('session explorer', () => {
 		const commandById = new Map(
 			manifest.contributes.commands.map((contribution) => [contribution.command, contribution]),
 		);
-		const inlineActions = manifest.contributes.menus['view/item/context'] ?? [];
+		const inlineActions = (manifest.contributes.menus['view/item/context'] ?? []).filter(
+			(contribution) => contribution.group?.startsWith('inline'),
+		);
 		const actionById = new Map(
 			inlineActions.map((contribution) => [contribution.command, contribution]),
 		);
@@ -678,6 +751,37 @@ suite('session explorer', () => {
 		assert.equal(item.command?.command, 'session-control.openSessionFromExplorer');
 		assert.equal(item.command?.title, 'Open Saved Session');
 		assert.equal(item.command?.arguments?.[0], item);
+	});
+
+	test('inline session actions are mirrored into the right-click menu', async () => {
+		const manifest = await readPackageManifest();
+		const itemActions = manifest.contributes.menus['view/item/context'] ?? [];
+		const sessionActionContext = 'view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/';
+		const expected: Array<[string, string]> = [
+			['session-control.openSessionFromExplorer', '1_open@1'],
+			[ANALYZE_SESSION_FROM_EXPLORER_COMMAND, '2_analysis@1'],
+			[REANALYZE_SESSION_FROM_EXPLORER_COMMAND, '2_analysis@1'],
+			['session-control-pro.harvestSessionFromExplorer', 'pro@2'],
+			['session-control.deleteSessionFromExplorer', '9_delete@1'],
+		];
+		for (const [commandId, group] of expected) {
+			const actions = itemActions.filter((contribution) => contribution.command === commandId);
+			// One inline icon plus one right-click entry with the same visibility.
+			assert.equal(actions.length, 2, commandId);
+			const inline = actions.find((contribution) => contribution.group?.startsWith('inline'));
+			const contextMenu = actions.find((contribution) => contribution.group === group);
+			assert.ok(inline, commandId);
+			assert.ok(contextMenu, commandId);
+			assert.equal(contextMenu?.when, inline?.when, commandId);
+		}
+		assert.equal(
+			itemActions.find((contribution) => contribution.group === '1_open@1')?.when,
+			sessionActionContext,
+		);
+		assert.match(
+			itemActions.find((contribution) => contribution.group === 'pro@2')?.when ?? '',
+			/&& session-control\.proFeaturesLoaded$/,
+		);
 	});
 
 	test('both inline analysis command variants run the shared single-session handler', async () => {
@@ -762,6 +866,50 @@ suite('session explorer', () => {
 		assert.equal(String(items[0]?.tooltip).includes('Harvested:'), false);
 		assert.equal((items[0]?.iconPath as vscode.ThemeIcon).id, 'graph');
 		assert.equal(items[0]?.contextValue, 'session-control.session.analyzed');
+	});
+
+	test('triaged sessions show triage signals in the tooltip', async () => {
+		const alpha = createWorkspaceFolder('C:/alpha', 'alpha', 0);
+		const provider = new SessionExplorerProvider({
+			getWorkspaceFolders: () => [alpha],
+			getStoragePath: () => 'C:/alpha/.chat',
+			listSessions: async () => [
+				createSession('Ranked Session', 'ranked.json', KNOWN_LOCAL_SAVED_AT, 'session-1'),
+				createSession('Skipped Session', 'skipped.json', KNOWN_LOCAL_SAVED_AT, 'session-2'),
+				createSession('Untriaged Session', 'untriaged.json', KNOWN_LOCAL_SAVED_AT, 'session-3'),
+			],
+			readAnalysisIndex: async () => ({
+				...createAnalysisIndex([]),
+				triagedSessions: [
+					{
+						fingerprint: 'fingerprint-1',
+						sessionId: 'session-1',
+						triagedAt: '2026-04-13T09:00:00.000Z',
+						skipped: false,
+						priority: 0.625,
+						signals: { friction: 2, toolFailureLoops: 1, instructionViolation: 0.4, controlFileLesson: 0.75, trivial: 0.1 },
+					},
+					{
+						fingerprint: 'fingerprint-2',
+						sessionId: 'session-2',
+						triagedAt: '2026-04-13T09:00:00.000Z',
+						skipped: true,
+						signals: { trivial: 0.9 },
+					},
+				],
+			}),
+		});
+
+		const items = await getSessionItems(provider);
+		const tooltipFor = (title: string) => String(items.find((item) => item.label === title)?.tooltip);
+		assert.equal(tooltipFor('Ranked Session').includes('Triage: priority 63%'), true);
+		assert.equal(
+			tooltipFor('Ranked Session').includes('Friction 2/3 · Tool failure loops 1/3 · Instruction violation 40% · Control-file lesson 75% · Trivial 10%'),
+			true,
+		);
+		assert.equal(tooltipFor('Skipped Session').includes('Triage: skipped as low-signal'), true);
+		assert.equal(tooltipFor('Skipped Session').includes('Trivial 90%'), true);
+		assert.equal(tooltipFor('Untriaged Session').includes('Triage:'), false);
 	});
 
 	test('harvested session shows the harvested badge and date in the tooltip', async () => {

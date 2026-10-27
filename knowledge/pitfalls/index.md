@@ -1,5 +1,7 @@
 # Pitfall
 
+- [Ensure correct contextValue for session rows in Pro package](ensure-correct-contextvalue-for-session-rows-in-pro-package.md) - Verify that the contextValue for session rows allows export and harvest commands.
+- [Avoid including local files in VSIX package](avoid-including-local-files-in-vsix-package.md) - Ensure local files are excluded from the VSIX to prevent errors.
 - [Avoid sibling `file:` dependencies when packaging VS Code extensions](avoid-sibling-file-dependencies-when-packaging-vs-code.md) - A sibling file dependency can create an out-of-tree symlink that makes vsce fail while scanning extension dependencies.
 - [Declare dynamically registered commands in `contributes.commands`](declare-dynamically-registered-commands-in-contributes.md) - Runtime registration alone does not make a VS Code command discoverable; declare it in the extension manifest.
 - [Do not look for Codex or Claude in `LanguageModelChat`](do-not-look-for-codex-or-claude-in-languagemodelchat.md) - External agent providers may not register `LanguageModelChat` models; discover their chat commands and hand off prompts instead.

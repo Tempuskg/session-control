@@ -20,6 +20,7 @@ import {
 	buildAnalysisPrompt,
 	buildAnalysisSynthesisPrompt,
 	buildImplementationHandoffPrompt,
+	buildSessionEvidence,
 	createCustomRangeSelection,
 	createNeedsAnalysisSelection,
 	createPresetAnalysisSelection,
@@ -47,7 +48,14 @@ import {
 import { fuzzyMatchSessions } from './utils';
 import { ANALYSIS_TRIAGE_QUESTION_SET_VERSION, triageAnalysisCandidates } from './typesafe/analysisTriage';
 import type { JudgmentService } from './typesafe/judgmentService';
+import { scoreResumeTurnRelevance } from './typesafe/resumeRelevance';
 import {
+	applyReportVerificationPolicy,
+	summarizeReportVerification,
+	verifyReportRecommendations,
+} from './typesafe/reportVerification';
+import {
+	judgeAnalysisTimeframe,
 	routeSlashlessPrompt,
 	toIntentRoutingSuggestionMetadata,
 	type IntentRoutingSuggestionMetadata,
@@ -85,7 +93,11 @@ const CURSOR_PASTE_SETTLE_MS = 250;
 const CURSOR_PASTE_RETRY_DELAY_MS = 150;
 const CURSOR_PASTE_MAX_ATTEMPTS = 6;
 
-export type ResumeOverflowStrategy = 'summarize' | 'truncate' | 'recent-only';
+export type ResumeOverflowStrategy = 'summarize' | 'truncate' | 'recent-only' | 'relevant';
+/** Strategy used when `relevant` has no relevance scores (TypeSafe off or failed). */
+export const RELEVANT_FALLBACK_STRATEGY: ResumeOverflowStrategy = 'summarize';
+/** Scores omitted turns against the resume prompt from zero to one; undefined means unavailable. */
+export type TurnRelevanceScorer = (omittedTurns: SavedTurn[], prompt: string) => Promise<readonly number[] | undefined>;
 export type ResumeTargetMode = 'origin-agent' | 'vscode-chat';
 const SUMMARIZE_FALLBACK_NOTE = 'Summary generation failed - showing most recent turns only.';
 
@@ -108,6 +120,8 @@ export interface ResumeIntoOriginAgentConfig {
 	maxTurns: number;
 	maxContextChars: number;
 	overflowStrategy: ResumeOverflowStrategy;
+	/** Scores omitted turns for the `relevant` strategy; omit to fall back. */
+	scoreTurnRelevance?: TurnRelevanceScorer;
 	providerCommands?: ResumeProviderCommands;
 	// Explicit target chosen by the user. When omitted, resume keeps targeting
 	// the session's origin provider.
@@ -205,7 +219,7 @@ export interface ImplementationHandoffFlowDeps {
 		analysisReportPath: string;
 		analysisStorageDirectory: string;
 	} | null;
-	buildPrompt: (reportFilePath: string, userPrompt: string) => string;
+	buildPrompt: (reportFilePath: string, userPrompt: string) => string | Promise<string>;
 	getCommands: () => Promise<readonly string[]>;
 	pickProvider: (choices: AnalysisProviderChoices) => Promise<AnalysisProviderSelection | undefined>;
 	dispatchHandoff: (
@@ -541,10 +555,26 @@ export async function pickAnalysisProvider(choices: AnalysisProviderChoices): Pr
 	return pick?.selection;
 }
 
-export async function resolveAnalysisSelection(prompt: string): Promise<import('./types').AnalysisSelection | undefined> {
+export interface ResolveAnalysisSelectionOptions {
+	/** TypeSafe judgments for free-form timeframes the alias parser does not recognize. */
+	readonly judgment?: JudgmentService;
+	readonly token?: vscode.CancellationToken;
+	readonly log?: (message: string) => void;
+}
+
+export async function resolveAnalysisSelection(
+	prompt: string,
+	options: ResolveAnalysisSelectionOptions = {},
+): Promise<import('./types').AnalysisSelection | undefined> {
 	const parsed = parseAnalysisSelectionAlias(prompt);
 	if (parsed) {
 		return parsed;
+	}
+
+	const judgedAlias = await judgeAnalysisTimeframe(prompt, options.judgment, options.token, options.log);
+	const judged = judgedAlias ? parseAnalysisSelectionAlias(judgedAlias) : undefined;
+	if (judged) {
+		return judged;
 	}
 
 	const pick = await vscode.window.showQuickPick(
@@ -732,7 +762,7 @@ export async function buildAnalysisHandoffPrompt(
 			`Write the markdown report using the existing Session Control format under "${ownerReportsDirectory}".`,
 			`Update the relevant analysis indexes using the existing Session Control schema, including "${ownerIndexPath}" for the owner workspace and any source storage indexes that need report references.`,
 			'',
-			buildAnalysisPersistenceContract(ANALYSIS_PROMPT_VERSION),
+			buildAnalysisPersistenceContract(ANALYSIS_PROMPT_VERSION, selection),
 			'Source storage directories:',
 			...storageDirectories,
 			'',
@@ -876,6 +906,8 @@ export interface AnalyzeSessionsFlowDepsOverrides {
 	maxPromptChars?: number;
 	promptExceedsModelInput?: AnalyzeSessionsFlowDeps['promptExceedsModelInput'];
 	triageCandidates?: AnalyzeSessionsFlowDeps['triageCandidates'];
+	recordTriage?: AnalyzeSessionsFlowDeps['recordTriage'];
+	verifyReport?: AnalyzeSessionsFlowDeps['verifyReport'];
 }
 
 export function createAnalyzeSessionsFlowDeps(overrides: AnalyzeSessionsFlowDepsOverrides): AnalyzeSessionsFlowDeps {
@@ -889,9 +921,9 @@ export function createAnalyzeSessionsFlowDeps(overrides: AnalyzeSessionsFlowDeps
 			candidates: AnalysisCandidateSession[],
 		) => loadRecommendationBaseline(workspaceFolders, candidates)),
 		splitIntoBatches: overrides.splitIntoBatches
-			?? ((candidates: AnalysisCandidateSession[], maxChars?: number) => splitCandidatesIntoAnalysisBatches(candidates, maxChars)),
-		buildPrompt: overrides.buildPrompt ?? ((selection, candidates, recommendationBaseline, detailLevel) =>
-			buildAnalysisPrompt(selection, candidates, recommendationBaseline, detailLevel)),
+			?? ((candidates, maxChars, detailLevels) => splitCandidatesIntoAnalysisBatches(candidates, maxChars, detailLevels)),
+		buildPrompt: overrides.buildPrompt ?? ((selection, candidates, recommendationBaseline, detailLevel, detailLevels) =>
+			buildAnalysisPrompt(selection, candidates, recommendationBaseline, detailLevel, detailLevels)),
 		buildSynthesisPrompt: overrides.buildSynthesisPrompt ?? ((selection, batchSummaries, recommendationBaseline) =>
 			buildAnalysisSynthesisPrompt(selection, batchSummaries, recommendationBaseline)),
 		runModelPrompt: overrides.runModelPrompt,
@@ -904,6 +936,8 @@ export function createAnalyzeSessionsFlowDeps(overrides: AnalyzeSessionsFlowDeps
 		...(overrides.maxPromptChars !== undefined ? { maxPromptChars: overrides.maxPromptChars } : {}),
 		...(overrides.promptExceedsModelInput ? { promptExceedsModelInput: overrides.promptExceedsModelInput } : {}),
 		...(overrides.triageCandidates ? { triageCandidates: overrides.triageCandidates } : {}),
+		...(overrides.recordTriage ? { recordTriage: overrides.recordTriage } : {}),
+		...(overrides.verifyReport ? { verifyReport: overrides.verifyReport } : {}),
 	};
 }
 
@@ -933,6 +967,21 @@ function createDefaultAnalyzeSessionsFlowDeps(
 						}),
 						...(log ? { log } : {}),
 					}),
+					recordTriage: async (storageDirectory, entries) => analysisStore.recordTriage(storageDirectory, entries),
+					verifyReport: async (report: string, analyzedCandidates: AnalysisCandidateSession[]) => {
+						const evidence = analyzedCandidates
+							.map((candidate) => buildSessionEvidence(candidate, 'summaryOnly'))
+							.join('\n\n');
+						const results = await verifyReportRecommendations(report, evidence, {
+							judgment,
+							token,
+							...(log ? { log } : {}),
+						});
+						return {
+							content: applyReportVerificationPolicy(report, results),
+							summary: summarizeReportVerification(results),
+						};
+					},
 			  }
 			: {}),
 	});
@@ -1050,11 +1099,13 @@ export async function runResumeIntoOriginAgent(
 		return false;
 	}
 
-	const constrained = applyResumeOverflowStrategy(
+	const constrained = await resolveResumeOverflow(
 		session.turns,
+		userPrompt,
 		config.maxTurns,
 		config.maxContextChars,
 		config.overflowStrategy,
+		config.scoreTurnRelevance,
 	);
 	const originNote = composeOriginProviderNote(originProvider, targetProvider);
 	const resumePrompt = composeResumePrompt(
@@ -1066,13 +1117,23 @@ export async function runResumeIntoOriginAgent(
 	return runPromptIntoOriginAgent(targetProvider, resumePrompt, config, depsOverrides);
 }
 
+/** Report text for verified-recommendation filtering; `undefined` keeps the unfiltered handoff. */
+export async function readReportContent(reportFilePath: string): Promise<string | undefined> {
+	try {
+		return await fs.readFile(reportFilePath, 'utf8');
+	} catch {
+		return undefined;
+	}
+}
+
 function createDefaultImplementationHandoffFlowDeps(
 	stream: vscode.ChatResponseStream,
 ): ImplementationHandoffFlowDeps {
 	const handoffDispatcher = createVSCodeHandoffDispatcher();
 	return {
 		findAnalysisReportMeta: (history) => findLatestAnalysisReportMeta(history),
-		buildPrompt: (reportFilePath: string, userPrompt: string) => buildImplementationHandoffPrompt(reportFilePath, userPrompt),
+		buildPrompt: async (reportFilePath: string, userPrompt: string) =>
+			buildImplementationHandoffPrompt(reportFilePath, userPrompt, await readReportContent(reportFilePath)),
 		getCommands: async () => vscode.commands.getCommands(true),
 		pickProvider: pickAnalysisProvider,
 		dispatchHandoff: async (prompt: string, target: HandoffSelectionId) => {
@@ -1121,7 +1182,7 @@ export async function runImplementationHandoffFlow(
 	}
 
 	const reportFilePath = path.join(analysisMeta.analysisStorageDirectory, analysisMeta.analysisReportPath);
-	const prompt = deps.buildPrompt(reportFilePath, requestPrompt);
+	const prompt = await deps.buildPrompt(reportFilePath, requestPrompt);
 	let availableCommands: readonly string[] = [];
 	try {
 		availableCommands = await deps.getCommands();
@@ -1250,12 +1311,60 @@ function splitRecentAndOmittedTurns(turns: SavedTurn[], maxTurns: number): { rec
 	return { recent, omitted };
 }
 
-function applyResumeOverflowStrategy(
+function turnCharLength(turn: SavedTurn): number {
+	return (turn.type === 'request' ? turn.prompt : turn.content).length;
+}
+
+// Keeps the last `maxTurns` (trimmed to the budget), then spends the remaining
+// `maxContextChars` on the most relevant omitted turns, emitted in turn order.
+function selectRelevantTurns(
+	turns: SavedTurn[],
+	maxTurns: number,
+	maxContextChars: number,
+	relevanceScores: readonly number[],
+): { turns: SavedTurn[]; note?: string } {
+	const split = splitRecentAndOmittedTurns(turns, maxTurns);
+	const recent = trimTurnsForResume(split.recent, split.recent.length || maxTurns, maxContextChars);
+	let remaining = maxContextChars - recent.reduce((total, turn) => total + turnCharLength(turn), 0);
+
+	const ranked = split.omitted
+		.map((turn, index) => ({ turn, index, relevance: relevanceScores[index] ?? 0 }))
+		.filter((entry) => entry.relevance > 0)
+		.sort((left, right) => right.relevance - left.relevance || right.index - left.index);
+	const chosen = new Set<number>();
+	for (const entry of ranked) {
+		const length = turnCharLength(entry.turn);
+		if (length <= remaining) {
+			chosen.add(entry.index);
+			remaining -= length;
+		}
+	}
+
+	const selected = split.omitted.filter((_turn, index) => chosen.has(index));
+	const omittedCount = split.omitted.length;
+	const note = omittedCount > 0
+		? `Included ${selected.length} of ${omittedCount} earlier turns selected by relevance to the follow-up; the rest were omitted.`
+		: undefined;
+	return {
+		turns: [...selected, ...recent],
+		...(note ? { note } : {}),
+	};
+}
+
+export function applyResumeOverflowStrategy(
 	turns: SavedTurn[],
 	maxTurns: number,
 	maxContextChars: number,
 	strategy: ResumeOverflowStrategy,
+	relevanceScores?: readonly number[],
 ): { turns: SavedTurn[]; note?: string } {
+	if (strategy === 'relevant') {
+		if (relevanceScores && maxTurns > 0 && maxContextChars > 0) {
+			return selectRelevantTurns(turns, maxTurns, maxContextChars, relevanceScores);
+		}
+		return applyResumeOverflowStrategy(turns, maxTurns, maxContextChars, RELEVANT_FALLBACK_STRATEGY);
+	}
+
 	if (strategy === 'recent-only') {
 		const split = splitRecentAndOmittedTurns(turns, maxTurns);
 		const recent = split.recent;
@@ -1283,6 +1392,62 @@ function applyResumeOverflowStrategy(
 	return {
 		turns: trimTurnsForResume(turns, maxTurns, maxContextChars),
 	};
+}
+
+export interface ResolvedResumeOverflow {
+	turns: SavedTurn[];
+	note?: string;
+	/** The strategy actually applied; `relevant` falls back when no scores are available. */
+	strategy: ResumeOverflowStrategy;
+}
+
+/**
+ * Applies the overflow strategy, scoring omitted turns first for `relevant`.
+ * Without a scorer, or when it returns nothing or throws, `relevant` falls back
+ * to `RELEVANT_FALLBACK_STRATEGY`.
+ */
+export async function resolveResumeOverflow(
+	turns: SavedTurn[],
+	prompt: string,
+	maxTurns: number,
+	maxContextChars: number,
+	strategy: ResumeOverflowStrategy,
+	scorer?: TurnRelevanceScorer,
+): Promise<ResolvedResumeOverflow> {
+	if (strategy === 'relevant') {
+		const omitted = splitRecentAndOmittedTurns(turns, maxTurns).omitted;
+		let scores: readonly number[] | undefined;
+		if (scorer && omitted.length > 0) {
+			try {
+				scores = await scorer(omitted, prompt);
+			} catch {
+				scores = undefined;
+			}
+		}
+		if (scores || (scorer && omitted.length === 0)) {
+			return { ...applyResumeOverflowStrategy(turns, maxTurns, maxContextChars, 'relevant', scores ?? []), strategy };
+		}
+		return {
+			...applyResumeOverflowStrategy(turns, maxTurns, maxContextChars, RELEVANT_FALLBACK_STRATEGY),
+			strategy: RELEVANT_FALLBACK_STRATEGY,
+		};
+	}
+
+	return { ...applyResumeOverflowStrategy(turns, maxTurns, maxContextChars, strategy), strategy };
+}
+
+function createJudgmentTurnRelevanceScorer(
+	judgment: JudgmentService,
+	token?: vscode.CancellationToken,
+	log?: (message: string) => void,
+): TurnRelevanceScorer {
+	return (omittedTurns, prompt) => scoreResumeTurnRelevance({
+		omittedTurns,
+		prompt,
+		judgment,
+		...(token ? { token } : {}),
+		...(log ? { log } : {}),
+	});
 }
 
 function turnsToContextBlock(turns: SavedTurn[]): string {
@@ -1551,11 +1716,20 @@ async function sendModelResponse(
 	maxTurns: number,
 	maxContextChars: number,
  	overflowStrategy: ResumeOverflowStrategy,
+	judgment?: JudgmentService,
+	log?: (message: string) => void,
 ): Promise<void> {
-	const constrained = applyResumeOverflowStrategy(session.turns, maxTurns, maxContextChars, overflowStrategy);
+	const constrained = await resolveResumeOverflow(
+		session.turns,
+		prompt,
+		maxTurns,
+		maxContextChars,
+		overflowStrategy,
+		judgment ? createJudgmentTurnRelevanceScorer(judgment, token, log) : undefined,
+	);
 	let overflowNote = constrained.note;
 
-	if (overflowStrategy === 'summarize') {
+	if (constrained.strategy === 'summarize') {
 		const split = splitRecentAndOmittedTurns(session.turns, maxTurns);
 		overflowNote = await resolveSummarizeNoteWithFallback(split.omitted, async (input) => {
 			const summaryRequest = await request.model.sendRequest(
@@ -1622,7 +1796,11 @@ export function registerChatParticipant(context: vscode.ExtensionContext, deps: 
 			}
 
 			if (command === 'analyze') {
-				const selection = await resolveAnalysisSelection(prompt);
+				const selection = await resolveAnalysisSelection(prompt, {
+					token,
+					...(deps.judgment ? { judgment: deps.judgment } : {}),
+					...(deps.log ? { log: deps.log } : {}),
+				});
 				if (!selection) {
 					return;
 				}
@@ -1734,6 +1912,9 @@ export function registerChatParticipant(context: vscode.ExtensionContext, deps: 
 								maxContextChars,
 								overflowStrategy,
 								providerCommands,
+								...(deps.judgment
+									? { scoreTurnRelevance: createJudgmentTurnRelevanceScorer(deps.judgment, token, deps.log) }
+									: {}),
 							},
 							createDefaultResumeIntoOriginAgentDeps(stream),
 						);
@@ -1819,7 +2000,18 @@ export function registerChatParticipant(context: vscode.ExtensionContext, deps: 
 				.getConfiguration('session-control', resumedWorkspaceFolder.uri)
 				.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize');
 
-			await sendModelResponse(request, stream, token, resumedSession, request.prompt, maxTurns, maxContextChars, overflowStrategy);
+			await sendModelResponse(
+				request,
+				stream,
+				token,
+				resumedSession,
+				request.prompt,
+				maxTurns,
+				maxContextChars,
+				overflowStrategy,
+				deps.judgment,
+				deps.log,
+			);
 			return {
 				metadata: {
 					resumedSessionFile: reassembled.rootFileName,

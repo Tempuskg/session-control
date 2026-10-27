@@ -5,6 +5,7 @@ import { createSessionStore } from './sessionStore';
 import {
 	AnalysisIndex,
 	AnalysisIndexEntry,
+	AnalysisTriageIndexEntry,
 	HarvestIndex,
 	HarvestIndexEntry,
 	SessionMeta,
@@ -109,6 +110,8 @@ export interface SessionExplorerGroup {
 	sessions: SessionMeta[];
 	analyzedSessions: AnalysisIndexEntry[];
 	harvestedSessions: HarvestIndexEntry[];
+	/** TypeSafe triage signals recorded by /analyze; absent when triage never ran. */
+	triagedSessions?: AnalysisTriageIndexEntry[];
 }
 
 interface SessionExplorerDeps {
@@ -166,6 +169,45 @@ export function findAnalyzedEntry(
 	}
 
 	return latest;
+}
+
+// Matches like findAnalyzedEntry so every part of a multi-part save shows the
+// same triage signals.
+export function findTriagedEntry(
+	entries: readonly AnalysisTriageIndexEntry[],
+	session: SessionMeta,
+): AnalysisTriageIndexEntry | undefined {
+	let latest: AnalysisTriageIndexEntry | undefined;
+	for (const entry of entries) {
+		if (entry.sessionId !== session.id && entry.rootFileName !== session.fileName) {
+			continue;
+		}
+
+		if (!latest || Date.parse(entry.triagedAt) > Date.parse(latest.triagedAt)) {
+			latest = entry;
+		}
+	}
+
+	return latest;
+}
+
+function formatProbability(value: number): string {
+	return `${Math.round(Math.min(1, Math.max(0, value)) * 100)}%`;
+}
+
+export function formatTriageTooltipLines(entry: AnalysisTriageIndexEntry): string[] {
+	const headline = entry.skipped
+		? 'Triage: skipped as low-signal'
+		: `Triage: priority ${formatProbability(entry.priority ?? 0)}`;
+	const { signals } = entry;
+	const details = [
+		...(signals.friction === undefined ? [] : [`Friction ${signals.friction}/3`]),
+		...(signals.toolFailureLoops === undefined ? [] : [`Tool failure loops ${signals.toolFailureLoops}/3`]),
+		...(signals.instructionViolation === undefined ? [] : [`Instruction violation ${formatProbability(signals.instructionViolation)}`]),
+		...(signals.controlFileLesson === undefined ? [] : [`Control-file lesson ${formatProbability(signals.controlFileLesson)}`]),
+		...(signals.trivial === undefined ? [] : [`Trivial ${formatProbability(signals.trivial)}`]),
+	];
+	return details.length > 0 ? [headline, `  ${details.join(' · ')}`] : [headline];
 }
 
 // Harvest entries carry no rootFileName, but part files of a split session
@@ -233,6 +275,10 @@ export class SessionExplorerSessionItem extends vscode.TreeItem {
 		}
 		if (harvested) {
 			tooltipLines.push(`Harvested: ${harvested.harvestedAt}`);
+		}
+		const triaged = findTriagedEntry(group.triagedSessions ?? [], session);
+		if (triaged) {
+			tooltipLines.push(...formatTriageTooltipLines(triaged));
 		}
 		this.tooltip = tooltipLines.join('\n');
 		// Each state combination gets its own icon shape so it stays glanceable
@@ -335,6 +381,7 @@ export async function listSessionExplorerGroups(
 				sessions,
 				analyzedSessions: analysisIndex?.analyzedSessions ?? [],
 				harvestedSessions: harvestIndex?.sessions ?? [],
+				...(analysisIndex?.triagedSessions ? { triagedSessions: analysisIndex.triagedSessions } : {}),
 			};
 		}),
 	);

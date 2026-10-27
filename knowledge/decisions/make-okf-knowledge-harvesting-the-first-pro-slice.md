@@ -35,4 +35,4 @@ The first paid feature reinforces the product's multi-assistant positioning and 
 
 # Citations
 
-1. Monetization sequencing and OKF knowledge harvesting session (not published)
+1. [Monetization sequencing and OKF knowledge harvesting session](../sessions/9d0009f2-dca3-408f-a679-f633dd6ae0b8.md)

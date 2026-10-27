@@ -8,5 +8,6 @@
         "slugification",
         "slugified",
         "vscodeignore"
-    ]
+    ],
+    "session-control.includeInGitignore": false
 }

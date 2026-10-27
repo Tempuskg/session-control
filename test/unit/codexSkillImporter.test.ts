@@ -2,7 +2,13 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { createCodexSkillImporter } from '../../src/codexSkillImporter';
+import {
+	SKILL_SUGGESTION_MIN_CONFIDENCE,
+	createCodexSkillImporter,
+	suggestMatchingSkill,
+	type SkillCatalogEntry,
+} from '../../src/codexSkillImporter';
+import { createFakeJudgmentService } from '../../src/typesafe/judgmentService';
 
 suite('codexSkillImporter', () => {
 	test('discovers guidance files and imports them into repo-scoped Codex skills by default', async () => {
@@ -381,5 +387,75 @@ suite('codexSkillImporter', () => {
 		} finally {
 			await fs.rm(workspaceRoot, { recursive: true, force: true });
 		}
+	});
+
+	suite('skill suggestion', () => {
+		const skills: SkillCatalogEntry[] = [
+			{ name: 'repo-validation', description: 'Validate touched files before broad test runs.', relativeSkillFilePath: '.agents/skills/repo-validation/SKILL.md' },
+			{ name: 'release', description: 'Cut a VS Code extension release.', relativeSkillFilePath: '.agents/skills/release/SKILL.md' },
+		];
+
+		test('asks one Choice over the skill catalog plus none and suggests a confident match', async () => {
+			const judgment = createFakeJudgmentService({ answers: { skill: { choice: 'skill-2', confidence: 0.9 } } });
+			const suggestion = await suggestMatchingSkill({ task: 'publish version 2.0', skills, judgment });
+
+			assert.deepEqual(suggestion, { skill: skills[1], confidence: 0.9 });
+			assert.equal(judgment.calls.length, 1);
+			assert.equal(judgment.calls[0]?.options, 'routing');
+			const question = (judgment.calls[0]?.questions as Record<string, { type?: string; criteria?: Record<string, string> }>).skill;
+			assert.equal(question?.type, 'choice');
+			assert.deepEqual(Object.keys(question?.criteria ?? {}), ['skill-1', 'skill-2', 'none']);
+		});
+
+		test('returns no suggestion for low confidence, none, or invalid answers', async () => {
+			const lowConfidence = createFakeJudgmentService({
+				answers: { skill: { choice: 'skill-1', confidence: SKILL_SUGGESTION_MIN_CONFIDENCE - 0.01 } },
+			});
+			assert.equal(await suggestMatchingSkill({ task: 'run tests', skills, judgment: lowConfidence }), undefined);
+
+			const none = createFakeJudgmentService({ answers: { skill: { choice: 'none', confidence: 0.99 } } });
+			assert.equal(await suggestMatchingSkill({ task: 'draw a logo', skills, judgment: none }), undefined);
+
+			const outOfRange = createFakeJudgmentService({ answers: { skill: { choice: 'skill-9', confidence: 0.99 } } });
+			assert.equal(await suggestMatchingSkill({ task: 'run tests', skills, judgment: outOfRange }), undefined);
+		});
+
+		test('skips the request when routing is off or there is nothing to choose', async () => {
+			const featureOff = createFakeJudgmentService({ features: { routing: false }, answers: { skill: { choice: 'skill-1', confidence: 0.9 } } });
+			assert.equal(await suggestMatchingSkill({ task: 'run tests', skills, judgment: featureOff }), undefined);
+			assert.equal(featureOff.calls.length, 0);
+
+			assert.equal(await suggestMatchingSkill({ task: 'run tests', skills, judgment: undefined }), undefined);
+
+			const judgment = createFakeJudgmentService({ answers: { skill: { choice: 'skill-1', confidence: 0.9 } } });
+			assert.equal(await suggestMatchingSkill({ task: 'run tests', skills: [], judgment }), undefined);
+			assert.equal(await suggestMatchingSkill({ task: '  ', skills, judgment }), undefined);
+			assert.equal(judgment.calls.length, 0);
+		});
+
+		test('lists the skill catalog from SKILL.md frontmatter', async () => {
+			const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-skill-catalog-'));
+			try {
+				await fs.mkdir(path.join(workspaceRoot, '.agents', 'skills', 'release'), { recursive: true });
+				await fs.mkdir(path.join(workspaceRoot, '.agents', 'skills', 'no-description'), { recursive: true });
+				await fs.writeFile(
+					path.join(workspaceRoot, '.agents', 'skills', 'release', 'SKILL.md'),
+					'---\nname: release\ndescription: "Cut a \\"release\\" build."\n---\nBody\n',
+					'utf8',
+				);
+				await fs.writeFile(
+					path.join(workspaceRoot, '.agents', 'skills', 'no-description', 'SKILL.md'),
+					'---\nname: no-description\n---\n',
+					'utf8',
+				);
+
+				const catalog = await createCodexSkillImporter().listSkillCatalog(workspaceRoot);
+				assert.deepEqual(catalog, [
+					{ name: 'release', description: 'Cut a "release" build.', relativeSkillFilePath: '.agents/skills/release/SKILL.md' },
+				]);
+			} finally {
+				await fs.rm(workspaceRoot, { recursive: true, force: true });
+			}
+		});
 	});
 });

@@ -1,0 +1,2286 @@
+{
+  "requestedName": "GPT-6.1 Sol",
+  "models": [
+    {
+      "name": "Metatron Orchestrator",
+      "id": "metatron",
+      "vendor": "customendpoint",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6.1 Terra",
+      "id": "openai/gpt-6.1-terra",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6.1 Terra (batch)",
+      "id": "openai/gpt-6.1-terra:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MoonshotAI: Kimi K3.1 Pro",
+      "id": "moonshotai/kimi-k3.1-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Recursive: Flint (free)",
+      "id": "recursive/flint-v1.0:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MiniMax: MiniMax M3.1 Flash",
+      "id": "minimax/minimax-m3.1-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "DeepSeek: DeepSeek V4.1 Flash 1017",
+      "id": "deepseek/deepseek-v4.1-flash-1017",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Elorian: Glimpse",
+      "id": "elorian/glimpse",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "XingChen: Xing4.0 29B A4B (free)",
+      "id": "xingchen-agi/xing4.0-29b-a4b:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Reflection: Beam 1.0 501B A23B",
+      "id": "reflection/beam-1.0-501b-a23b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Inception: Mercury 3",
+      "id": "inception/mercury-3",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Meta: Muse Spark Open",
+      "id": "meta/muse-spark-open",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "NVIDIA: Nemotron 3.5 Super VL",
+      "id": "nvidia/nemotron-3.5-super-vl",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "NVIDIA: Nemotron 3.5 Super VL (free)",
+      "id": "nvidia/nemotron-3.5-super-vl:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Pareto 26.10",
+      "id": "unbiased/pareto-26.10",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Pareto 26.9",
+      "id": "unbiased/pareto-26.9",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "LiquidAI: LFM2.5-24B-A2B",
+      "id": "liquid/lfm-2.5-24b-a2b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 4 Argon",
+      "id": "google/gemini-4-argon",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 4 Argon (batch)",
+      "id": "google/gemini-4-argon:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Meta: Muse Wonder",
+      "id": "meta/muse-wonder",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "StepFun: Step 5 Preview",
+      "id": "stepfun/step-5-preview",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Haiku 5.5",
+      "id": "anthropic/claude-haiku-5.5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Haiku 5.5 (batch)",
+      "id": "anthropic/claude-haiku-5.5:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Nano Banana 2.1",
+      "id": "google/gemini-nano-banana-2.1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Mistral Large 4",
+      "id": "mistralai/mistral-large-4-0",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "inclusionAI: Ling 3.1 Flash",
+      "id": "inclusionai/ling-3.1-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6.1 Sol Pro",
+      "id": "openai/gpt-6.1-sol-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6.1 Sol Pro (batch)",
+      "id": "openai/gpt-6.1-sol-pro:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6.1 Sol",
+      "id": "openai/gpt-6.1-sol",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6.1 Sol (batch)",
+      "id": "openai/gpt-6.1-sol:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Sonnet 5.5",
+      "id": "anthropic/claude-sonnet-5.5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Sonnet 5.5 (batch)",
+      "id": "anthropic/claude-sonnet-5.5:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Perceptron: Perceptron Mk1.5",
+      "id": "perceptron/perceptron-mk1.5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Fireworks: Ember-1",
+      "id": "fireworks/ember-1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 5.3 Prime",
+      "id": "z-ai/glm-5.3-prime",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.8 Max Prime",
+      "id": "qwen/qwen3.8-max-prime",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "AionLabs: Aion 3.5 Mini",
+      "id": "aion-labs/aion-3.5-mini",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "AionLabs: Aion 3.5",
+      "id": "aion-labs/aion-3.5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Upstage: Solar Mini 4",
+      "id": "upstage/solar-mini4",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Cohere: Command A+",
+      "id": "cohere/command-a-plus",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6 Luna Pro",
+      "id": "openai/gpt-6-luna-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6 Luna Pro (batch)",
+      "id": "openai/gpt-6-luna-pro:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6 Luna",
+      "id": "openai/gpt-6-luna",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6 Luna (batch)",
+      "id": "openai/gpt-6-luna:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6 Sol Pro",
+      "id": "openai/gpt-6-sol-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6 Sol Pro (batch)",
+      "id": "openai/gpt-6-sol-pro:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6 Sol",
+      "id": "openai/gpt-6-sol",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6 Sol (batch)",
+      "id": "openai/gpt-6-sol:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Opus 5.5",
+      "id": "anthropic/claude-opus-5.5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Opus 5.5 (batch)",
+      "id": "anthropic/claude-opus-5.5:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Xiaomi: MiMo-V2.6-Pro-UltraSpeed",
+      "id": "xiaomi/mimo-v2.6-pro-ultraspeed",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Xiaomi: MiMo-V2.6-Flash",
+      "id": "xiaomi/mimo-v2.6-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Xiaomi: MiMo-V2.6-Pro",
+      "id": "xiaomi/mimo-v2.6-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "SpaceXAI: Grok 4.7",
+      "id": "x-ai/grok-4.7",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.8 Omni Flash",
+      "id": "qwen/qwen3.8-omni-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "PrismML: Ternary Bonsai 2 27B",
+      "id": "prism-ml/ternary-bonsai-2-27b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 5.3 FlashX",
+      "id": "z-ai/glm-5.3-flashx",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Sakana: Fugu Ultra v2",
+      "id": "sakana/fugu-ultra-v2",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Sakana: Fugu Max",
+      "id": "sakana/fugu-max",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "inclusionAI: Ling 3.0 Flash VL",
+      "id": "inclusionai/ling-3.0-flash-vl",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "DeepSeek: DeepSeek V4.1 Flash",
+      "id": "deepseek/deepseek-v4.1-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "DeepSeek: DeepSeek V4.1 Flash (batch)",
+      "id": "deepseek/deepseek-v4.1-flash:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Inception: Mercury 2.5",
+      "id": "inception/mercury-2.5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Nex AGI: Nex-N2.5-Pro",
+      "id": "nex-agi/nex-n2.5-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6 Astra",
+      "id": "openai/gpt-6-astra",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6 Astra (batch)",
+      "id": "openai/gpt-6-astra:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6 Astra Pro",
+      "id": "openai/gpt-6-astra-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-6 Astra Pro (batch)",
+      "id": "openai/gpt-6-astra-pro:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.8 Max (0902)",
+      "id": "qwen/qwen3.8-max-0902",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Meta: Muse Spark 1.3 Contributor",
+      "id": "meta/muse-spark-1.3-contributor",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Meta: Muse Spark 1.3",
+      "id": "meta/muse-spark-1.3",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.8 Flash",
+      "id": "google/gemini-3.8-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.8 Flash (batch)",
+      "id": "google/gemini-3.8-flash:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Fable 5.1",
+      "id": "anthropic/claude-fable-5.1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Fable 5.1 (batch)",
+      "id": "anthropic/claude-fable-5.1:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "IBM: Granite 4.2 8B",
+      "id": "ibm-granite/granite-4.2-8b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Tencent: Hy4 preview",
+      "id": "tencent/hy4-preview",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.8 Flash",
+      "id": "qwen/qwen3.8-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 5.3 Flash",
+      "id": "z-ai/glm-5.3-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 5.3 Flash (batch)",
+      "id": "z-ai/glm-5.3-flash:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Meta: Muse Spark 1.2 Contributor",
+      "id": "meta/muse-spark-1.2-contributor",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "DeepSeek: DeepSeek V4 Flash Vision Exp",
+      "id": "deepseek/deepseek-v4-flash-vision-exp",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 5.3",
+      "id": "z-ai/glm-5.3",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 5.3 (batch)",
+      "id": "z-ai/glm-5.3:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.8 27B",
+      "id": "qwen/qwen3.8-27b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Dots Studio: Dots3-Note Preview (free)",
+      "id": "dots-studio/dots-3-note-preview:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.7 Flash",
+      "id": "google/gemini-3.7-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.7 Flash (batch)",
+      "id": "google/gemini-3.7-flash:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "ByteDance Seed: Seed 2.1 Turbo",
+      "id": "bytedance-seed/seed-2-1-turbo",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.8 2.4T A95B",
+      "id": "qwen/qwen3.8-2.4t-a95b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "ByteDance Seed: Seed-2.0-Code",
+      "id": "bytedance-seed/seed-2.0-code",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "DeepSeek: DeepSeek V4 Pro 0813",
+      "id": "deepseek/deepseek-v4-pro-0813",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "SpaceXAI: Grok 4.6",
+      "id": "x-ai/grok-4.6",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "LiquidAI: LFM2.5-2.6B",
+      "id": "liquid/lfm-2.5-2.6b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "LiquidAI: LFM2.5-2.6B (free)",
+      "id": "liquid/lfm-2.5-2.6b:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "NVIDIA: Nemotron 3.5 Lightning",
+      "id": "nvidia/nemotron-3.5-lightning",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "NVIDIA: Nemotron 3.5 Lightning (free)",
+      "id": "nvidia/nemotron-3.5-lightning:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Sakana: Sakana Namazu",
+      "id": "sakana/sakana-namazu",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Upstage: Solar Pro 4",
+      "id": "upstage/solar-pro4",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Meta: Muse Glimmer 30B",
+      "id": "meta/muse-glimmer-30b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Meta: Muse Spark 1.2",
+      "id": "meta/muse-spark-1.2",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "DeepSeek: DeepSeek V4 Flash 0731",
+      "id": "deepseek/deepseek-v4-flash-0731",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Thinking Machines: Inkling Small",
+      "id": "thinkingmachines/inkling-small",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Thinking Machines: Inkling Small (free)",
+      "id": "thinkingmachines/inkling-small:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.7 Flash",
+      "id": "qwen/qwen3.7-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Opus 5",
+      "id": "anthropic/claude-opus-5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Opus 5 (batch)",
+      "id": "anthropic/claude-opus-5:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "inclusionAI: Ling 3.0 Flash",
+      "id": "inclusionai/ling-3.0-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Poolside: Laguna S 2.1",
+      "id": "poolside/laguna-s-2.1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Poolside: Laguna S 2.1 (free)",
+      "id": "poolside/laguna-s-2.1:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.6 Flash",
+      "id": "google/gemini-3.6-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.6 Flash (batch)",
+      "id": "google/gemini-3.6-flash:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.5 Flash Lite",
+      "id": "google/gemini-3.5-flash-lite",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.5 Flash Lite (batch)",
+      "id": "google/gemini-3.5-flash-lite:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Meituan: LongCat 2.0",
+      "id": "meituan/longcat-2.0",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Thinking Machines: Inkling",
+      "id": "thinkingmachines/inkling",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Thinking Machines: Inkling (free)",
+      "id": "thinkingmachines/inkling:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MoonshotAI: Kimi K3",
+      "id": "moonshotai/kimi-k3",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MoonshotAI: Kimi K3 (batch)",
+      "id": "moonshotai/kimi-k3:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Meta: Muse Spark 1.1",
+      "id": "meta/muse-spark-1.1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.6 Luna Pro",
+      "id": "openai/gpt-5.6-luna-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.6 Luna Pro (batch)",
+      "id": "openai/gpt-5.6-luna-pro:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.6 Luna",
+      "id": "openai/gpt-5.6-luna",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.6 Luna (batch)",
+      "id": "openai/gpt-5.6-luna:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.6 Terra Pro",
+      "id": "openai/gpt-5.6-terra-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.6 Terra Pro (batch)",
+      "id": "openai/gpt-5.6-terra-pro:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.6 Terra",
+      "id": "openai/gpt-5.6-terra",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.6 Terra (batch)",
+      "id": "openai/gpt-5.6-terra:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.6 Sol Pro",
+      "id": "openai/gpt-5.6-sol-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.6 Sol Pro (batch)",
+      "id": "openai/gpt-5.6-sol-pro:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.6 Sol",
+      "id": "openai/gpt-5.6-sol",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.6 Sol (batch)",
+      "id": "openai/gpt-5.6-sol:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "SpaceXAI: Grok 4.5",
+      "id": "x-ai/grok-4.5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "AionLabs: Aion-3.0-Mini",
+      "id": "aion-labs/aion-3.0-mini",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "AionLabs: Aion-3.0",
+      "id": "aion-labs/aion-3.0",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Tencent: Hy3",
+      "id": "tencent/hy3",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Poolside: Laguna XS 2.1",
+      "id": "poolside/laguna-xs-2.1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Poolside: Laguna XS 2.1 (free)",
+      "id": "poolside/laguna-xs-2.1:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Sonnet 5",
+      "id": "anthropic/claude-sonnet-5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Sonnet 5 (batch)",
+      "id": "anthropic/claude-sonnet-5:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Sakana: Fugu Ultra",
+      "id": "sakana/fugu-ultra",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Nano Banana Pro (Gemini 3 Pro Image)",
+      "id": "google/gemini-3-pro-image",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Cohere: North Mini Code (free)",
+      "id": "cohere/north-mini-code:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 5.2",
+      "id": "z-ai/glm-5.2",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MoonshotAI: Kimi K2.7 Code",
+      "id": "moonshotai/kimi-k2.7-code",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Fable 5",
+      "id": "anthropic/claude-fable-5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Fable 5 (batch)",
+      "id": "anthropic/claude-fable-5:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "NVIDIA: Nemotron 3 Ultra",
+      "id": "nvidia/nemotron-3-ultra-550b-a55b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "NVIDIA: Nemotron 3 Ultra (free)",
+      "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.7 Plus",
+      "id": "qwen/qwen3.7-plus",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.7 Plus (batch)",
+      "id": "qwen/qwen3.7-plus:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MiniMax: MiniMax M3",
+      "id": "minimax/minimax-m3",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "StepFun: Step 3.7 Flash",
+      "id": "stepfun/step-3.7-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Opus 4.8",
+      "id": "anthropic/claude-opus-4.8",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Opus 4.8 (batch)",
+      "id": "anthropic/claude-opus-4.8:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.7 Max",
+      "id": "qwen/qwen3.7-max",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "SpaceXAI: Grok Build 0.1",
+      "id": "x-ai/grok-build-0.1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.5 Flash",
+      "id": "google/gemini-3.5-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.5 Flash (batch)",
+      "id": "google/gemini-3.5-flash:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.1 Flash Lite",
+      "id": "google/gemini-3.1-flash-lite",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.1 Flash Lite (batch)",
+      "id": "google/gemini-3.1-flash-lite:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT Chat Latest",
+      "id": "openai/gpt-chat-latest",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "SpaceXAI: Grok 4.3",
+      "id": "x-ai/grok-4.3",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "SpaceXAI: Grok 4.3 (batch)",
+      "id": "x-ai/grok-4.3:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Mistral Medium 3.5",
+      "id": "mistralai/mistral-medium-3-5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Mistral Medium 3.5 (batch)",
+      "id": "mistralai/mistral-medium-3-5:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "NVIDIA: Nemotron 3 Nano Omni (free)",
+      "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.5 Plus 2026-04-20",
+      "id": "qwen/qwen3.5-plus-20260420",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.6 Flash",
+      "id": "qwen/qwen3.6-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.6 35B A3B",
+      "id": "qwen/qwen3.6-35b-a3b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.6 27B",
+      "id": "qwen/qwen3.6-27b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.5 Pro",
+      "id": "openai/gpt-5.5-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.5 Pro (batch)",
+      "id": "openai/gpt-5.5-pro:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.5",
+      "id": "openai/gpt-5.5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.5 (batch)",
+      "id": "openai/gpt-5.5:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "DeepSeek: DeepSeek V4 Pro 0423",
+      "id": "deepseek/deepseek-v4-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "DeepSeek: DeepSeek V4 Flash 0423",
+      "id": "deepseek/deepseek-v4-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Tencent: Hy3 preview",
+      "id": "tencent/hy3-preview",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Xiaomi: MiMo-V2.5-Pro",
+      "id": "xiaomi/mimo-v2.5-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Xiaomi: MiMo-V2.5",
+      "id": "xiaomi/mimo-v2.5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MoonshotAI: Kimi K2.6",
+      "id": "moonshotai/kimi-k2.6",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Opus 4.7",
+      "id": "anthropic/claude-opus-4.7",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Opus 4.7 (batch)",
+      "id": "anthropic/claude-opus-4.7:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 5.1",
+      "id": "z-ai/glm-5.1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemma 4 26B A4B ",
+      "id": "google/gemma-4-26b-a4b-it",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemma 4 26B A4B  (free)",
+      "id": "google/gemma-4-26b-a4b-it:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemma 4 31B",
+      "id": "google/gemma-4-31b-it",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemma 4 31B (free)",
+      "id": "google/gemma-4-31b-it:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.6 Plus",
+      "id": "qwen/qwen3.6-plus",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 5V Turbo",
+      "id": "z-ai/glm-5v-turbo",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "SpaceXAI: Grok 4.20",
+      "id": "x-ai/grok-4.20",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Reka Edge",
+      "id": "rekaai/reka-edge",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MiniMax: MiniMax M2.7",
+      "id": "minimax/minimax-m2.7",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.4 Nano",
+      "id": "openai/gpt-5.4-nano",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.4 Nano (batch)",
+      "id": "openai/gpt-5.4-nano:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.4 Mini",
+      "id": "openai/gpt-5.4-mini",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.4 Mini (batch)",
+      "id": "openai/gpt-5.4-mini:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Mistral Small 4",
+      "id": "mistralai/mistral-small-2603",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 5 Turbo",
+      "id": "z-ai/glm-5-turbo",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "NVIDIA: Nemotron 3 Super",
+      "id": "nvidia/nemotron-3-super-120b-a12b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "NVIDIA: Nemotron 3 Super (free)",
+      "id": "nvidia/nemotron-3-super-120b-a12b:free",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "ByteDance Seed: Seed-2.0-Lite",
+      "id": "bytedance-seed/seed-2.0-lite",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.5-9B",
+      "id": "qwen/qwen3.5-9b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.4 Pro",
+      "id": "openai/gpt-5.4-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.4 Pro (batch)",
+      "id": "openai/gpt-5.4-pro:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.4",
+      "id": "openai/gpt-5.4",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.4 (batch)",
+      "id": "openai/gpt-5.4:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Inception: Mercury 2",
+      "id": "inception/mercury-2",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.1 Flash Lite Preview",
+      "id": "google/gemini-3.1-flash-lite-preview",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "ByteDance Seed: Seed-2.0-Mini",
+      "id": "bytedance-seed/seed-2.0-mini",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.5-35B-A3B",
+      "id": "qwen/qwen3.5-35b-a3b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.5-27B",
+      "id": "qwen/qwen3.5-27b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.5-122B-A10B",
+      "id": "qwen/qwen3.5-122b-a10b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.5-Flash",
+      "id": "qwen/qwen3.5-flash-02-23",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.1 Pro Preview Custom Tools",
+      "id": "google/gemini-3.1-pro-preview-customtools",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.3-Codex",
+      "id": "openai/gpt-5.3-codex",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "AionLabs: Aion-2.0",
+      "id": "aion-labs/aion-2.0",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.1 Pro Preview",
+      "id": "google/gemini-3.1-pro-preview",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3.1 Pro Preview (batch)",
+      "id": "google/gemini-3.1-pro-preview:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Sonnet 4.6",
+      "id": "anthropic/claude-sonnet-4.6",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Sonnet 4.6 (batch)",
+      "id": "anthropic/claude-sonnet-4.6:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.5 Plus 2026-02-15",
+      "id": "qwen/qwen3.5-plus-02-15",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3.5 397B A17B",
+      "id": "qwen/qwen3.5-397b-a17b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MiniMax: MiniMax M2.5",
+      "id": "minimax/minimax-m2.5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 5",
+      "id": "z-ai/glm-5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Opus 4.6",
+      "id": "anthropic/claude-opus-4.6",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Opus 4.6 (batch)",
+      "id": "anthropic/claude-opus-4.6:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 Coder Next",
+      "id": "qwen/qwen3-coder-next",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "StepFun: Step 3.5 Flash",
+      "id": "stepfun/step-3.5-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MoonshotAI: Kimi K2.5",
+      "id": "moonshotai/kimi-k2.5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Upstage: Solar Pro 3",
+      "id": "upstage/solar-pro-3",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT Audio",
+      "id": "openai/gpt-audio",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT Audio Mini",
+      "id": "openai/gpt-audio-mini",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 4.7 Flash",
+      "id": "z-ai/glm-4.7-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.2-Codex",
+      "id": "openai/gpt-5.2-codex",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "ByteDance Seed: Seed 1.6 Flash",
+      "id": "bytedance-seed/seed-1.6-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "ByteDance Seed: Seed 1.6",
+      "id": "bytedance-seed/seed-1.6",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MiniMax: MiniMax M2.1",
+      "id": "minimax/minimax-m2.1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 4.7",
+      "id": "z-ai/glm-4.7",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3 Flash Preview",
+      "id": "google/gemini-3-flash-preview",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 3 Flash Preview (batch)",
+      "id": "google/gemini-3-flash-preview:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "NVIDIA: Nemotron 3 Nano 30B A3B",
+      "id": "nvidia/nemotron-3-nano-30b-a3b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.2 Chat",
+      "id": "openai/gpt-5.2-chat",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.2 Pro",
+      "id": "openai/gpt-5.2-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.2 Pro (batch)",
+      "id": "openai/gpt-5.2-pro:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.2",
+      "id": "openai/gpt-5.2",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.2 (batch)",
+      "id": "openai/gpt-5.2:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Devstral 2 2512",
+      "id": "mistralai/devstral-2512",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Relace: Relace Search",
+      "id": "relace/relace-search",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 4.6V",
+      "id": "z-ai/glm-4.6v",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.1-Codex-Max",
+      "id": "openai/gpt-5.1-codex-max",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Amazon: Nova 2 Lite",
+      "id": "amazon/nova-2-lite-v1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Ministral 3 14B 2512",
+      "id": "mistralai/ministral-14b-2512",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Ministral 3 8B 2512",
+      "id": "mistralai/ministral-8b-2512",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Ministral 3 3B 2512",
+      "id": "mistralai/ministral-3b-2512",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Mistral Large 3 2512",
+      "id": "mistralai/mistral-large-2512",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "DeepSeek: DeepSeek V3.2",
+      "id": "deepseek/deepseek-v3.2",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Opus 4.5",
+      "id": "anthropic/claude-opus-4.5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Opus 4.5 (batch)",
+      "id": "anthropic/claude-opus-4.5:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.1",
+      "id": "openai/gpt-5.1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.1 (batch)",
+      "id": "openai/gpt-5.1:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.1-Codex",
+      "id": "openai/gpt-5.1-codex",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5.1-Codex-Mini",
+      "id": "openai/gpt-5.1-codex-mini",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MoonshotAI: Kimi K2 Thinking",
+      "id": "moonshotai/kimi-k2-thinking",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Amazon: Nova Premier 1.0",
+      "id": "amazon/nova-premier-v1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Voxtral Small 24B 2507",
+      "id": "mistralai/voxtral-small-24b-2507",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: gpt-oss-safeguard-20b",
+      "id": "openai/gpt-oss-safeguard-20b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MiniMax: MiniMax M2",
+      "id": "minimax/minimax-m2",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Haiku 4.5",
+      "id": "anthropic/claude-haiku-4.5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Haiku 4.5 (batch)",
+      "id": "anthropic/claude-haiku-4.5:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 VL 8B Instruct",
+      "id": "qwen/qwen3-vl-8b-instruct",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 VL 30B A3B Thinking",
+      "id": "qwen/qwen3-vl-30b-a3b-thinking",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 VL 30B A3B Instruct",
+      "id": "qwen/qwen3-vl-30b-a3b-instruct",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5 Pro",
+      "id": "openai/gpt-5-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5 Pro (batch)",
+      "id": "openai/gpt-5-pro:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 4.6",
+      "id": "z-ai/glm-4.6",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Sonnet 4.5",
+      "id": "anthropic/claude-sonnet-4.5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Sonnet 4.5 (batch)",
+      "id": "anthropic/claude-sonnet-4.5:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "DeepSeek: DeepSeek V3.2 Exp",
+      "id": "deepseek/deepseek-v3.2-exp",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 VL 235B A22B Instruct",
+      "id": "qwen/qwen3-vl-235b-a22b-instruct",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "DeepSeek: DeepSeek V3.1 Terminus",
+      "id": "deepseek/deepseek-v3.1-terminus",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 Coder Flash",
+      "id": "qwen/qwen3-coder-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 Next 80B A3B Thinking",
+      "id": "qwen/qwen3-next-80b-a3b-thinking",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 Next 80B A3B Instruct",
+      "id": "qwen/qwen3-next-80b-a3b-instruct",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MoonshotAI: Kimi K2 0905",
+      "id": "moonshotai/kimi-k2-0905",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "DeepSeek: DeepSeek V3.1",
+      "id": "deepseek/deepseek-chat-v3.1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Mistral Medium 3.1",
+      "id": "mistralai/mistral-medium-3.1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 4.5V",
+      "id": "z-ai/glm-4.5v",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5",
+      "id": "openai/gpt-5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5 (batch)",
+      "id": "openai/gpt-5:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5 Mini",
+      "id": "openai/gpt-5-mini",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5 Mini (batch)",
+      "id": "openai/gpt-5-mini:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5 Nano",
+      "id": "openai/gpt-5-nano",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-5 Nano (batch)",
+      "id": "openai/gpt-5-nano:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: gpt-oss-120b",
+      "id": "openai/gpt-oss-120b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: gpt-oss-120b (batch)",
+      "id": "openai/gpt-oss-120b:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: gpt-oss-20b",
+      "id": "openai/gpt-oss-20b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: gpt-oss-20b (batch)",
+      "id": "openai/gpt-oss-20b:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Opus 4.1",
+      "id": "anthropic/claude-opus-4.1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Anthropic: Claude Opus 4.1 (batch)",
+      "id": "anthropic/claude-opus-4.1:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Codestral 2508",
+      "id": "mistralai/codestral-2508",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 Coder 30B A3B Instruct",
+      "id": "qwen/qwen3-coder-30b-a3b-instruct",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 30B A3B Instruct 2507",
+      "id": "qwen/qwen3-30b-a3b-instruct-2507",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 4.5",
+      "id": "z-ai/glm-4.5",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Z.ai: GLM 4.5 Air",
+      "id": "z-ai/glm-4.5-air",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 235B A22B Thinking 2507",
+      "id": "qwen/qwen3-235b-a22b-thinking-2507",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 Coder 480B A35B",
+      "id": "qwen/qwen3-coder",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 2.5 Flash Lite",
+      "id": "google/gemini-2.5-flash-lite",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 235B A22B Instruct 2507",
+      "id": "qwen/qwen3-235b-a22b-2507",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MoonshotAI: Kimi K2 0711",
+      "id": "moonshotai/kimi-k2",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Mistral Small 3.2 24B",
+      "id": "mistralai/mistral-small-3.2-24b-instruct",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "MiniMax: MiniMax M1",
+      "id": "minimax/minimax-m1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 2.5 Flash",
+      "id": "google/gemini-2.5-flash",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 2.5 Pro",
+      "id": "google/gemini-2.5-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: o3 Pro",
+      "id": "openai/o3-pro",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemini 2.5 Pro Preview 06-05",
+      "id": "google/gemini-2.5-pro-preview",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "DeepSeek: R1 0528",
+      "id": "deepseek/deepseek-r1-0528",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Mistral Medium 3",
+      "id": "mistralai/mistral-medium-3",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 30B A3B",
+      "id": "qwen/qwen3-30b-a3b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 14B",
+      "id": "qwen/qwen3-14b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen3 32B",
+      "id": "qwen/qwen3-32b",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: o4 Mini High",
+      "id": "openai/o4-mini-high",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: o3",
+      "id": "openai/o3",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: o3 (batch)",
+      "id": "openai/o3:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: o4 Mini",
+      "id": "openai/o4-mini",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: o4 Mini (batch)",
+      "id": "openai/o4-mini:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4.1",
+      "id": "openai/gpt-4.1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4.1 (batch)",
+      "id": "openai/gpt-4.1:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4.1 Mini",
+      "id": "openai/gpt-4.1-mini",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4.1 Mini (batch)",
+      "id": "openai/gpt-4.1-mini:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4.1 Nano",
+      "id": "openai/gpt-4.1-nano",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4.1 Nano (batch)",
+      "id": "openai/gpt-4.1-nano:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Meta: Llama 4 Maverick",
+      "id": "meta-llama/llama-4-maverick",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Meta: Llama 4 Scout",
+      "id": "meta-llama/llama-4-scout",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "DeepSeek: DeepSeek V3 0324",
+      "id": "deepseek/deepseek-chat-v3-0324",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Mistral Small 3.1 24B",
+      "id": "mistralai/mistral-small-3.1-24b-instruct",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemma 3 12B",
+      "id": "google/gemma-3-12b-it",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Google: Gemma 3 27B",
+      "id": "google/gemma-3-27b-it",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Saba",
+      "id": "mistralai/mistral-saba",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: o3 Mini High",
+      "id": "openai/o3-mini-high",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen-Plus",
+      "id": "qwen/qwen-plus",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: o3 Mini",
+      "id": "openai/o3-mini",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: o3 Mini (batch)",
+      "id": "openai/o3-mini:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "DeepSeek: DeepSeek V3",
+      "id": "deepseek/deepseek-chat",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: o1",
+      "id": "openai/o1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Meta: Llama 3.3 70B Instruct",
+      "id": "meta-llama/llama-3.3-70b-instruct",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Amazon: Nova Lite 1.0",
+      "id": "amazon/nova-lite-v1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Amazon: Nova Micro 1.0",
+      "id": "amazon/nova-micro-v1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Amazon: Nova Pro 1.0",
+      "id": "amazon/nova-pro-v1",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4o (2024-11-20)",
+      "id": "openai/gpt-4o-2024-11-20",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral Large 2407",
+      "id": "mistralai/mistral-large-2407",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen: Qwen2.5 7B Instruct",
+      "id": "qwen/qwen-2.5-7b-instruct",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Qwen2.5 72B Instruct",
+      "id": "qwen/qwen-2.5-72b-instruct",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Cohere: Command R (08-2024)",
+      "id": "cohere/command-r-08-2024",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Cohere: Command R+ (08-2024)",
+      "id": "cohere/command-r-plus-08-2024",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4o (2024-08-06)",
+      "id": "openai/gpt-4o-2024-08-06",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Meta: Llama 3.1 70B Instruct",
+      "id": "meta-llama/llama-3.1-70b-instruct",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Meta: Llama 3.1 8B Instruct",
+      "id": "meta-llama/llama-3.1-8b-instruct",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Mistral Nemo",
+      "id": "mistralai/mistral-nemo",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4o-mini",
+      "id": "openai/gpt-4o-mini",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4o-mini (2024-07-18)",
+      "id": "openai/gpt-4o-mini-2024-07-18",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4o-mini (batch)",
+      "id": "openai/gpt-4o-mini:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4o",
+      "id": "openai/gpt-4o",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4o (2024-05-13)",
+      "id": "openai/gpt-4o-2024-05-13",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4o (batch)",
+      "id": "openai/gpt-4o:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral: Mixtral 8x22B Instruct",
+      "id": "mistralai/mixtral-8x22b-instruct",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4 Turbo",
+      "id": "openai/gpt-4-turbo",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4 Turbo (batch)",
+      "id": "openai/gpt-4-turbo:batch",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Mistral Large",
+      "id": "mistralai/mistral-large",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-3.5 Turbo (older v0613)",
+      "id": "openai/gpt-3.5-turbo-0613",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-3.5 Turbo 16k",
+      "id": "openai/gpt-3.5-turbo-16k",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "OpenAI: GPT-4",
+      "id": "openai/gpt-4",
+      "vendor": "openrouter",
+      "version": "1.0.0"
+    },
+    {
+      "name": "Auto",
+      "id": "auto",
+      "vendor": "copilotcli",
+      "version": ""
+    },
+    {
+      "name": "GPT-4o mini",
+      "id": "gpt-4o-mini",
+      "vendor": "copilot",
+      "version": "gpt-4o-mini-2024-07-18"
+    },
+    {
+      "name": "Auto",
+      "id": "auto",
+      "vendor": "copilot",
+      "version": "claude-fable-5.1"
+    },
+    {
+      "name": "GPT-4o mini",
+      "id": "copilot-utility-small",
+      "vendor": "copilot",
+      "version": "gpt-4o-mini-2024-07-18"
+    },
+    {
+      "name": "GPT-4.1",
+      "id": "copilot-utility",
+      "vendor": "copilot",
+      "version": "gpt-4.1-2025-04-14"
+    },
+    {
+      "name": "GPT-5.4 nano",
+      "id": "copilot-dictation-cleanup-nano",
+      "vendor": "copilot",
+      "version": "gpt-5.4-nano"
+    },
+    {
+      "name": "GPT-5.6 Luna",
+      "id": "copilot-dictation-cleanup-luna",
+      "vendor": "copilot",
+      "version": "gpt-5.6-luna"
+    },
+    {
+      "name": "GPT-5.6 Luna",
+      "id": "gpt-5.6-luna",
+      "vendor": "copilot",
+      "version": "gpt-5.6-luna"
+    }
+  ],
+  "matchingDirectModels": 0
+}

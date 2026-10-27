@@ -1,11 +1,17 @@
 import * as assert from 'node:assert';
 
-import type { AnalysisCandidateSession } from '../../src/sessionAnalysis';
+import { buildSessionEvidence, type AnalysisCandidateSession } from '../../src/sessionAnalysis';
 import type { ChatSession, SavedTurn } from '../../src/types';
 import {
 	ANALYSIS_TRIAGE_QUESTIONS,
+	ANALYSIS_TRIAGE_PRIORITY_WEIGHTS,
 	ANALYSIS_TRIAGE_QUESTION_SET_VERSION,
+	ANALYSIS_TRIAGE_TRIVIAL_THRESHOLD,
+	UNTRIAGED_ANALYSIS_PRIORITY,
 	buildAnalysisTriageState,
+	computeAnalysisPriority,
+	isTrivialAnalysisCandidate,
+	planAnalysisFromTriage,
 	triageAnalysisCandidates,
 	type AnalysisTriageAnswers,
 } from '../../src/typesafe/analysisTriage';
@@ -177,5 +183,128 @@ suite('typesafe analysis triage', () => {
 		);
 		assert.deepEqual([...results.keys()], ['fp-2']);
 		assert.ok(logs.some((message) => message.includes('boom')));
+	});
+});
+
+
+interface PolicySignals {
+	readonly friction?: number;
+	readonly toolFailureLoops?: number;
+	readonly instructionViolation?: number;
+	readonly controlFileLesson?: number;
+	readonly trivial?: number;
+}
+
+function policyAnswers(signals: PolicySignals): AnalysisTriageAnswers {
+	return {
+		friction: { type: 'score', score: signals.friction ?? 0, confidence: 0.9 },
+		toolFailureLoops: { type: 'score', score: signals.toolFailureLoops ?? 0, confidence: 0.9 },
+		instructionViolation: { type: 'noul', noul: signals.instructionViolation ?? 0 },
+		controlFileLesson: { type: 'noul', noul: signals.controlFileLesson ?? 0 },
+		trivial: { type: 'noul', noul: signals.trivial ?? 0 },
+	} as unknown as AnalysisTriageAnswers;
+}
+
+/** Runs triage through the fake judgment service, answering per candidate title. */
+async function triageWithFake(
+	candidates: AnalysisCandidateSession[],
+	signalsByFingerprint: Readonly<Record<string, PolicySignals>>,
+) {
+	const judgment = createFakeJudgmentService({
+		handler: async (state) => {
+			const fingerprint = (state as { title: string }).title.replace('Session ', '');
+			return policyAnswers(signalsByFingerprint[fingerprint] ?? {}) as never;
+		},
+	});
+	return triageAnalysisCandidates(candidates, { judgment });
+}
+
+suite('typesafe analysis triage policy', () => {
+	test('weights and thresholds are code constants, not part of the questions', () => {
+		const weights = Object.values(ANALYSIS_TRIAGE_PRIORITY_WEIGHTS);
+		assert.ok(Math.abs(weights.reduce((sum, weight) => sum + weight, 0) - 1) < 1e-9);
+		assert.ok(ANALYSIS_TRIAGE_TRIVIAL_THRESHOLD > 0 && ANALYSIS_TRIAGE_TRIVIAL_THRESHOLD < 1);
+		const questionText = JSON.stringify(ANALYSIS_TRIAGE_QUESTIONS);
+		assert.equal(/weight|threshold|priority/i.test(questionText), false);
+	});
+
+	test('priority is the weighted sum of normalized signals', () => {
+		assert.equal(computeAnalysisPriority(policyAnswers({})), 0);
+		assert.ok(Math.abs(computeAnalysisPriority(policyAnswers({
+			friction: 3,
+			toolFailureLoops: 3,
+			instructionViolation: 1,
+			controlFileLesson: 1,
+		})) - 1) < 1e-9);
+		assert.ok(Math.abs(computeAnalysisPriority(policyAnswers({ friction: 1.5 }))
+			- ANALYSIS_TRIAGE_PRIORITY_WEIGHTS.friction / 2) < 1e-9);
+		assert.ok(Math.abs(computeAnalysisPriority(policyAnswers({ controlFileLesson: 0.5 }))
+			- ANALYSIS_TRIAGE_PRIORITY_WEIGHTS.controlFileLesson / 2) < 1e-9);
+	});
+
+	test('trivial passes at the threshold', () => {
+		assert.equal(isTrivialAnalysisCandidate(policyAnswers({ trivial: ANALYSIS_TRIAGE_TRIVIAL_THRESHOLD })), true);
+		assert.equal(isTrivialAnalysisCandidate(policyAnswers({ trivial: ANALYSIS_TRIAGE_TRIVIAL_THRESHOLD - 0.01 })), false);
+	});
+
+	test('trivial sessions are skipped and the rest are ranked by priority', async () => {
+		const candidates = ['fp-1', 'fp-2', 'fp-3', 'fp-4'].map((fingerprint) => createCandidate(fingerprint));
+		const triage = await triageWithFake(candidates, {
+			'fp-1': { friction: 1 },
+			'fp-2': { trivial: 0.95, friction: 3 },
+			'fp-3': { friction: 3, instructionViolation: 0.9 },
+			'fp-4': { toolFailureLoops: 2 },
+		});
+		const plan = planAnalysisFromTriage(candidates, triage, 1_000_000);
+
+		assert.deepEqual(plan.skipped.map((candidate) => candidate.fingerprint), ['fp-2']);
+		assert.deepEqual(plan.analyzable.map((candidate) => candidate.fingerprint), ['fp-3', 'fp-4', 'fp-1']);
+		assert.equal(plan.priorities.has('fp-2'), false);
+		for (const candidate of plan.analyzable) {
+			assert.equal(plan.detailLevels.get(candidate.fingerprint), 'full');
+		}
+	});
+
+	test('candidates without triage answers are kept at a neutral priority', async () => {
+		const candidates = [createCandidate('fp-1'), createCandidate('fp-2'), createCandidate('fp-3')];
+		const triage = new Map(await triageWithFake(candidates, {
+			'fp-1': {},
+			'fp-3': { friction: 3, toolFailureLoops: 3, instructionViolation: 1, controlFileLesson: 1 },
+		}));
+		triage.delete('fp-2');
+		const plan = planAnalysisFromTriage(candidates, triage, 1_000_000);
+
+		assert.deepEqual(plan.analyzable.map((candidate) => candidate.fingerprint), ['fp-3', 'fp-2', 'fp-1']);
+		assert.equal(plan.priorities.get('fp-2'), UNTRIAGED_ANALYSIS_PRIORITY);
+	});
+
+	test('evidence detail follows priority rank within the batch budget', async () => {
+		const candidates = ['fp-1', 'fp-2', 'fp-3'].map((fingerprint) => createCandidate(fingerprint, createTurns(40)));
+		const triage = await triageWithFake(candidates, {
+			'fp-1': { friction: 1 },
+			'fp-2': { friction: 3 },
+			'fp-3': { friction: 2 },
+		});
+		const [high, middle] = [candidates[1], candidates[2]] as [AnalysisCandidateSession, AnalysisCandidateSession];
+		const budget = buildSessionEvidence(high, 'full').length + 6 + buildSessionEvidence(middle, 'compact').length;
+		const plan = planAnalysisFromTriage(candidates, triage, budget);
+
+		assert.deepEqual(plan.analyzable.map((candidate) => candidate.fingerprint), ['fp-2', 'fp-3', 'fp-1']);
+		assert.equal(plan.detailLevels.get('fp-2'), 'full');
+		assert.equal(plan.detailLevels.get('fp-3'), 'compact');
+		assert.equal(plan.detailLevels.get('fp-1'), 'summaryOnly');
+	});
+
+	test('detail never increases as rank decreases', async () => {
+		const large = createCandidate('fp-1', createTurns(60));
+		const small = createCandidate('fp-2', createTurns(2));
+		const triage = await triageWithFake([large, small], { 'fp-1': { friction: 3 }, 'fp-2': { friction: 1 } });
+		const budget = buildSessionEvidence(large, 'compact').length + 6
+			+ Math.max(buildSessionEvidence(small, 'full').length, buildSessionEvidence(small, 'compact').length);
+		assert.ok(buildSessionEvidence(large, 'full').length > budget);
+		const plan = planAnalysisFromTriage([large, small], triage, budget);
+
+		assert.equal(plan.detailLevels.get('fp-1'), 'compact');
+		assert.equal(plan.detailLevels.get('fp-2'), 'compact');
 	});
 });

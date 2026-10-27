@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Resume in Cursor loads the saved conversation when its original assistant is unavailable.** The viewer now uses the existing native Cursor handoff instead of inserting a VS Code participant command as plain text. Installed origin assistants and stock VS Code keep their existing routes.
+
 ## [1.9.0] - 2026-10-18
 
 ### Changed

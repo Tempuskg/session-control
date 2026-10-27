@@ -1,0 +1,12 @@
+{
+  "name": "mwnn-triage-benchmark",
+  "displayName": "MWNN Local Triage Benchmark",
+  "publisher": "workspace-local",
+  "version": "0.0.1",
+  "engines": { "vscode": "^1.93.0" },
+  "main": "extension.cjs",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [{ "command": "mwnn.runApprovedTriageBenchmark", "title": "MWNN: Run Approved Triage Benchmark" }]
+  }
+}

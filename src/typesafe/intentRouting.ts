@@ -225,3 +225,42 @@ export async function routeSlashlessPrompt<T extends SessionMeta>(
 export function toIntentRoutingSuggestionMetadata(intent: RoutedIntent<SessionMeta>): IntentRoutingSuggestionMetadata {
 	return { command: intent.command, prompt: intent.prompt, interpretation: intent.interpretation };
 }
+
+/**
+ * Map a free-form `/analyze` argument (e.g. "past week") to an alias that
+ * `parseAnalysisSelectionAlias` accepts. Returns undefined when TypeSafe is off,
+ * unsure, or answers `unspecified`, so the caller keeps the scope picker.
+ */
+export async function judgeAnalysisTimeframe(
+	prompt: string,
+	judgment: JudgmentService | undefined,
+	token?: vscode.CancellationToken,
+	log?: (message: string) => void,
+): Promise<string | undefined> {
+	const trimmed = prompt.trim();
+	if (!trimmed || !judgment || !judgment.isFeatureEnabled('routing')) {
+		return undefined;
+	}
+
+	const answers = await judgment.ask(
+		{ prompt: trimmed },
+		{
+			timeframe: choice(
+				'Which saved sessions or timeframe does the user want analyzed?',
+				TIMEFRAME_CRITERIA,
+			),
+		},
+		token,
+		'routing',
+	);
+	if (!answers || token?.isCancellationRequested) {
+		return undefined;
+	}
+
+	const timeframe = readChoice((answers as Record<string, unknown>).timeframe);
+	const alias = timeframe && timeframe.confidence >= INTENT_ROUTING_MEDIUM_CONFIDENCE && isTimeframe(timeframe.choice)
+		? TIMEFRAME_PROMPTS[timeframe.choice]
+		: '';
+	log?.(`timeframe=${timeframe?.choice ?? 'invalid'} confidence=${timeframe?.confidence ?? 'n/a'} alias=${alias || 'none'}`);
+	return alias || undefined;
+}

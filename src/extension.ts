@@ -87,7 +87,7 @@ import {
 	registerSessionExplorerVisibilityRefresh,
 	runSortSessionExplorerCommand,
 } from './sessionExplorer';
-import { buildResumeProviderChoices, ResumeProviderChoice, ResumeProviderCommands } from './resumeTarget';
+import { buildResumeProviderChoices, resolveResumeTarget, ResumeProviderChoice, ResumeProviderCommands } from './resumeTarget';
 import { SessionViewerPanel } from './sessionViewer';
 import { createSessionStore, OrphanedPartFile, SessionFileNameOptions, SessionPruneAction } from './sessionStore';
 import { applySaveBloatControls, createChatSession, SaveOverflowStrategy } from './sessionWriter';
@@ -96,6 +96,7 @@ import {
 	hasProLicense,
 	initializeProLicenseCommands,
 	maybeShowProUpgradeNotice,
+	recordProUpgradeNoticeSave,
 	showUpgradePrompt,
 } from './pro';
 import {
@@ -230,6 +231,7 @@ interface ImportCopilotGuidanceCommandOptions {
 
 interface ResumeSessionFromViewerCommandDeps {
 	writeClipboard: (text: string) => Promise<void>;
+	getHostAppName: () => string;
 }
 
 interface ContinueSessionWithProviderCommandDeps {
@@ -409,7 +411,8 @@ interface ImplementLatestAnalysisDeps {
 		storageDirectory: string,
 	) => Promise<{ reports: AnalysisReportReference[]; analyzedSessions?: AnalysisIndexEntry[] }>;
 	readReport: (storageDirectory: string, reportPath: string) => Promise<string>;
-	buildPrompt: (reportFilePath: string, userPrompt: string) => string;
+	/** `reportContent`, when given, limits the handoff to verified recommendations. */
+	buildPrompt: (reportFilePath: string, userPrompt: string, reportContent?: string) => string;
 	selectChatModels: () => Promise<readonly vscode.LanguageModelChat[]>;
 	getCommands: () => Promise<readonly string[]>;
 	pickProvider: (choices: AnalysisProviderChoices) => Promise<AnalysisProviderSelection | undefined>;
@@ -887,8 +890,8 @@ function createDefaultImplementLatestAnalysisDeps(): ImplementLatestAnalysisDeps
 		readIndex: async (storageDirectory: string) => analysisStore.readIndex(storageDirectory),
 		readReport: async (storageDirectory: string, reportPath: string) =>
 			analysisStore.readReport(storageDirectory, reportPath),
-		buildPrompt: (reportFilePath: string, userPrompt: string) =>
-			buildImplementationHandoffPrompt(reportFilePath, userPrompt),
+		buildPrompt: (reportFilePath: string, userPrompt: string, reportContent?: string) =>
+			buildImplementationHandoffPrompt(reportFilePath, userPrompt, reportContent),
 		selectChatModels: async () => vscode.lm.selectChatModels(),
 		getCommands: async () => vscode.commands.getCommands(true),
 		pickProvider: pickAnalysisProviderFromChat,
@@ -1265,7 +1268,12 @@ async function runSaveSessionFromProviderCommand(context: vscode.ExtensionContex
 
 	const storageDirectory = getStoragePath(workspaceFolder);
 	const sessions = await loadSessionsForProvider(context, workspaceFolder, provider);
-	await runSaveSourceSessionFlow(provider, sessions, workspaceFolder, storageDirectory);
+	const writtenFiles = await runSaveSourceSessionFlow(provider, sessions, workspaceFolder, storageDirectory);
+	if (writtenFiles?.length) {
+		// The one-time Pro notice is earned by deliberate saves, not activation or
+		// auto-save. Fire-and-forget so the toast never delays the explorer refresh.
+		void recordProUpgradeNoticeSave(context).then(() => maybeShowProUpgradeNotice(context, workspaceFolder));
+	}
 }
 
 async function runImportCopilotGuidanceCommand(options: ImportCopilotGuidanceCommandOptions): Promise<void> {
@@ -1680,7 +1688,13 @@ async function dispatchImplementationForReport(
 	report: LatestAnalysisReportTarget,
 	deps: ImplementLatestAnalysisDeps,
 ): Promise<void> {
-	const prompt = deps.buildPrompt(path.join(report.storageDirectory, report.reportPath), '');
+	let reportContent: string | undefined;
+	try {
+		reportContent = await deps.readReport(report.storageDirectory, report.reportPath);
+	} catch {
+		// The handoff still points at the report file; it just skips verified-recommendation filtering.
+	}
+	const prompt = deps.buildPrompt(path.join(report.storageDirectory, report.reportPath), '', reportContent);
 	let models: readonly vscode.LanguageModelChat[] = [];
 	try {
 		models = await deps.selectChatModels();
@@ -2610,6 +2624,7 @@ export async function runResumeSessionFromViewerCommand(
 ): Promise<void> {
 	const deps: ResumeSessionFromViewerCommandDeps = {
 		writeClipboard: async (text: string) => vscode.env.clipboard.writeText(text),
+		getHostAppName: () => vscode.env.appName,
 		...depsOverrides,
 	};
 	const panel = SessionViewerPanel.currentPanel;
@@ -2626,6 +2641,40 @@ export async function runResumeSessionFromViewerCommand(
 
 	const session = panel.getSession();
 	const provider = panel.getSessionProvider();
+
+	// Cursor's chat.open only prefills a native draft; it does not invoke our
+	// VS Code chat participant. Keep installed origin agents, otherwise hand
+	// the actual saved context to Cursor through the existing native route.
+	if (session && /cursor/i.test(deps.getHostAppName())) {
+		const configuration = readResumeSessionConfiguration(panel.getFilePath());
+		const availableCommands = await vscode.commands.getCommands(true);
+		const originTarget = configuration.resumeTargetMode === 'origin-agent' && provider && provider !== 'copilot'
+			? resolveResumeTarget(provider, availableCommands, configuration.providerCommands)
+			: undefined;
+		if (!originTarget) {
+			const cursorTarget = resolveResumeTarget('cursor', availableCommands, configuration.providerCommands);
+			const openedCursor = cursorTarget
+				? await runResumeIntoOriginAgent(
+					session,
+					'Continue this session.',
+					{
+						maxTurns: configuration.maxTurns,
+						maxContextChars: configuration.maxContextChars,
+						overflowStrategy: configuration.overflowStrategy,
+						providerCommands: configuration.providerCommands,
+						targetProvider: 'cursor',
+					},
+					createResumeIntoAgentDeps(deps.writeClipboard),
+				)
+				: false;
+			if (!openedCursor) {
+				await vscode.window.showWarningMessage(
+					'Cursor chat could not be opened. Use Continue This Session In... to select an available assistant.',
+				);
+			}
+			return;
+		}
+	}
 	if (session && provider && provider !== 'copilot') {
 		const configuration = readResumeSessionConfiguration(panel.getFilePath());
 		if (configuration.resumeTargetMode === 'origin-agent') {
@@ -2979,10 +3028,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		log: (message) => output.appendLine(`[pro] ${message}`),
 		registerDisposable: (disposable) => context.subscriptions.push(disposable),
 	});
-
-	// Fire-and-forget: the one-time upgrade notice must never delay activation, and it
-	// retires itself the first time it is displayed.
-	void maybeShowProUpgradeNotice(context);
 
 	context.subscriptions.push(...registerTypeSafeApiKeyCommands(context));
 

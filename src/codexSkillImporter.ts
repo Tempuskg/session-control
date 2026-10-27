@@ -1,5 +1,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import type * as vscode from 'vscode';
+import { choice, type ChoiceQuestion, type JudgmentService, type Questions } from './typesafe/judgmentService';
 import { slugify } from './utils';
 
 interface DirectoryEntry {
@@ -31,6 +33,31 @@ export interface CodexSkillImportResult {
 export interface CodexSkillImportOptions {
 	skillDirectorySegments?: readonly string[];
 }
+
+export interface SkillCatalogEntry {
+	readonly name: string;
+	readonly description: string;
+	readonly relativeSkillFilePath: string;
+}
+
+export interface SkillSuggestionInput {
+	readonly task: string;
+	readonly skills: readonly SkillCatalogEntry[];
+	readonly judgment: JudgmentService | undefined;
+	readonly token?: vscode.CancellationToken;
+	readonly log?: (message: string) => void;
+}
+
+export interface SkillSuggestion {
+	readonly skill: SkillCatalogEntry;
+	readonly confidence: number;
+}
+
+export const SKILL_SUGGESTION_MIN_CONFIDENCE = 0.7;
+export const SKILL_SUGGESTION_MAX_CANDIDATES = 40;
+
+const SKILL_LABEL_PREFIX = 'skill-';
+const NO_SKILL_LABEL = 'none';
 
 const EXCLUDED_DIRECTORIES = new Set([
 	'.agents',
@@ -187,6 +214,74 @@ function extractImportedGuidance(skillContent: string): string | undefined {
 	return importedGuidance ? normalizeComparableText(importedGuidance) : undefined;
 }
 
+function readFrontmatterField(skillContent: string, field: string): string | undefined {
+	const frontmatter = skillContent.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1];
+	const line = frontmatter?.split(/\r?\n/).find((candidate) => candidate.startsWith(`${field}:`));
+	const raw = line?.slice(field.length + 1).trim();
+	if (!raw) {
+		return undefined;
+	}
+	if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) {
+		return raw.slice(1, -1).replace(/\\(["\\])/g, '$1');
+	}
+	return raw;
+}
+
+export function buildSkillSuggestionQuestions(skills: readonly SkillCatalogEntry[]): Questions {
+	const criteria: Record<string, string> = {};
+	skills.forEach((skill, index) => {
+		criteria[`${SKILL_LABEL_PREFIX}${index + 1}`] = `${skill.name}: ${skill.description}`;
+	});
+	criteria[NO_SKILL_LABEL] = 'None of the listed skills fits the task.';
+	const questions: Record<string, ChoiceQuestion> = {
+		skill: choice('Which existing skill best matches the task the user is working on?', criteria),
+	};
+	return questions;
+}
+
+/**
+ * Suggest the existing skill that best matches the current task, following the
+ * skill-suggestion cookbook: one Choice over the skill catalog plus `none`.
+ * Returns undefined when TypeSafe or `routing` is off, the request fails, the
+ * answer is `none`, or confidence is below `SKILL_SUGGESTION_MIN_CONFIDENCE`.
+ */
+export async function suggestMatchingSkill(input: SkillSuggestionInput): Promise<SkillSuggestion | undefined> {
+	const task = input.task.trim();
+	const judgment = input.judgment;
+	const skills = input.skills.slice(0, SKILL_SUGGESTION_MAX_CANDIDATES);
+	if (!task || !skills.length || !judgment) {
+		return undefined;
+	}
+
+	try {
+		if (!judgment.isFeatureEnabled('routing')) {
+			return undefined;
+		}
+
+		const answers = await judgment.ask({ task }, buildSkillSuggestionQuestions(skills), input.token, 'routing');
+		if (!answers || input.token?.isCancellationRequested) {
+			return undefined;
+		}
+
+		const answer = (answers as Record<string, { choice?: unknown; confidence?: unknown } | undefined>).skill;
+		const label = typeof answer?.choice === 'string' ? answer.choice : undefined;
+		const confidence = typeof answer?.confidence === 'number' && Number.isFinite(answer.confidence) ? answer.confidence : undefined;
+		const index = label?.startsWith(SKILL_LABEL_PREFIX) ? Number(label.slice(SKILL_LABEL_PREFIX.length)) - 1 : -1;
+		const skill = Number.isInteger(index) ? skills[index] : undefined;
+		if (!skill || confidence === undefined || confidence < SKILL_SUGGESTION_MIN_CONFIDENCE) {
+			input.log?.(`[skill-suggestion] choice=${label ?? 'invalid'} confidence=${confidence ?? 'n/a'} decision=none`);
+			return undefined;
+		}
+
+		input.log?.(`[skill-suggestion] choice=${skill.name} confidence=${confidence} decision=suggest`);
+		return { skill, confidence };
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		input.log?.(`[skill-suggestion] ${message}`);
+		return undefined;
+	}
+}
+
 async function collectMatchingFiles(
 	directoryPath: string,
 	deps: CodexSkillImporterDeps,
@@ -266,6 +361,7 @@ async function collectExistingSkillSignatures(
 export function createCodexSkillImporter(overrides: Partial<CodexSkillImporterDeps> = {}): {
 	discoverSourceFiles(workspaceRoot: string): Promise<string[]>;
 	importSkills(workspaceRoot: string, options?: CodexSkillImportOptions): Promise<CodexSkillImportResult>;
+	listSkillCatalog(workspaceRoot: string, options?: CodexSkillImportOptions): Promise<SkillCatalogEntry[]>;
 } {
 	const deps = {
 		...createDefaultDeps(),
@@ -291,6 +387,25 @@ export function createCodexSkillImporter(overrides: Partial<CodexSkillImporterDe
 
 	return {
 		discoverSourceFiles,
+
+		async listSkillCatalog(workspaceRoot: string, options: CodexSkillImportOptions = {}): Promise<SkillCatalogEntry[]> {
+			const skillRoot = path.join(workspaceRoot, ...resolveSkillDirectorySegments(options));
+			const skillFiles = new Set<string>();
+			await collectMatchingFiles(skillRoot, deps, (fileName) => /^SKILL\.md$/i.test(fileName), skillFiles);
+			const catalog: SkillCatalogEntry[] = [];
+
+			for (const skillFilePath of [...skillFiles].sort((left, right) => left.localeCompare(right))) {
+				const skillContent = await deps.readFile(skillFilePath);
+				const name = readFrontmatterField(skillContent, 'name') ?? path.basename(path.dirname(skillFilePath));
+				const description = readFrontmatterField(skillContent, 'description');
+				if (!description) {
+					continue;
+				}
+				catalog.push({ name, description, relativeSkillFilePath: normalizeRelativePath(workspaceRoot, skillFilePath) });
+			}
+
+			return catalog;
+		},
 
 		async importSkills(workspaceRoot: string, options: CodexSkillImportOptions = {}): Promise<CodexSkillImportResult> {
 			const sourceFiles = await discoverSourceFiles(workspaceRoot);

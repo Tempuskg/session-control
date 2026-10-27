@@ -475,6 +475,102 @@ suite('extension phase 10', () => {
 });
 
 suite('runResumeSessionFromViewerCommand', () => {
+
+	async function resumeViewerInHost(
+		hostAppName: string,
+		provider: 'claude-code' | 'copilot',
+		availableCommands: readonly string[],
+	) {
+		const originalPanel = SessionViewerPanel.currentPanel;
+		const originalCommands = {
+			getCommands: vscode.commands.getCommands,
+			executeCommand: vscode.commands.executeCommand,
+		};
+		const originalWindow = {
+			showInformationMessage: vscode.window.showInformationMessage,
+			showWarningMessage: vscode.window.showWarningMessage,
+		};
+		const captured = createChatSession(createCopilotSession('Viewer Resume Session'), {
+			title: 'Viewer Resume Session',
+			savedAt: '2026-10-21T12:00:00.000Z',
+			vscodeVersion: '1.128.0',
+		});
+		const session = {
+			...captured,
+			provider,
+			turns: captured.turns.map((turn) => ({ ...turn, participant: provider })),
+		};
+		const executed: { commandId: string; args?: unknown }[] = [];
+		const warnings: string[] = [];
+		let clipboardText: string | undefined;
+		try {
+			Object.assign(SessionViewerPanel, {
+				currentPanel: {
+					getSessionTitle: () => session.title,
+					getSessionProvider: () => session.provider,
+					getSession: () => session,
+					getFilePath: () => 'C:/repo/.chat/cursor-resume.json',
+				},
+			});
+			Object.assign(vscode.commands, {
+				getCommands: async () => [...availableCommands],
+				executeCommand: async (commandId: string, args?: unknown) => {
+					executed.push({ commandId, ...(args === undefined ? {} : { args }) });
+				},
+			});
+			Object.assign(vscode.window, {
+				showInformationMessage: async () => undefined,
+				showWarningMessage: async (message: string) => {
+					warnings.push(message);
+					return undefined;
+				},
+			});
+			await runResumeSessionFromViewerCommand({
+				getHostAppName: () => hostAppName,
+				writeClipboard: async (text: string) => { clipboardText = text; },
+			});
+			return { executed, warnings, clipboardText };
+		} finally {
+			Object.assign(SessionViewerPanel, { currentPanel: originalPanel });
+			Object.assign(vscode.commands, originalCommands);
+			Object.assign(vscode.window, originalWindow);
+		}
+	}
+
+	for (const provider of ['claude-code', 'copilot'] as const) {
+		test('loads ' + provider + ' viewer context into native Cursor when its origin is unavailable', async () => {
+			const result = await resumeViewerInHost('Cursor', provider, [
+				'composer.newAgentChat', 'composer.focusComposer', 'workbench.action.chat.open',
+			]);
+			assert.deepEqual(result.executed.map((call) => call.commandId), [
+				'composer.newAgentChat', 'composer.focusComposer', 'editor.action.clipboardPasteAction',
+			]);
+			assert.equal(result.clipboardText?.includes('User: Prompt'), true);
+			assert.equal(result.clipboardText?.includes('Response'), true);
+			assert.equal(result.clipboardText?.includes('User follow-up: Continue this session.'), true);
+			assert.equal(result.clipboardText?.includes('@session-control /resume'), false);
+			assert.deepEqual(result.warnings, []);
+		});
+	}
+
+	test('keeps the VS Code participant fallback outside Cursor', async () => {
+		const result = await resumeViewerInHost('Visual Studio Code', 'claude-code', ['workbench.action.chat.open']);
+		assert.deepEqual(result.executed, [{
+			commandId: 'workbench.action.chat.open',
+			args: { query: '@session-control /resume Viewer Resume Session' },
+		}]);
+		assert.equal(result.clipboardText, undefined);
+	});
+
+	test('warns without inserting a participant command when native Cursor chat is unavailable', async () => {
+		const result = await resumeViewerInHost('Cursor', 'claude-code', ['workbench.action.chat.open']);
+		assert.deepEqual(result.executed, []);
+		assert.equal(result.clipboardText, undefined);
+		assert.deepEqual(result.warnings, [
+			'Cursor chat could not be opened. Use Continue This Session In... to select an available assistant.',
+		]);
+	});
+
 	test('shows info message when no session viewer is open', async () => {
 		const infoMessages: string[] = [];
 		let originalExecuteCommand = vscode.commands.executeCommand;
@@ -597,6 +693,7 @@ suite('runResumeSessionFromViewerCommand', () => {
 			(vscode.window as any).showInformationMessage = async () => undefined;
 
 			await runResumeSessionFromViewerCommand({
+				getHostAppName: () => 'Cursor',
 				writeClipboard: async (text: string) => {
 					clipboardText = text;
 				},

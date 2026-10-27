@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "evidence": {
+    "analysisFile": "analysis-1793062329161.json",
+    "triageFile": "triage-1793062000319.json"
+  },
+  "analysisModel": {
+    "name": "OpenAI: GPT-6.1 Sol",
+    "id": "openai/gpt-6.1-sol",
+    "vendor": "openrouter",
+    "version": "1.0.0",
+    "maxInputTokens": 922000
+  },
+  "triageModels": [
+    "jev-1.14.0"
+  ],
+  "threshold": 0.7,
+  "recall": 1,
+  "retainedPositiveIds": [
+    "eval-01",
+    "eval-02",
+    "eval-04",
+    "eval-05",
+    "eval-10",
+    "eval-16",
+    "eval-17",
+    "eval-18",
+    "eval-19",
+    "eval-20",
+    "eval-26",
+    "eval-27",
+    "eval-28",
+    "eval-30",
+    "eval-38",
+    "eval-41"
+  ],
+  "missedPositiveIds": [],
+  "retainedSessions": 39,
+  "skippedSessions": 5,
+  "before": {
+    "inputTokens": 108541,
+    "outputTokens": 11886,
+    "totalVisibleTokens": 120427,
+    "wallTimeMs": 272992.6801
+  },
+  "after": {
+    "inputTokens": 84709,
+    "outputTokens": 9376,
+    "totalVisibleTokens": 94085,
+    "analysisWallTimeMs": 205635.1458,
+    "triageProviderInputTokens": 76385,
+    "triageProviderOutputTokens": 4180,
+    "triageWallTimeMs": 1447.952,
+    "endToEndWallTimeMs": 207083.0978,
+    "arithmeticCombinedTokenCount": 174650
+  },
+  "changePercent": {
+    "analysisVisibleTokens": -21.873832280136515,
+    "endToEndWallTime": -24.143351490544237,
+    "arithmeticCombinedTokenCount": 45.02561717887185
+  },
+  "limitations": [
+    "VS Code model.countTokens on the explicit user message and returned text. Provider billed usage, hidden reasoning, system overhead and provider caching are not exposed; these remain unknown.",
+    "Combined count adds unlike model tokenizers and does not establish financial cost. No verified price or provider billed analysis usage.",
+    "Compact fixture prompts in recorded order, first/last response only; no fabricated tools or timestamps; fixture JSON as summary. Results apply to these redacted fixtures.",
+    "Single sequential baseline-then-comparison run; no repeated randomized timing or report-quality equivalence evaluation."
+  ],
+  "humanDecision": {
+    "decision": "adjust before shipping as a cost-saving feature",
+    "answer": "Yes",
+    "question": "Do you agree with recording that as your decision?",
+    "precedingProposal": "adjust before shipping as a cost-saving feature",
+    "evidenceClassification": "user-reported",
+    "source": "interview chat, 2026-10-26",
+    "publicationApproved": false,
+    "adjustmentImplemented": false
+  }
+}

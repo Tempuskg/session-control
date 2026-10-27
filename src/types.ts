@@ -136,6 +136,37 @@ export interface AnalysisReportReference {
 	sourceSessions?: AnalysisReportSourceSession[];
 	status?: AnalysisReportStatus;
 	warnings?: string[];
+	triage?: AnalysisReportTriageSummary;
+}
+
+/** Session counts for a report whose candidates went through TypeSafe triage. */
+export interface AnalysisReportTriageSummary {
+	/** Candidates that received triage answers. */
+	triaged: number;
+	/** Candidates sent to the LLM and covered by the report. */
+	analyzed: number;
+	/** Candidates triage flagged as low-signal and left out of the LLM. */
+	skipped: number;
+}
+
+/** Normalized triage answers: scores are rubric levels 0 to 3, the rest are probabilities 0 to 1. */
+export interface AnalysisTriageSignals {
+	friction?: number;
+	toolFailureLoops?: number;
+	instructionViolation?: number;
+	controlFileLesson?: number;
+	trivial?: number;
+}
+
+export interface AnalysisTriageIndexEntry {
+	fingerprint: string;
+	sessionId: string;
+	triagedAt: string;
+	skipped: boolean;
+	signals: AnalysisTriageSignals;
+	rootFileName?: string;
+	/** Composite priority from 0 to 1; absent for skipped sessions. */
+	priority?: number;
 }
 
 export interface AnalysisIndexEntry {
@@ -155,6 +186,7 @@ export interface AnalysisIndex {
 	updatedAt: string;
 	reports: AnalysisReportReference[];
 	analyzedSessions: AnalysisIndexEntry[];
+	triagedSessions?: AnalysisTriageIndexEntry[];
 }
 
 export interface CachedJudgmentEntry<TAnswers = Record<string, unknown>> {
@@ -377,7 +409,33 @@ export function isAnalysisReportReference(value: unknown): value is AnalysisRepo
 		&& (value.status === undefined || isAnalysisReportStatus(value.status))
 		&& (value.warnings === undefined
 			|| (Array.isArray(value.warnings)
-				&& value.warnings.every((warning) => typeof warning === 'string')));
+				&& value.warnings.every((warning) => typeof warning === 'string')))
+		&& (value.triage === undefined || isAnalysisReportTriageSummary(value.triage));
+}
+
+function isAnalysisReportTriageSummary(value: unknown): value is AnalysisReportTriageSummary {
+	return isRecord(value)
+		&& typeof value.triaged === 'number'
+		&& typeof value.analyzed === 'number'
+		&& typeof value.skipped === 'number';
+}
+
+const ANALYSIS_TRIAGE_SIGNAL_KEYS = ['friction', 'toolFailureLoops', 'instructionViolation', 'controlFileLesson', 'trivial'] as const;
+
+export function isAnalysisTriageIndexEntry(value: unknown): value is AnalysisTriageIndexEntry {
+	if (!isRecord(value)) {
+		return false;
+	}
+
+	const signals = value.signals;
+	return typeof value.fingerprint === 'string'
+		&& typeof value.sessionId === 'string'
+		&& isIsoTimestamp(value.triagedAt)
+		&& typeof value.skipped === 'boolean'
+		&& isRecord(signals)
+		&& ANALYSIS_TRIAGE_SIGNAL_KEYS.every((key) => signals[key] === undefined || typeof signals[key] === 'number')
+		&& (value.rootFileName === undefined || typeof value.rootFileName === 'string')
+		&& (value.priority === undefined || typeof value.priority === 'number');
 }
 
 export function isAnalysisIndexEntry(value: unknown): value is AnalysisIndexEntry {
@@ -406,7 +464,98 @@ export function isAnalysisIndex(value: unknown): value is AnalysisIndex {
 		&& Array.isArray(value.reports)
 		&& value.reports.every((report) => isAnalysisReportReference(report))
 		&& Array.isArray(value.analyzedSessions)
-		&& value.analyzedSessions.every((entry) => isAnalysisIndexEntry(entry));
+		&& value.analyzedSessions.every((entry) => isAnalysisIndexEntry(entry))
+		&& (value.triagedSessions === undefined
+			|| (Array.isArray(value.triagedSessions)
+				&& value.triagedSessions.every((entry) => isAnalysisTriageIndexEntry(entry))));
+}
+
+const RANGE_NULL_SELECTION_GUIDANCE = 'Single Session and Needs Analysis selections must use "range": null'
+	+ ' (never {"start": null, "end": null}), and a singleSession selection must also include the selected "sessionId".'
+	+ ' Date-filtered selections must use {"start": "<ISO timestamp>", "end": "<ISO timestamp>"}.';
+
+/** Explains why a selection fails isAnalysisSelection, or returns undefined when it is valid. */
+export function describeAnalysisSelectionProblem(value: unknown): string | undefined {
+	if (!isRecord(value)) {
+		return 'selection must be an object.';
+	}
+
+	if (!isAnalysisSelectionMode(value.mode)) {
+		return `selection.mode ${JSON.stringify(value.mode)} is not a supported mode `
+			+ '(last24Hours, last7Days, last30Days, customRange, needsAnalysis, singleSession).';
+	}
+
+	if (typeof value.label !== 'string') {
+		return 'selection.label must be a string.';
+	}
+
+	if (value.onlyUnanalyzed !== undefined && typeof value.onlyUnanalyzed !== 'boolean') {
+		return 'selection.onlyUnanalyzed must be a boolean when present.';
+	}
+
+	if (value.sessionId !== undefined && typeof value.sessionId !== 'string') {
+		return 'selection.sessionId must be a string when present.';
+	}
+
+	if (value.range !== null && !isAnalysisTimeRange(value.range)) {
+		return `selection.range for mode "${value.mode}" must be null or an object with ISO timestamp "start" and "end" strings;`
+			+ ` found ${JSON.stringify(value.range) ?? 'undefined'}. ${RANGE_NULL_SELECTION_GUIDANCE}`;
+	}
+
+	return undefined;
+}
+
+/** Names the first field that makes an analysis index fail isAnalysisIndex, or returns undefined when it is valid. */
+export function describeAnalysisIndexProblem(value: unknown): string | undefined {
+	if (!isRecord(value)) {
+		return 'the index must be a JSON object.';
+	}
+
+	if (typeof value.version !== 'number') {
+		return '"version" must be a number.';
+	}
+
+	if (!isIsoTimestamp(value.updatedAt)) {
+		return '"updatedAt" must be an ISO timestamp string.';
+	}
+
+	if (!Array.isArray(value.reports)) {
+		return '"reports" must be an array.';
+	}
+
+	for (const [index, report] of value.reports.entries()) {
+		if (isAnalysisReportReference(report)) {
+			continue;
+		}
+
+		const id = isRecord(report) && typeof report.id === 'string' ? ` (id ${JSON.stringify(report.id)})` : '';
+		const selectionProblem = isRecord(report) ? describeAnalysisSelectionProblem(report.selection) : undefined;
+		return selectionProblem
+			? `reports[${index}]${id}: ${selectionProblem}`
+			: `reports[${index}]${id} does not match the analysis report reference schema.`;
+	}
+
+	if (!Array.isArray(value.analyzedSessions)) {
+		return '"analyzedSessions" must be an array.';
+	}
+
+	const invalidEntry = value.analyzedSessions.findIndex((entry) => !isAnalysisIndexEntry(entry));
+	if (invalidEntry !== -1) {
+		return `analyzedSessions[${invalidEntry}] does not match the analyzed session entry schema.`;
+	}
+
+	if (value.triagedSessions !== undefined) {
+		if (!Array.isArray(value.triagedSessions)) {
+			return '"triagedSessions" must be an array when present.';
+		}
+
+		const invalidTriage = value.triagedSessions.findIndex((entry) => !isAnalysisTriageIndexEntry(entry));
+		if (invalidTriage !== -1) {
+			return `triagedSessions[${invalidTriage}] does not match the triaged session entry schema.`;
+		}
+	}
+
+	return undefined;
 }
 
 export function isCachedJudgmentEntry(value: unknown): value is CachedJudgmentEntry {

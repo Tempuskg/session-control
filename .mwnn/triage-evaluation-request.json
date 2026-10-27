@@ -1,0 +1,300 @@
+{
+  "schemaVersion": 1,
+  "cardId": "card-mug8ch4z-11",
+  "preparedDate": "2026-10-26",
+  "state": "evaluation-and-human-decision-recorded",
+  "analysisModel": {
+    "runtimeId": null,
+    "displayName": "GPT-6.1 Sol",
+    "runtimeAvailabilityVerified": false,
+    "source": "user-reported in interview chat, 2026-10-26"
+  },
+  "triageModel": {
+    "configuredName": "jev-latest",
+    "runtimeId": null,
+    "source": "src/typesafe/judgmentService.ts"
+  },
+  "protocol": {
+    "requiredMeasurements": [
+      "analysis input and output tokens per arm",
+      "analysis wall time per arm",
+      "TypeSafe input and output tokens",
+      "TypeSafe latency",
+      "end-to-end wall time including triage",
+      "retained positive ids and missed positive ids",
+      "recall = retained positives / 16",
+      "errors and fallback retention",
+      "exact model ids, prompt version, baseline and budget"
+    ],
+    "constraints": [
+      "Hold analysis model and generation settings fixed",
+      "Do not mix cold-cache and warm-cache measurements",
+      "Do not infer token usage from character counts",
+      "Do not substitute labels for triage model predictions",
+      "Do not publish or change extension settings as part of this request"
+    ],
+    "positiveLabelCount": 16,
+    "questionSetVersion": "analysis-triage-v1",
+    "baseline": "Same evaluation inputs with triage disabled",
+    "comparison": "Same evaluation inputs with triage enabled",
+    "trivialSkipThreshold": 0.7
+  },
+  "payloadScope": {
+    "analysisDestination": "Provider serving the selected in-editor GPT-6.1 Sol model; runtime identity not yet verified",
+    "fixtureCount": 44,
+    "excludedData": [
+      "unredacted .chat transcripts",
+      "credentials",
+      "unrelated workspace content"
+    ],
+    "typeSafeDestination": "api.typesafe.ai",
+    "expectedUsage": "Consumes provider quota or incurs charges according to the connected accounts; amount not measured or estimated",
+    "allowedData": "Existing redacted fixture evidence plus necessary analysis/triage prompts and approved local instruction baseline"
+  },
+  "labels": {
+    "path": "test/fixtures/typesafe/labels.json",
+    "sha256": "3704f1c9b678608fefc46c5a54aecd75a1c56a94e2f91c1d1eff916de504cc69"
+  },
+  "fixtures": [
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-01.json",
+      "id": "eval-01",
+      "sha256": "a90712b76d06289d9cec3b8bb8075829ef642cd66e25d5c64b818ff80a8ba52c"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-02.json",
+      "id": "eval-02",
+      "sha256": "0401180a0f9866ab28dd2f07f0074b82bfa55c5c76bc8c07207444365330d2d1"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-03.json",
+      "id": "eval-03",
+      "sha256": "d213928f29613943cff5abaadb9da1b78d400f303da8a114f1ca0ae9d5a56672"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-04.json",
+      "id": "eval-04",
+      "sha256": "72615c1c5dedc1588e1219ab61e34f3f883a3310b1655046781718c141b2b1e9"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-05.json",
+      "id": "eval-05",
+      "sha256": "84819cde75c33bb55b35e91209ce326817d0724ea849a21511a91b7318ab64ca"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-06.json",
+      "id": "eval-06",
+      "sha256": "be585e0cd87a1e093992ed25de02ffdb58099bb2425650c8b8b1439083a67950"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-07.json",
+      "id": "eval-07",
+      "sha256": "22e8a3ccec9e2b339ba3ddbe9be32497d2d2069b01a705a84d339abdbf398206"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-08.json",
+      "id": "eval-08",
+      "sha256": "bbae3f44f3f0a6375ba6da09181ee8066eb268b6e3560334a468a180a74bb706"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-09.json",
+      "id": "eval-09",
+      "sha256": "3ddc286e112395e586d6c0bd0b2126e932159e45011df12e31e91018c343a1db"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-10.json",
+      "id": "eval-10",
+      "sha256": "cf679c67c13f607a87707741deeeb7530df8e3d4d370cc40b55a983a3ca1e496"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-11.json",
+      "id": "eval-11",
+      "sha256": "1221970002f2f565e5a84ea6a0c018ee5f333b807d311fbce1e8528e6d222076"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-12.json",
+      "id": "eval-12",
+      "sha256": "205e0610cd868af55ab019e00dde16e6ba6605d7d9565c3dae43034157ccc8d7"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-13.json",
+      "id": "eval-13",
+      "sha256": "61356b5c87c1fa3ef757449a2207e9a33a5d4fd546eaa94ca94b0124e15d14da"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-14.json",
+      "id": "eval-14",
+      "sha256": "721d717da7f75e9b0ba1ace53504cc99e0201a3e5dd4c0816ff38d0ebd63001a"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-15.json",
+      "id": "eval-15",
+      "sha256": "0b19734bde55223955985d4ac5c464c8c6fd247d92b3587340d98238a05e2e2a"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-16.json",
+      "id": "eval-16",
+      "sha256": "f20e028dd482040c9fdf5e1161c1364e0fe993f19e45be10f6d6979eeb00cf61"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-17.json",
+      "id": "eval-17",
+      "sha256": "40b6aab5e56e66b494e725e40ee2820c670a2d026bb4ba6af009dfe16440b618"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-18.json",
+      "id": "eval-18",
+      "sha256": "43cb12b7aabc8c324e1f0c238c601262d4cc62a56b246e735c81bb8a0a3f42c1"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-19.json",
+      "id": "eval-19",
+      "sha256": "ddfa2e9b2dd92104c858b7891d74d94cb1b2a2d736f5e46d590d02835a4af2c5"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-20.json",
+      "id": "eval-20",
+      "sha256": "e900a7f12028705890d0524daa1145e2f9abe1d7f2095ffeafada0b9e335afab"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-21.json",
+      "id": "eval-21",
+      "sha256": "051da48b7407a55a13cdd4201e1d0dae8decaa1ebc462a78cc811eb19298221a"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-22.json",
+      "id": "eval-22",
+      "sha256": "07f8e698034e685e70140ad809cb5246b5c010c10eb969a49958abb43f14ea56"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-23.json",
+      "id": "eval-23",
+      "sha256": "9b282af54d494eba626725c1cedb34b04ba920433e88f626c80e4d4d240ff72e"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-24.json",
+      "id": "eval-24",
+      "sha256": "5f6f279d5021cec07cf26d79b8fbb4a0f52779cf472e1af931a74ca412ea35a8"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-25.json",
+      "id": "eval-25",
+      "sha256": "1cf67ef13a899bf301c5ed8eae26f16bd29a86442ee6c9640bbd43eab216e87f"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-26.json",
+      "id": "eval-26",
+      "sha256": "64e6ef2b4e3de938aa16564d9084a17afd1372d91cd9dd6f7ad9da8cfcedc6a9"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-27.json",
+      "id": "eval-27",
+      "sha256": "80c78eba800a68aca80cf201450b7fbbaf281720284babbe94a019a98036fc77"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-28.json",
+      "id": "eval-28",
+      "sha256": "213dbbe1d179b79a598c36bab999ba49174be71d9356814b149d750203789371"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-29.json",
+      "id": "eval-29",
+      "sha256": "33fef4040f2909274cad3cee79e3465179c094bffb2928b3a6164f2c02e3a458"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-30.json",
+      "id": "eval-30",
+      "sha256": "48db8f41fe924ad0728f7444b380e5d95537ebe32ac2b296e032871144e713dc"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-31.json",
+      "id": "eval-31",
+      "sha256": "def77c6a5ffecb6136ef90f3df1738c6020c78af0380592767d9feb825614a66"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-32.json",
+      "id": "eval-32",
+      "sha256": "6b3b0e670326b0590606b9ba2abc05db81a113fc26450084550b36082ba2bffe"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-33.json",
+      "id": "eval-33",
+      "sha256": "f55fb95bdf90e75b09480bad0cfc16cbf84c6c43e20c5751150f9ddbfb91b624"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-34.json",
+      "id": "eval-34",
+      "sha256": "084d24e69e700064bc29dc5ab2e7337087799c2793e762360e576c4f557515b5"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-35.json",
+      "id": "eval-35",
+      "sha256": "b24b6139619fc7350d3704fc57568732f1b4c02318d29dcb1ac61675f8d0e04e"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-36.json",
+      "id": "eval-36",
+      "sha256": "cf7e31aee95534232ed46c9e510bc2bba4ec0d900e03435e00ae48c6be1c947f"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-37.json",
+      "id": "eval-37",
+      "sha256": "ac05c19c24bcc504b15e5d37bdb62eaebc3162ba430afbbdbef53edfc386d39d"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-38.json",
+      "id": "eval-38",
+      "sha256": "4e7fdec8fdf290f8240b135a09b283e2e2b72eddfe81a925513c62e91efe9e2b"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-39.json",
+      "id": "eval-39",
+      "sha256": "15014b2df1b81b67421e5edc2f5cb73256c83303621838ff8fed39117b18474a"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-40.json",
+      "id": "eval-40",
+      "sha256": "648334027296d2558e5387fa7e692632f555192b4988c05021f372f41081e007"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-41.json",
+      "id": "eval-41",
+      "sha256": "82b9820e9b87f096dafc60306f708e053f8ef46375c7556f7b9195f696989ac1"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-42.json",
+      "id": "eval-42",
+      "sha256": "43ae556d3f6b57dffe9b52c169dc6891eafbefbe3ef8b4eda8a604868080dbda"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-43.json",
+      "id": "eval-43",
+      "sha256": "647377539a40ceb54b0f2fa7ed94ee4dbfdbcb4fd29622beff7714977ecf0466"
+    },
+    {
+      "path": "test/fixtures/typesafe/sessions/eval-44.json",
+      "id": "eval-44",
+      "sha256": "4f4da58dd0d82a55ad5b83519ec58e1e5db394ae93c833d954e49820d494dd12"
+    }
+  ],
+  "executionLimitations": [
+    "No benchmark runner or live VS Code extension-host connection is currently available in this session",
+    "This file is a reviewable request, not executable code or measurement evidence",
+    "Approval permits external calls only within this scope once an execution path is available; it does not claim runtime access"
+  ],
+  "approval": {
+    "source": "user-reported in interview chat, 2026-10-26",
+    "scope": "44 redacted fixtures to TypeSafe and the selected GPT-6.1 Sol analysis provider for before/after benchmark; provider quota or paid usage approved",
+    "answer": "Yes"
+  },
+  "humanDecision": {
+    "decision": "adjust before shipping as a cost-saving feature",
+    "answer": "Yes",
+    "question": "Do you agree with recording that as your decision?",
+    "precedingProposal": "adjust before shipping as a cost-saving feature",
+    "evidenceClassification": "user-reported",
+    "source": "interview chat, 2026-10-26",
+    "publicationApproved": false,
+    "adjustmentImplemented": false
+  }
+}

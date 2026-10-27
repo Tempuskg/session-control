@@ -10,10 +10,11 @@ import {
 // `shown` is the one-time latch: once it is true the notice is spent for good, on
 // every window and every workspace, and nothing in this module ever clears it.
 export const PRO_UPGRADE_NOTICE_SHOWN_STATE_KEY = 'session-control.pro.upgradeNotice.shown';
-// Recorded on the first activation that would otherwise have shown the notice, so a
-// brand-new install is not greeted by an upsell before it has done anything useful.
-export const PRO_UPGRADE_NOTICE_FIRST_SEEN_STATE_KEY = 'session-control.pro.upgradeNotice.firstSeenAt';
-export const PRO_UPGRADE_NOTICE_DELAY_MS = 24 * 60 * 60 * 1000;
+// Counts sessions the user saved on purpose. The notice is earned by real usage,
+// so it stays silent until this reaches the threshold, and it is only ever checked
+// right after a save — never on activation.
+export const PRO_UPGRADE_NOTICE_SAVE_COUNT_STATE_KEY = 'session-control.pro.upgradeNotice.savedSessionCount';
+export const PRO_UPGRADE_NOTICE_SAVE_THRESHOLD = 3;
 
 // Lead with the benefit, name the Pro capabilities, and reassure users that free
 // features stay free. Keep the copy brief enough for a VS Code notification.
@@ -27,8 +28,8 @@ export type ProUpgradeNoticeOutcome =
 	| 'already-shown'
 	/** The user is licensed, so the notice is retired without ever being shown. */
 	| 'suppressed-licensed'
-	/** Too early in this install's life; the notice may show on a later activation. */
-	| 'deferred'
+	/** Not enough saved sessions yet; the notice may show after a later save. */
+	| 'below-threshold'
 	/** The notice was displayed, and is now spent. */
 	| 'shown';
 
@@ -38,14 +39,36 @@ export interface ShowProUpgradeNoticeDeps {
 	openExternal: (target: vscode.Uri) => Thenable<boolean>;
 	parseUri: (value: string) => vscode.Uri;
 	executeCommand: (command: string) => Thenable<unknown>;
-	now: () => number;
 	upgradeUrl: string;
-	delayMs: number;
+	saveThreshold: number;
+}
+
+function readSaveCount(state: vscode.Memento): number {
+	const stored = state.get<number>(PRO_UPGRADE_NOTICE_SAVE_COUNT_STATE_KEY);
+	// A missing or corrupt count starts from zero rather than blocking the notice.
+	return typeof stored === 'number' && Number.isInteger(stored) && stored > 0 ? stored : 0;
+}
+
+/**
+ * Record one user-initiated session save toward the notice's usage threshold. Once the
+ * notice is spent the count is no longer maintained.
+ */
+export async function recordProUpgradeNoticeSave(context: vscode.ExtensionContext): Promise<number> {
+	const state = context.globalState;
+	if (state.get<boolean>(PRO_UPGRADE_NOTICE_SHOWN_STATE_KEY) === true) {
+		return readSaveCount(state);
+	}
+
+	const next = readSaveCount(state) + 1;
+	await state.update(PRO_UPGRADE_NOTICE_SAVE_COUNT_STATE_KEY, next);
+	return next;
 }
 
 /**
  * Show the Pro upgrade notice at most once per installation, and never again after
  * the user has seen it — whether they acted on it, dismissed it, or ignored it.
+ * State lives in globalState, so the latch is shared by every workspace and window.
+ * Call this only after a save, never from activation.
  */
 export async function maybeShowProUpgradeNotice(
 	context: vscode.ExtensionContext,
@@ -64,28 +87,19 @@ export async function maybeShowProUpgradeNotice(
 	const parseUri = deps.parseUri ?? ((value: string) => vscode.Uri.parse(value));
 	const executeCommand = deps.executeCommand
 		?? ((command: string) => vscode.commands.executeCommand(command));
-	const now = deps.now ?? (() => Date.now());
 	const upgradeUrl = deps.upgradeUrl ?? PRO_PURCHASE_URL;
-	const delayMs = deps.delayMs ?? PRO_UPGRADE_NOTICE_DELAY_MS;
+	const saveThreshold = deps.saveThreshold ?? PRO_UPGRADE_NOTICE_SAVE_THRESHOLD;
+
+	// Check usage before the license so an early save does not trigger license work.
+	if (readSaveCount(state) < saveThreshold) {
+		return 'below-threshold';
+	}
 
 	if (await checkProLicense(workspaceFolder)) {
 		// Nothing to upsell. Spend the notice so it cannot surface later if the
 		// license lapses or validation is offline.
 		await state.update(PRO_UPGRADE_NOTICE_SHOWN_STATE_KEY, true);
 		return 'suppressed-licensed';
-	}
-
-	const currentTime = now();
-	const firstSeenAt = state.get<number>(PRO_UPGRADE_NOTICE_FIRST_SEEN_STATE_KEY);
-	// A missing, corrupt, or future timestamp (clock moved backwards) restarts the
-	// wait rather than deferring the notice forever.
-	if (typeof firstSeenAt !== 'number' || !Number.isFinite(firstSeenAt) || firstSeenAt > currentTime) {
-		await state.update(PRO_UPGRADE_NOTICE_FIRST_SEEN_STATE_KEY, currentTime);
-		return 'deferred';
-	}
-
-	if (currentTime - firstSeenAt < delayMs) {
-		return 'deferred';
 	}
 
 	// Spend the notice before it is displayed. Whatever happens next — the user picks

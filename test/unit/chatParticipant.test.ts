@@ -3,6 +3,9 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import {
 	ANALYSIS_CHAT_DETAIL_CURRENT_MODEL,
+	applyResumeOverflowStrategy,
+	RELEVANT_FALLBACK_STRATEGY,
+	resolveResumeOverflow,
 	buildEmptyModelResponseMessage,
 	buildParticipantFollowups,
 	createAnalysisProviderPickItems,
@@ -11,6 +14,7 @@ import {
 	IMPLEMENTATION_CHAT_DETAIL,
 	isDirectRequestModel,
 	isInEditorChatAvailable,
+	resolveAnalysisSelection,
 	resolveChatAnalysisModel,
 	selectDefaultAnalysisModel,
 	type AnalysisProviderChoices,
@@ -33,6 +37,7 @@ import {
 	INTENT_ROUTING_MAX_SESSION_CANDIDATES,
 	INTENT_ROUTING_MEDIUM_CONFIDENCE,
 	buildIntentRoutingQuestions,
+	judgeAnalysisTimeframe,
 	routeSlashlessPrompt,
 	selectSessionRefCandidates,
 	toIntentRoutingSuggestionMetadata,
@@ -42,7 +47,7 @@ import {
 	type HandoffDispatchResult,
 	type HandoffSelectionId,
 } from '../../src/handoffDispatcher';
-import { AnalysisIndex, AnalysisReportReference, ChatSession, SavedTurn, SessionMeta } from '../../src/types';
+import { AnalysisIndex, AnalysisReportReference, AnalysisTriageIndexEntry, ChatSession, SavedTurn, SessionMeta } from '../../src/types';
 
 function createMeta(overrides: Partial<SessionMeta> = {}): SessionMeta {
 	return {
@@ -429,6 +434,89 @@ suite('chatParticipant selection', () => {
 	});
 });
 
+suite('chatParticipant applyResumeOverflowStrategy', () => {
+	function request(prompt: string): SavedTurn {
+		return { type: 'request', participant: 'copilot', prompt, references: [], timestamp: '2026-04-12T12:00:00.000Z' };
+	}
+
+	function textOf(turn: SavedTurn): string {
+		return turn.type === 'request' ? turn.prompt : turn.content;
+	}
+
+	// t0..t5, 10 chars each; the last two are the recent window.
+	const turns: SavedTurn[] = ['t0-auth---', 't1-css----', 't2-auth---', 't3-deploy-', 't4-recent-', 't5-recent-'].map(request);
+
+	// Fake scorer: relevant when the turn text mentions the follow-up keyword.
+	function keywordScorer(calls: SavedTurn[][]): (omitted: SavedTurn[], prompt: string) => Promise<number[]> {
+		return async (omitted, prompt) => {
+			calls.push(omitted);
+			return omitted.map((turn) => (textOf(turn).includes(prompt) ? 1 : 0.1));
+		};
+	}
+
+	test('truncate keeps the last turns within the budget', () => {
+		const result = applyResumeOverflowStrategy(turns, 2, 1000, 'truncate');
+		assert.deepEqual(result.turns.map(textOf), ['t4-recent-', 't5-recent-']);
+		assert.equal(result.note, undefined);
+	});
+
+	test('relevant fills the char budget with the highest-scored omitted turns in turn order', () => {
+		const result = applyResumeOverflowStrategy(turns, 2, 40, 'relevant', [0.9, 0.2, 0.8, 0]);
+		assert.deepEqual(result.turns.map(textOf), ['t0-auth---', 't2-auth---', 't4-recent-', 't5-recent-']);
+		assert.equal(result.note?.includes('2 of 4 earlier turns'), true);
+	});
+
+	test('relevant always keeps the last maxTurns even when the budget is spent', () => {
+		const result = applyResumeOverflowStrategy(turns, 2, 20, 'relevant', [1, 1, 1, 1]);
+		assert.deepEqual(result.turns.map(textOf), ['t4-recent-', 't5-recent-']);
+	});
+
+	test('relevant without scores falls back to summarize', () => {
+		const relevant = applyResumeOverflowStrategy(turns, 2, 1000, 'relevant');
+		const summarize = applyResumeOverflowStrategy(turns, 2, 1000, RELEVANT_FALLBACK_STRATEGY);
+		assert.equal(RELEVANT_FALLBACK_STRATEGY, 'summarize');
+		assert.deepEqual(relevant, summarize);
+	});
+
+	test('resolveResumeOverflow scores only omitted turns with the fake scorer', async () => {
+		const calls: SavedTurn[][] = [];
+		const result = await resolveResumeOverflow(turns, 'auth', 2, 1000, 'relevant', keywordScorer(calls));
+		assert.equal(result.strategy, 'relevant');
+		assert.equal(calls.length, 1);
+		assert.deepEqual(calls[0]?.map(textOf), ['t0-auth---', 't1-css----', 't2-auth---', 't3-deploy-']);
+		// Budget fits everything, so every scored turn is included in turn order.
+		assert.deepEqual(result.turns.map(textOf), turns.map(textOf));
+	});
+
+	test('resolveResumeOverflow prefers relevant turns when the budget is tight', async () => {
+		const result = await resolveResumeOverflow(turns, 'auth', 2, 40, 'relevant', keywordScorer([]));
+		assert.deepEqual(result.turns.map(textOf), ['t0-auth---', 't2-auth---', 't4-recent-', 't5-recent-']);
+	});
+
+	test('resolveResumeOverflow falls back to summarize when TypeSafe is unavailable', async () => {
+		const unavailable = await resolveResumeOverflow(turns, 'auth', 2, 1000, 'relevant', async () => undefined);
+		assert.equal(unavailable.strategy, 'summarize');
+		assert.equal(unavailable.note?.includes('Summary of omitted context:'), true);
+
+		const failing = await resolveResumeOverflow(turns, 'auth', 2, 1000, 'relevant', async () => {
+			throw new Error('offline');
+		});
+		assert.equal(failing.strategy, 'summarize');
+
+		const noScorer = await resolveResumeOverflow(turns, 'auth', 2, 1000, 'relevant');
+		assert.equal(noScorer.strategy, 'summarize');
+		assert.deepEqual(noScorer.turns.map(textOf), ['t4-recent-', 't5-recent-']);
+	});
+
+	test('resolveResumeOverflow leaves other strategies untouched and skips the scorer', async () => {
+		const calls: SavedTurn[][] = [];
+		const result = await resolveResumeOverflow(turns, 'auth', 2, 1000, 'truncate', keywordScorer(calls));
+		assert.equal(result.strategy, 'truncate');
+		assert.equal(calls.length, 0);
+		assert.deepEqual(result.turns.map(textOf), ['t4-recent-', 't5-recent-']);
+	});
+});
+
 suite('chatParticipant analyze flow', () => {
 	function createFlowMeta() {
 		return [{ ...createMeta(), workspaceFolder: createWorkspaceFolder('workspace', 'e:/workspace', 0), storageDirectory: 'e:/workspace/.chat', displayTitle: '[workspace] Fix auth bug' }];
@@ -458,6 +546,159 @@ suite('chatParticipant analyze flow', () => {
 		assert.deepEqual(order, ['triage', 'batch']);
 		assert.deepEqual(triaged, [['fingerprint-1']]);
 		assert.equal(result?.triage, answers);
+	});
+
+	test('saves the verified report content and reports the verification summary', async () => {
+		const written: string[] = [];
+		const streamed: string[] = [];
+		const verifiedWith: string[][] = [];
+		await runAnalyzeSessionsFlow(
+			'needs analysis',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			createFlowMeta(),
+			createAnalyzeFlowDeps({
+				streamMarkdown: (markdown: string) => streamed.push(markdown),
+				verifyReport: async (report, candidates) => {
+					verifiedWith.push(candidates.map((candidate) => candidate.fingerprint));
+					return { content: `${report}\n\nverified`, summary: { total: 3, verified: 1, unsupported: 1, demoted: 1 } };
+				},
+				writeReport: async (_storageDirectory, input) => {
+					written.push(input.content);
+					return { report: createAnalyzeReportReference(), reportFilePath: 'e:/workspace/.chat/analysis/reports/report-1.md' };
+				},
+			}),
+		);
+
+		assert.deepEqual(verifiedWith, [['fingerprint-1']]);
+		assert.deepEqual(written, ['## Findings\n\nReport content\n\nverified']);
+		assert.ok(streamed.some((markdown) => markdown.includes('1 of 3 recommendations verified, 1 flagged as unsupported, 1 demoted')));
+	});
+
+	test('saves the unverified report when verification throws', async () => {
+		const written: string[] = [];
+		await runAnalyzeSessionsFlow(
+			'needs analysis',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			createFlowMeta(),
+			createAnalyzeFlowDeps({
+				verifyReport: async () => {
+					throw new Error('judgment down');
+				},
+				writeReport: async (_storageDirectory, input) => {
+					written.push(input.content);
+					return { report: createAnalyzeReportReference(), reportFilePath: 'e:/workspace/.chat/analysis/reports/report-1.md' };
+				},
+			}),
+		);
+
+		assert.deepEqual(written, ['## Findings\n\nReport content']);
+	});
+
+	test('the triage policy excludes trivial sessions and passes rank-based detail levels', async () => {
+		const candidates = ['fingerprint-1', 'fingerprint-2', 'fingerprint-3']
+			.map((fingerprint) => createAnalysisCandidate({ fingerprint }));
+		const triage = new Map([
+			['fingerprint-1', { trivial: { type: 'noul', noul: 0.9 } }],
+			['fingerprint-2', { friction: { type: 'score', score: 1 } }],
+			['fingerprint-3', { friction: { type: 'score', score: 3 } }],
+		]);
+		const batched: string[][] = [];
+		const prompted: { fingerprints: string[]; levels: (string | undefined)[] }[] = [];
+		const streamed: string[] = [];
+		const result = await runAnalyzeSessionsFlow(
+			'needs analysis',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			createFlowMeta(),
+			createAnalyzeFlowDeps({
+				createCandidates: async () => candidates,
+				batchCharBudget: 1_000_000,
+				triageCandidates: async () => triage as never,
+				splitIntoBatches: (batchInput, _maxChars, detailLevels) => {
+					assert.ok(detailLevels);
+					batched.push(batchInput.map((candidate) => candidate.fingerprint));
+					return [batchInput];
+				},
+				buildPrompt: (_selection, promptInput, _baseline, _detailLevel, detailLevels) => {
+					prompted.push({
+						fingerprints: promptInput.map((candidate) => candidate.fingerprint),
+						levels: promptInput.map((candidate) => detailLevels?.get(candidate.fingerprint)),
+					});
+					return 'analysis prompt';
+				},
+				streamMarkdown: (markdown: string) => {
+					streamed.push(markdown);
+				},
+			}),
+		);
+
+		assert.deepEqual(batched, [['fingerprint-3', 'fingerprint-2']]);
+		assert.deepEqual(prompted, [{ fingerprints: ['fingerprint-3', 'fingerprint-2'], levels: ['full', 'full'] }]);
+		assert.ok(streamed.some((markdown) => markdown.includes('Skipping 1 of 3 sessions')));
+		assert.equal(result?.metadata.analysisStatus, 'complete');
+	});
+
+	test('triage counts reach the report input and signals are recorded per storage directory', async () => {
+		const candidates = ['fingerprint-1', 'fingerprint-2', 'fingerprint-3']
+			.map((fingerprint) => createAnalysisCandidate({ fingerprint, storageDirectory: 'e:/workspace/.chat' }));
+		const triage = new Map([
+			['fingerprint-1', { trivial: { type: 'noul', noul: 0.9 } }],
+			['fingerprint-2', { friction: { type: 'score', score: 3 }, instructionViolation: { type: 'noul', noul: 0.5 } }],
+		]);
+		const reportTriage: unknown[] = [];
+		const recordedTriage: { storageDirectory: string; entries: AnalysisTriageIndexEntry[] }[] = [];
+		await runAnalyzeSessionsFlow(
+			'needs analysis',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			createFlowMeta(),
+			createAnalyzeFlowDeps({
+				createCandidates: async () => candidates,
+				batchCharBudget: 1_000_000,
+				triageCandidates: async () => triage as never,
+				recordTriage: async (storageDirectory, entries) => {
+					recordedTriage.push({ storageDirectory, entries });
+				},
+				writeReport: async (_storageDirectory, input) => {
+					reportTriage.push(input.triage);
+					return {
+						report: createAnalyzeReportReference(),
+						reportFilePath: 'e:/workspace/.chat/analysis/reports/report-1.md',
+					};
+				},
+			}),
+		);
+
+		assert.deepEqual(reportTriage, [{ triaged: 2, analyzed: 2, skipped: 1 }]);
+		assert.equal(recordedTriage.length, 1);
+		assert.equal(recordedTriage[0]?.storageDirectory, 'e:/workspace/.chat');
+		const entries = recordedTriage[0]?.entries ?? [];
+		assert.deepEqual(entries.map((entry) => [entry.fingerprint, entry.skipped]), [['fingerprint-1', true], ['fingerprint-2', false]]);
+		assert.deepEqual(entries[1]?.signals, { friction: 3, instructionViolation: 0.5 });
+		assert.equal(entries[0]?.priority, undefined);
+		assert.equal(typeof entries[1]?.priority, 'number');
+	});
+
+	test('the flow stops before the LLM when triage marks every session trivial', async () => {
+		const prompts: string[] = [];
+		const streamed: string[] = [];
+		const result = await runAnalyzeSessionsFlow(
+			'needs analysis',
+			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
+			createFlowMeta(),
+			createAnalyzeFlowDeps({
+				triageCandidates: async () => new Map([['fingerprint-1', { trivial: { type: 'noul', noul: 0.99 } }]]) as never,
+				runModelPrompt: async (prompt: string) => {
+					prompts.push(prompt);
+					return 'report';
+				},
+				streamMarkdown: (markdown: string) => {
+					streamed.push(markdown);
+				},
+			}),
+		);
+
+		assert.equal(result, undefined);
+		assert.equal(prompts.length, 0);
+		assert.ok(streamed.some((markdown) => markdown.includes('skipped as low-signal')));
 	});
 
 	test('without triage the flow result is unchanged', async () => {
@@ -1372,5 +1613,55 @@ suite('chatParticipant slash-less intent routing', () => {
 		judgment.setAnswers({ intent: choiceAnswer('implement', INTENT_ROUTING_HIGH_CONFIDENCE - 0.01) });
 		const below = await routeSlashlessPrompt({ prompt: 'apply the recommendations', sessions: [], judgment });
 		assert.equal(below.kind, 'suggest');
+	});
+});
+
+suite('chatParticipant analysis timeframe fallback', () => {
+	function choiceAnswer(choice: string, confidence: number): { type: 'choice'; choice: string; confidence: number; probabilities: Record<string, number> } {
+		return { type: 'choice', choice, confidence, probabilities: { [choice]: confidence } };
+	}
+
+	test('resolves existing aliases without a TypeSafe call', async () => {
+		const judgment = createFakeJudgmentService({ answers: { timeframe: choiceAnswer('last30Days', 0.99) } });
+		for (const [alias, mode] of [['24h', 'last24Hours'], ['7d', 'last7Days'], ['last 30 days', 'last30Days'], ['needs analysis', 'needsAnalysis']] as const) {
+			const selection = await resolveAnalysisSelection(alias, { judgment });
+			assert.equal(selection?.mode, mode);
+		}
+		assert.equal(judgment.calls.length, 0);
+	});
+
+	test('resolves a free-form timeframe to a preset selection through the timeframe Choice', async () => {
+		const judgment = createFakeJudgmentService({ answers: { timeframe: choiceAnswer('last7Days', 0.93) } });
+		const logs: string[] = [];
+		const selection = await resolveAnalysisSelection('past week', { judgment, log: (message) => logs.push(message) });
+
+		assert.equal(selection?.mode, 'last7Days');
+		assert.equal(selection?.onlyUnanalyzed, false);
+		assert.equal(judgment.calls.length, 1);
+		assert.equal(judgment.calls[0]?.options, 'routing');
+		assert.deepEqual(Object.keys(judgment.calls[0]?.questions ?? {}), ['timeframe']);
+		assert.match(logs[0] ?? '', /timeframe=last7Days confidence=0\.93 alias=last 7 days/);
+	});
+
+	test('maps the needs-analysis timeframe to the needs-analysis selection', async () => {
+		const judgment = createFakeJudgmentService({ answers: { timeframe: choiceAnswer('needsAnalysis', 0.9) } });
+		const selection = await resolveAnalysisSelection('chats I have not reviewed', { judgment });
+		assert.equal(selection?.mode, 'needsAnalysis');
+	});
+
+	test('keeps the scope picker when the timeframe is unspecified, unsure, or TypeSafe is off', async () => {
+		const unspecified = createFakeJudgmentService({ answers: { timeframe: choiceAnswer('unspecified', 0.99) } });
+		assert.equal(await judgeAnalysisTimeframe('my chats', unspecified), undefined);
+
+		const unsure = createFakeJudgmentService({ answers: { timeframe: choiceAnswer('last7Days', INTENT_ROUTING_MEDIUM_CONFIDENCE - 0.01) } });
+		assert.equal(await judgeAnalysisTimeframe('recently', unsure), undefined);
+
+		const disabled = createFakeJudgmentService({ features: { routing: false }, answers: { timeframe: choiceAnswer('last7Days', 0.99) } });
+		assert.equal(await judgeAnalysisTimeframe('past week', disabled), undefined);
+		assert.equal(disabled.calls.length, 0);
+
+		assert.equal(await judgeAnalysisTimeframe('past week', undefined), undefined);
+		assert.equal(await judgeAnalysisTimeframe('   ', unspecified), undefined);
+		assert.equal(unspecified.calls.length, 1);
 	});
 });

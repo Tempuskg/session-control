@@ -7,11 +7,14 @@ import {
 	AnalysisReportRepositorySummary,
 	AnalysisReportReference,
 	AnalysisReportSourceSession,
+	AnalysisReportTriageSummary,
+	AnalysisTriageIndexEntry,
 	AnalysisSelection,
 	CachedJudgmentEntry,
 	ChatSession,
 	GitContext,
 	JudgmentCache,
+	describeAnalysisIndexProblem,
 	isAnalysisIndex,
 	isCachedJudgmentEntry,
 	isJudgmentCache,
@@ -49,6 +52,7 @@ export interface AnalysisWriteReportInput {
 	repositories?: AnalysisReportRepositorySummary[];
 	sourceSessions?: AnalysisReportSourceSession[];
 	warnings?: string[];
+	triage?: AnalysisReportTriageSummary;
 }
 
 export interface AnalysisRecordInput {
@@ -229,6 +233,11 @@ function renderReportMarkdown(report: AnalysisReportReference, content: string):
 	}
 	lines.push(`- Workspaces: ${report.contributingWorkspaces.join(', ') || 'n/a'}`);
 	lines.push(`- Sessions Analyzed: ${report.analyzedFingerprints.length}`);
+	if (report.triage) {
+		lines.push(
+			`- Triage: ${report.triage.triaged} triaged, ${report.triage.analyzed} analyzed, ${report.triage.skipped} skipped as low-signal`,
+		);
+	}
 
 	if (report.repositories && report.repositories.length > 0) {
 		lines.push('');
@@ -311,23 +320,26 @@ function createExampleFingerprintSession(): ChatSession {
 	};
 }
 
-function createExampleAnalysisReport(promptVersion: string): AnalysisReportReference {
+const EXAMPLE_ANALYSIS_SELECTION: AnalysisSelection = {
+	mode: 'last7Days',
+	label: 'Last 7 Days',
+	range: {
+		start: '2026-06-01T13:55:52.509Z',
+		end: '2026-06-08T13:55:52.509Z',
+	},
+	onlyUnanalyzed: true,
+};
+
+function createExampleAnalysisReport(promptVersion: string, selection: AnalysisSelection): AnalysisReportReference {
 	const exampleSession = createExampleFingerprintSession();
 	const fingerprint = createSessionAnalysisFingerprint(exampleSession);
+	const createdAt = '2026-06-08T13:55:52.509Z';
 	return {
 		id: 'report-example',
-		createdAt: '2026-06-08T13:55:52.509Z',
-		selection: {
-			mode: 'last7Days',
-			label: 'Last 7 Days',
-			range: {
-				start: '2026-06-01T13:55:52.509Z',
-				end: '2026-06-08T13:55:52.509Z',
-			},
-			onlyUnanalyzed: true,
-		},
+		createdAt,
+		selection,
 		promptVersion,
-		reportPath: 'analysis/reports/2026-06-08T13-55-last-7-days-example.md',
+		reportPath: `analysis/reports/${createReportFileName(createdAt, selection, 'example')}`,
 		contributingWorkspaces: ['repo'],
 		analyzedFingerprints: [fingerprint],
 		sessionCount: 1,
@@ -353,9 +365,9 @@ function createExampleAnalysisReport(promptVersion: string): AnalysisReportRefer
 	};
 }
 
-function renderAnalysisReportTemplate(promptVersion: string): string {
+function renderAnalysisReportTemplate(promptVersion: string, selection: AnalysisSelection): string {
 	return renderReportMarkdown(
-		createExampleAnalysisReport(promptVersion),
+		createExampleAnalysisReport(promptVersion, selection),
 		[
 			'## Repository-Specific Findings',
 			'',
@@ -364,8 +376,8 @@ function renderAnalysisReportTemplate(promptVersion: string): string {
 	);
 }
 
-function renderAnalysisIndexTemplate(promptVersion: string): string {
-	const report = createExampleAnalysisReport(promptVersion);
+function renderAnalysisIndexTemplate(promptVersion: string, selection: AnalysisSelection): string {
+	const report = createExampleAnalysisReport(promptVersion, selection);
 	const analyzedSession = report.sourceSessions?.[0];
 	if (!analyzedSession) {
 		throw new Error('Example analysis report must include a source session.');
@@ -399,21 +411,43 @@ function renderNormalizedFingerprintTemplate(): string {
 	);
 }
 
-export function buildAnalysisPersistenceContract(promptVersion: string): string {
+function describeSelectionPersistenceRule(selection: AnalysisSelection): string {
+	if (selection.mode === 'singleSession') {
+		return '- This is a single-session selection: write `"mode": "singleSession"`, `"range": null`, and the selected `"sessionId"`. Never write `"range": {"start": null, "end": null}`; Session Control rejects the whole index when a range endpoint is not an ISO timestamp.';
+	}
+
+	if (selection.range === null) {
+		return `- This selection has no date range: write \`"mode": "${selection.mode}"\` and \`"range": null\`. Never write \`"range": {"start": null, "end": null}\`; Session Control rejects the whole index when a range endpoint is not an ISO timestamp.`;
+	}
+
+	return `- This is a date-filtered selection: write \`"mode": "${selection.mode}"\` and a \`range\` whose \`start\` and \`end\` are both ISO timestamp strings. Use \`"range": null\` only for single-session and Needs Analysis selections.`;
+}
+
+export function buildAnalysisPersistenceContract(
+	promptVersion: string,
+	selection: AnalysisSelection = EXAMPLE_ANALYSIS_SELECTION,
+): string {
 	return [
 		'Session Control persistence contract for this handoff:',
 		'',
 		`- Use report prompt version \`${promptVersion}\` and analysis index version \`${ANALYSIS_INDEX_VERSION}\`.`,
+		'- Copy this exact `selection` object into the report reference in `analysis/index.json`:',
+		'',
+		'```json',
+		JSON.stringify(selection, null, 2),
+		'```',
+		'',
+		describeSelectionPersistenceRule(selection),
 		'- Save the report markdown at the requested report path using this top-level shape:',
 		'',
 		'```md',
-		renderAnalysisReportTemplate(promptVersion),
+		renderAnalysisReportTemplate(promptVersion, selection),
 		'```',
 		'',
 		'- Keep `analysis/index.json` in this shape. Merge by `report.id` and session `fingerprint` instead of replacing unrelated entries:',
 		'',
 		'```json',
-		renderAnalysisIndexTemplate(promptVersion),
+		renderAnalysisIndexTemplate(promptVersion, selection),
 		'```',
 		'',
 		'- Compute each root-session fingerprint as SHA-256 over the UTF-8 bytes of `JSON.stringify(normalizedSession)` and write the lowercase hex digest.',
@@ -508,7 +542,8 @@ export function createAnalysisStore(overrides: Partial<AnalysisStoreDeps> = {}) 
 		const content = await deps.readFile(indexPath);
 		const parsed = JSON.parse(content) as unknown;
 		if (!isAnalysisIndex(parsed)) {
-			throw new Error(`Invalid analysis index schema: ${indexPath}`);
+			const problem = describeAnalysisIndexProblem(parsed) ?? 'the index does not match the expected schema.';
+			throw new Error(`Invalid analysis index schema: ${indexPath}: ${problem}`);
 		}
 
 		return parsed;
@@ -544,6 +579,7 @@ export function createAnalysisStore(overrides: Partial<AnalysisStoreDeps> = {}) 
 			...(input.repositories === undefined ? {} : { repositories: [...input.repositories] }),
 			...(input.sourceSessions === undefined ? {} : { sourceSessions: [...input.sourceSessions] }),
 			...(input.warnings === undefined ? {} : { warnings: [...input.warnings] }),
+			...(input.triage === undefined ? {} : { triage: { ...input.triage } }),
 		};
 
 		await writeAtomic(deps, reportFilePath, renderReportMarkdown(report, input.content));
@@ -596,6 +632,31 @@ export function createAnalysisStore(overrides: Partial<AnalysisStoreDeps> = {}) 
 			updatedAt: deps.now().toISOString(),
 			reports: [...reportsById.values()].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
 			analyzedSessions: [...entriesByFingerprint.values()].sort((a, b) => Date.parse(b.analyzedAt) - Date.parse(a.analyzedAt)),
+			...(current.triagedSessions === undefined ? {} : { triagedSessions: current.triagedSessions }),
+		};
+
+		await writeIndex(storageDirectory, next);
+		return next;
+	}
+
+	/** Upserts triage signals by fingerprint so the Saved Sessions explorer can show them. */
+	async function recordTriage(
+		storageDirectory: string,
+		entries: AnalysisTriageIndexEntry[],
+	): Promise<AnalysisIndex> {
+		const current = await readIndex(storageDirectory);
+		const entriesByFingerprint = new Map<string, AnalysisTriageIndexEntry>();
+		for (const entry of current.triagedSessions ?? []) {
+			entriesByFingerprint.set(entry.fingerprint, entry);
+		}
+		for (const entry of entries) {
+			entriesByFingerprint.set(entry.fingerprint, entry);
+		}
+
+		const next: AnalysisIndex = {
+			...current,
+			updatedAt: deps.now().toISOString(),
+			triagedSessions: [...entriesByFingerprint.values()].sort((a, b) => Date.parse(b.triagedAt) - Date.parse(a.triagedAt)),
 		};
 
 		await writeIndex(storageDirectory, next);
@@ -723,6 +784,7 @@ export function createAnalysisStore(overrides: Partial<AnalysisStoreDeps> = {}) 
 		readReport,
 		writeReport,
 		recordAnalysis,
+		recordTriage,
 		hasAnalyzedFingerprint,
 		getJudgmentCachePath,
 		readJudgments,

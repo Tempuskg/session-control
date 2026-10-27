@@ -176,6 +176,7 @@ suite('pro boundary', () => {
 		const proViewEntries = [
 			...manifest.contributes.menus['view/title'] ?? [],
 			...manifest.contributes.menus['view/item/context'] ?? [],
+			...manifest.contributes.menus['explorer/context'] ?? [],
 		].filter((entry) => entry.command.startsWith('session-control-pro.'));
 
 		assert.deepEqual(
@@ -184,13 +185,39 @@ suite('pro boundary', () => {
 				'session-control-pro.exportSessionToControlFile',
 				'session-control-pro.gitSyncPull',
 				'session-control-pro.gitSyncPush',
+				'session-control-pro.harvestDocument',
+				'session-control-pro.harvestKnowledge',
+				'session-control-pro.harvestSessionFromExplorer',
 				'session-control-pro.harvestSessionFromExplorer',
 				'session-control-pro.searchSessions',
+				'session-control-pro.syncAiSkills',
 			],
 		);
 		for (const entry of proViewEntries) {
 			assert.match(entry.when ?? '', /&& session-control\.proFeaturesLoaded$/, entry.command);
 		}
+	});
+
+	test('package.json offers the harvest dry-run preview only to unlicensed users', async () => {
+		const manifestPath = path.resolve(__dirname, '..', '..', '..', 'package.json');
+		const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+			contributes: {
+				commands: Array<{ command: string; category?: string }>;
+				menus: Record<string, Array<{ command: string; when?: string }>>;
+			};
+		};
+		const command = manifest.contributes.commands.find(
+			(entry) => entry.command === 'session-control-pro.previewHarvest',
+		);
+		const paletteEntry = manifest.contributes.menus['commandPalette']?.find(
+			(entry) => entry.command === 'session-control-pro.previewHarvest',
+		);
+
+		assert.equal(command?.category, 'Session Control Pro');
+		assert.equal(
+			paletteEntry?.when,
+			'session-control.proFeaturesLoaded && !session-control.hasProLicense',
+		);
 	});
 
 	test('activateProFeatures advertises the versioned shared handoff capability', async () => {

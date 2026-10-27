@@ -1,5 +1,32 @@
 # Log
 
+## 2026-10-23
+
+Harvest run `2026-10-23T12:14:34.666Z` - scope: 2026-10-03T15:05:02.680Z to 2026-10-04T16:25:15.544Z (5 sessions),
+Execution: destination: `Chat extension`; provider/backend: `copilot`; model: `GPT-4o mini`; model source: `Explicit VS Code chat-extension selection`; reasoning behavior: `Unknown reasoning behavior (provider does not expose it)`; reasoning source: `Unknown reasoning behavior (provider does not expose it)`; configuration: `Model source: Explicit VS Code chat-extension selection; reasoning source: Unknown reasoning behavior (provider does not expose it)`; by session-control-pro@1.9.0+harvest-v1.
+Result: 11 created, 0 updated, 2 skipped (0 duplicates, 0 below confidence).
+
+- **Creation** [/playbooks/update-kanban-card-for-session-control-pro-export-command.md](playbooks/update-kanban-card-for-session-control-pro-export-command.md) — source sessions: [/sessions/1bff48ed-e135-435c-9bae-7e0e5bfe3425.md](sessions/1bff48ed-e135-435c-9bae-7e0e5bfe3425.md)
+- **Creation** [/references/export-session-to-ai-control-file-command-implementation.md](references/export-session-to-ai-control-file-command-implementation.md) — source sessions: [/sessions/1bff48ed-e135-435c-9bae-7e0e5bfe3425.md](sessions/1bff48ed-e135-435c-9bae-7e0e5bfe3425.md)
+- **Creation** [/pitfalls/ensure-correct-contextvalue-for-session-rows-in-pro-package.md](pitfalls/ensure-correct-contextvalue-for-session-rows-in-pro-package.md) — source sessions: [/sessions/1bff48ed-e135-435c-9bae-7e0e5bfe3425.md](sessions/1bff48ed-e135-435c-9bae-7e0e5bfe3425.md)
+- **Creation** [/playbooks/publish-a-new-release-for-vs-code-extension-v1-4-0.md](playbooks/publish-a-new-release-for-vs-code-extension-v1-4-0.md) — source sessions: [/sessions/01a0e2e9-ea29-7252-9185-0931fb366ac8.md](sessions/01a0e2e9-ea29-7252-9185-0931fb366ac8.md)
+- **Creation** [/decisions/authorize-publication-of-release-v1-4-0-to-both-marketplaces.md](decisions/authorize-publication-of-release-v1-4-0-to-both-marketplaces.md) — source sessions: [/sessions/01a0e2e9-ea29-7252-9185-0931fb366ac8.md](sessions/01a0e2e9-ea29-7252-9185-0931fb366ac8.md)
+- **Creation** [/references/release-versioning-format-for-vs-code-extensions.md](references/release-versioning-format-for-vs-code-extensions.md) — source sessions: [/sessions/01a0e2e9-ea29-7252-9185-0931fb366ac8.md](sessions/01a0e2e9-ea29-7252-9185-0931fb366ac8.md)
+- **Creation** [/pitfalls/avoid-including-local-files-in-vsix-package.md](pitfalls/avoid-including-local-files-in-vsix-package.md) — source sessions: [/sessions/01a0e2e9-ea29-7252-9185-0931fb366ac8.md](sessions/01a0e2e9-ea29-7252-9185-0931fb366ac8.md)
+- **Creation** [/sessions/7f0c41fb-5f1d-4b81-bd77-bfa78a5bae27.md](sessions/7f0c41fb-5f1d-4b81-bd77-bfa78a5bae27.md) — source sessions: [/sessions/7f0c41fb-5f1d-4b81-bd77-bfa78a5bae27.md](sessions/7f0c41fb-5f1d-4b81-bd77-bfa78a5bae27.md)
+- **Creation** [/sessions/1bff48ed-e135-435c-9bae-7e0e5bfe3425.md](sessions/1bff48ed-e135-435c-9bae-7e0e5bfe3425.md) — source sessions: [/sessions/1bff48ed-e135-435c-9bae-7e0e5bfe3425.md](sessions/1bff48ed-e135-435c-9bae-7e0e5bfe3425.md)
+- **Creation** [/sessions/ea159390-1aac-4bb6-a87e-a553037060b3.md](sessions/ea159390-1aac-4bb6-a87e-a553037060b3.md) — source sessions: [/sessions/ea159390-1aac-4bb6-a87e-a553037060b3.md](sessions/ea159390-1aac-4bb6-a87e-a553037060b3.md)
+- **Creation** [/sessions/01a0e2e9-ea29-7252-9185-0931fb366ac8.md](sessions/01a0e2e9-ea29-7252-9185-0931fb366ac8.md) — source sessions: [/sessions/01a0e2e9-ea29-7252-9185-0931fb366ac8.md](sessions/01a0e2e9-ea29-7252-9185-0931fb366ac8.md)
+
+## 2026-10-21
+
+Harvest run `2026-10-21T14:17:35.940Z` - scope: Last 24 Hours, only unharvested (2 sessions),
+Execution: destination: `Chat extension`; provider/backend: `copilot`; model: `GPT-4o mini`; model source: `Explicit VS Code chat-extension selection`; reasoning behavior: `Unknown reasoning behavior (provider does not expose it)`; reasoning source: `Unknown reasoning behavior (provider does not expose it)`; configuration: `Model source: Explicit VS Code chat-extension selection; reasoning source: Unknown reasoning behavior (provider does not expose it)`; by session-control-pro@1.9.0+harvest-v1.
+Result: 2 created, 0 updated, 0 skipped (0 duplicates, 0 below confidence).
+
+- **Creation** [/sessions/b4c387d4-974d-4de0-8d4f-06d5e81aee9f.md](sessions/b4c387d4-974d-4de0-8d4f-06d5e81aee9f.md) — source sessions: [/sessions/b4c387d4-974d-4de0-8d4f-06d5e81aee9f.md](sessions/b4c387d4-974d-4de0-8d4f-06d5e81aee9f.md)
+- **Creation** [/sessions/1b16a05f-c05b-4bcb-ae0e-a266f3ed1f27.md](sessions/1b16a05f-c05b-4bcb-ae0e-a266f3ed1f27.md) — source sessions: [/sessions/1b16a05f-c05b-4bcb-ae0e-a266f3ed1f27.md](sessions/1b16a05f-c05b-4bcb-ae0e-a266f3ed1f27.md)
+
 ## 2026-10-12
 
 Harvest run `2026-10-12T04:04:51.434Z` - scope: Session: Pro harvest and control-file export picker (1 sessions),

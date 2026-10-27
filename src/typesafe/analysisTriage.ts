@@ -1,8 +1,13 @@
 import type * as vscode from 'vscode';
 import type { EntryType, JsonValue } from '@typesafe-ai/sdk';
 
-import { buildSessionEvidence, type AnalysisCandidateSession } from '../sessionAnalysis';
-import type { SavedTurn } from '../types';
+import {
+	buildSessionEvidence,
+	type AnalysisCandidateSession,
+	type AnalysisEvidenceDetailLevel,
+	type AnalysisEvidenceDetailLevels,
+} from '../sessionAnalysis';
+import type { AnalysisTriageSignals, SavedTurn } from '../types';
 import {
 	noul,
 	score,
@@ -132,4 +137,127 @@ export async function triageAnalysisCandidates(
 	await Promise.all(Array.from({ length: workerCount }, () => worker()));
 	deps.log?.(`[analysis-triage] judged ${results.size} of ${candidates.length} candidates`);
 	return results;
+}
+
+/*
+ * Triage policy. Weights and thresholds live here in code, not in the
+ * questions, so the policy can change without invalidating cached answers.
+ */
+
+/** Weights for the composite priority; each signal is normalized to 0..1 first. */
+export const ANALYSIS_TRIAGE_PRIORITY_WEIGHTS = {
+	friction: 0.35,
+	toolFailureLoops: 0.25,
+	instructionViolation: 0.2,
+	controlFileLesson: 0.2,
+} as const;
+
+/** `trivial` probability at or above which a candidate skips the LLM. */
+export const ANALYSIS_TRIAGE_TRIVIAL_THRESHOLD = 0.7;
+
+/** Priority for candidates without triage answers, so they are neither skipped nor favored. */
+export const UNTRIAGED_ANALYSIS_PRIORITY = 0.5;
+
+/** Highest rubric level of the triage Score questions (four levels, 0 to 3). */
+const MAX_TRIAGE_SCORE = 3;
+
+const EVIDENCE_DETAIL_LEVELS: readonly AnalysisEvidenceDetailLevel[] = ['full', 'compact', 'summaryOnly'];
+const EVIDENCE_SEPARATOR_LENGTH = 6;
+
+function unit(value: unknown): number {
+	return typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
+}
+
+/** Weighted sum of the normalized triage signals, from 0 (low signal) to 1. */
+export function computeAnalysisPriority(answers: AnalysisTriageAnswers): number {
+	const weights = ANALYSIS_TRIAGE_PRIORITY_WEIGHTS;
+	return (
+		weights.friction * unit(answers.friction?.score / MAX_TRIAGE_SCORE) +
+		weights.toolFailureLoops * unit(answers.toolFailureLoops?.score / MAX_TRIAGE_SCORE) +
+		weights.instructionViolation * unit(answers.instructionViolation?.noul) +
+		weights.controlFileLesson * unit(answers.controlFileLesson?.noul)
+	);
+}
+
+function finiteOrUndefined(value: unknown): number | undefined {
+	return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+/** Flattens triage answers into the persisted signal shape, omitting signals the judgment lacks. */
+export function summarizeAnalysisTriageSignals(answers: AnalysisTriageAnswers): AnalysisTriageSignals {
+	const values: [keyof AnalysisTriageSignals, number | undefined][] = [
+		['friction', finiteOrUndefined(answers.friction?.score)],
+		['toolFailureLoops', finiteOrUndefined(answers.toolFailureLoops?.score)],
+		['instructionViolation', finiteOrUndefined(answers.instructionViolation?.noul)],
+		['controlFileLesson', finiteOrUndefined(answers.controlFileLesson?.noul)],
+		['trivial', finiteOrUndefined(answers.trivial?.noul)],
+	];
+	return Object.fromEntries(values.filter(([, value]) => value !== undefined)) as AnalysisTriageSignals;
+}
+
+export function isTrivialAnalysisCandidate(answers: AnalysisTriageAnswers): boolean {
+	return unit(answers.trivial?.noul) >= ANALYSIS_TRIAGE_TRIVIAL_THRESHOLD;
+}
+
+export interface AnalysisTriagePlan {
+	/** Candidates to send to the LLM, highest priority first. */
+	readonly analyzable: AnalysisCandidateSession[];
+	/** Candidates skipped as trivial, in their original order. */
+	readonly skipped: AnalysisCandidateSession[];
+	readonly priorities: ReadonlyMap<string, number>;
+	readonly detailLevels: AnalysisEvidenceDetailLevels;
+}
+
+/**
+ * Applies the triage policy: skips trivial candidates, ranks the rest by
+ * priority, and gives the richest evidence that still fits the batch budget to
+ * the highest-ranked candidates. Detail never increases as rank decreases.
+ */
+export function planAnalysisFromTriage(
+	candidates: readonly AnalysisCandidateSession[],
+	triage: AnalysisTriageResults,
+	batchCharBudget: number,
+): AnalysisTriagePlan {
+	const skipped: AnalysisCandidateSession[] = [];
+	const priorities = new Map<string, number>();
+	const ranked: { candidate: AnalysisCandidateSession; priority: number; index: number }[] = [];
+
+	candidates.forEach((candidate, index) => {
+		const answers = triage.get(candidate.fingerprint);
+		if (answers && isTrivialAnalysisCandidate(answers)) {
+			skipped.push(candidate);
+			return;
+		}
+		const priority = answers ? computeAnalysisPriority(answers) : UNTRIAGED_ANALYSIS_PRIORITY;
+		priorities.set(candidate.fingerprint, priority);
+		ranked.push({ candidate, priority, index });
+	});
+	ranked.sort((left, right) => right.priority - left.priority || left.index - right.index);
+
+	const detailLevels = new Map<string, AnalysisEvidenceDetailLevel>();
+	let floor = 0;
+	let usedChars = 0;
+	for (const { candidate } of ranked) {
+		const separator = usedChars === 0 ? 0 : EVIDENCE_SEPARATOR_LENGTH;
+		let chosen = EVIDENCE_DETAIL_LEVELS.length - 1;
+		let chosenLength: number | undefined;
+		for (let level = floor; level < EVIDENCE_DETAIL_LEVELS.length; level += 1) {
+			const length = buildSessionEvidence(candidate, EVIDENCE_DETAIL_LEVELS[level]).length;
+			if (usedChars + separator + length <= batchCharBudget) {
+				chosen = level;
+				chosenLength = length;
+				break;
+			}
+		}
+		floor = chosen;
+		usedChars += separator + (chosenLength ?? 0);
+		detailLevels.set(candidate.fingerprint, EVIDENCE_DETAIL_LEVELS[chosen] ?? 'summaryOnly');
+	}
+
+	return {
+		analyzable: ranked.map((entry) => entry.candidate),
+		skipped,
+		priorities,
+		detailLevels,
+	};
 }

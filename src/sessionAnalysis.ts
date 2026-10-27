@@ -4,6 +4,7 @@ import {
 	ChatSession,
 	ToolCall,
 } from './types';
+import { extractVerifiedRecommendations } from './typesafe/reportVerification';
 
 export interface AnalysisCandidateSession {
 	workspaceName: string;
@@ -15,6 +16,19 @@ export interface AnalysisCandidateSession {
 }
 
 export type AnalysisEvidenceDetailLevel = 'full' | 'compact' | 'summaryOnly';
+
+/** Per-candidate evidence detail ceilings keyed by fingerprint; missing candidates use `full`. */
+export type AnalysisEvidenceDetailLevels = ReadonlyMap<string, AnalysisEvidenceDetailLevel>;
+
+const EVIDENCE_DETAIL_RANK: Readonly<Record<AnalysisEvidenceDetailLevel, number>> = { full: 0, compact: 1, summaryOnly: 2 };
+
+/** Returns the less detailed of two evidence levels. */
+export function leastDetailedEvidenceLevel(
+	first: AnalysisEvidenceDetailLevel,
+	second: AnalysisEvidenceDetailLevel,
+): AnalysisEvidenceDetailLevel {
+	return EVIDENCE_DETAIL_RANK[second] > EVIDENCE_DETAIL_RANK[first] ? second : first;
+}
 
 export const ANALYSIS_PROMPT_VERSION = '5';
 export const DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET = 48000;
@@ -449,6 +463,7 @@ export function buildSessionEvidence(
 export function splitCandidatesIntoAnalysisBatches(
 	candidates: AnalysisCandidateSession[],
 	maxChars: number = DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET,
+	detailLevels?: AnalysisEvidenceDetailLevels,
 ): AnalysisCandidateSession[][] {
 	if (candidates.length === 0) {
 		return [];
@@ -459,7 +474,7 @@ export function splitCandidatesIntoAnalysisBatches(
 	let currentChars = 0;
 
 	for (const candidate of candidates) {
-		const evidenceLength = buildSessionEvidence(candidate).length;
+		const evidenceLength = buildSessionEvidence(candidate, detailLevels?.get(candidate.fingerprint) ?? 'full').length;
 		const separatorLength = currentBatch.length === 0 ? 0 : 6;
 		if (currentBatch.length > 0 && currentChars + evidenceLength + separatorLength > maxChars) {
 			batches.push(currentBatch);
@@ -497,10 +512,15 @@ export function buildAnalysisPrompt(
 	candidates: AnalysisCandidateSession[],
 	existingAiFileBaseline = '',
 	detailLevel: AnalysisEvidenceDetailLevel = 'full',
+	detailLevels?: AnalysisEvidenceDetailLevels,
 ): string {
 	const instruction = ANALYSIS_PROMPT_TEMPLATE.replace('{user chosen timeframe}', selection.label);
-	const evidence = candidates.map((candidate) => buildSessionEvidence(candidate, detailLevel)).join('\n\n---\n\n');
-	const compressionGuidance = buildEvidenceCompressionGuidance(detailLevel);
+	const candidateLevels = candidates.map((candidate) =>
+		leastDetailedEvidenceLevel(detailLevel, detailLevels?.get(candidate.fingerprint) ?? 'full'));
+	const evidence = candidates
+		.map((candidate, index) => buildSessionEvidence(candidate, candidateLevels[index]))
+		.join('\n\n---\n\n');
+	const compressionGuidance = buildEvidenceCompressionGuidance(candidateLevels.reduce(leastDetailedEvidenceLevel, detailLevel));
 
 	return [
 		instruction,
@@ -542,7 +562,29 @@ export function buildAnalysisSynthesisPrompt(
 	].join('\n');
 }
 
-export function buildImplementationHandoffPrompt(reportFilePath: string, userPrompt: string): string {
+function buildVerifiedRecommendationLines(reportContent: string | undefined): string[] {
+	const verified = reportContent === undefined ? undefined : extractVerifiedRecommendations(reportContent);
+	if (verified === undefined) {
+		return [];
+	}
+	if (verified.length === 0) {
+		return [
+			'Report verification left no verified recommendations: every recommendation is flagged as unsupported, unverified, or demoted for targeting files outside AI control files.',
+			'Do not implement any recommendation from this report. Report that nothing was verified and stop.',
+		];
+	}
+	return [
+		'Report verification checked each recommendation against the cited session evidence and AGENTS.md rule 13.',
+		'Implement only these verified recommendations. Skip any report item flagged with a ⚠️ note or listed under Demoted Recommendations:',
+		...verified.map((text, index) => `${index + 1}. ${text.replace(/\s+/g, ' ').trim()}`),
+	];
+}
+
+/**
+ * `reportContent`, when given, filters the handoff to the recommendations the
+ * report verification policy left actionable.
+ */
+export function buildImplementationHandoffPrompt(reportFilePath: string, userPrompt: string, reportContent?: string): string {
 	const normalizedPrompt = userPrompt.trim().length > 0
 		? userPrompt.trim()
 		: 'Implement the highest-priority recommendations from the saved analysis report.';
@@ -556,6 +598,7 @@ export function buildImplementationHandoffPrompt(reportFilePath: string, userPro
 		'Do not expand into application source files, tests, build tooling, or general documentation unless the saved report specifically calls for updating an AI control file that governs those workflows.',
 		'Inspect the current working tree first so you do not assume a clean baseline before editing or validating.',
 		'Make the next concrete implementation change in the relevant AI control file or new AI skill file and validate it with focused checks before expanding scope.',
+		...buildVerifiedRecommendationLines(reportContent),
 		`User request: ${normalizedPrompt}`,
 	].join('\n');
 }

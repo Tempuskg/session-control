@@ -10,6 +10,7 @@ import {
 	DEFAULT_ANALYSIS_BATCH_CHAR_BUDGET,
 	filterCandidatesForAnalysis,
 	type AnalysisEvidenceDetailLevel,
+	type AnalysisEvidenceDetailLevels,
 	type AnalysisCandidateSession,
 } from './sessionAnalysis';
 import {
@@ -19,9 +20,16 @@ import {
 	type AnalysisReportResultMetadata,
 	type AnalysisReportStatus,
 	type AnalysisSelection,
+	type AnalysisTriageIndexEntry,
 	type SessionMeta,
 } from './types';
-import type { AnalysisTriageResults } from './typesafe/analysisTriage';
+import {
+	planAnalysisFromTriage,
+	summarizeAnalysisTriageSignals,
+	type AnalysisTriagePlan,
+	type AnalysisTriageResults,
+} from './typesafe/analysisTriage';
+import type { ReportVerificationSummary } from './typesafe/reportVerification';
 
 export interface WorkspaceSessionMeta extends SessionMeta {
 	workspaceFolder: vscode.WorkspaceFolder;
@@ -43,12 +51,18 @@ export interface AnalyzeSessionsFlowDeps {
 		workspaceFolders: readonly vscode.WorkspaceFolder[],
 		candidates: AnalysisCandidateSession[],
 	) => Promise<string>;
-	splitIntoBatches: (candidates: AnalysisCandidateSession[], maxChars?: number) => AnalysisCandidateSession[][];
+	splitIntoBatches: (
+		candidates: AnalysisCandidateSession[],
+		maxChars?: number,
+		detailLevels?: AnalysisEvidenceDetailLevels,
+	) => AnalysisCandidateSession[][];
+	/** `detailLevels` are per-candidate ceilings from the triage policy; `detailLevel` caps every candidate. */
 	buildPrompt: (
 		selection: AnalysisSelection,
 		candidates: AnalysisCandidateSession[],
 		recommendationBaseline: string,
 		detailLevel?: AnalysisEvidenceDetailLevel,
+		detailLevels?: AnalysisEvidenceDetailLevels,
 	) => string;
 	buildSynthesisPrompt: (
 		selection: AnalysisSelection,
@@ -66,8 +80,15 @@ export interface AnalyzeSessionsFlowDeps {
 	maxPromptChars?: number;
 	/** Exact check against the selected model's input limit; takes precedence over the maxPromptChars estimate. */
 	promptExceedsModelInput?: (prompt: string) => Promise<boolean>;
-	/** Optional TypeSafe triage, run once per candidate before batching; omit to skip triage. */
+	/** Optional TypeSafe triage, run once per candidate before batching; omit to skip triage. Answers drive the triage policy. */
 	triageCandidates?: (candidates: AnalysisCandidateSession[]) => Promise<AnalysisTriageResults>;
+	/** Optional persistence of per-session triage signals for the Saved Sessions explorer. */
+	recordTriage?: (storageDirectory: string, entries: AnalysisTriageIndexEntry[]) => Promise<unknown>;
+	/** Optional TypeSafe report verification; returns the report with the verification policy applied. */
+	verifyReport?: (
+		report: string,
+		analyzedCandidates: AnalysisCandidateSession[],
+	) => Promise<{ content: string; summary: ReportVerificationSummary }>;
 }
 
 const TOKEN_LIMIT_ERROR_PATTERN = /token limit|context length|too many tokens|maximum context|message exceeds/i;
@@ -517,6 +538,45 @@ async function runTriage(
 	}
 }
 
+async function recordTriageSignals(
+	recordTriage: NonNullable<AnalyzeSessionsFlowDeps['recordTriage']>,
+	candidates: readonly AnalysisCandidateSession[],
+	triage: AnalysisTriageResults,
+	plan: AnalysisTriagePlan,
+): Promise<void> {
+	const triagedAt = new Date().toISOString();
+	const skipped = new Set(plan.skipped.map((candidate) => candidate.fingerprint));
+	const byStorageDirectory = new Map<string, AnalysisTriageIndexEntry[]>();
+	for (const candidate of candidates) {
+		const answers = triage.get(candidate.fingerprint);
+		if (!answers) {
+			continue;
+		}
+
+		const priority = plan.priorities.get(candidate.fingerprint);
+		const entry: AnalysisTriageIndexEntry = {
+			fingerprint: candidate.fingerprint,
+			sessionId: candidate.session.id,
+			triagedAt,
+			skipped: skipped.has(candidate.fingerprint),
+			signals: summarizeAnalysisTriageSignals(answers),
+			...(candidate.rootFileName ? { rootFileName: candidate.rootFileName } : {}),
+			...(priority === undefined ? {} : { priority }),
+		};
+		const entries = byStorageDirectory.get(candidate.storageDirectory) ?? [];
+		entries.push(entry);
+		byStorageDirectory.set(candidate.storageDirectory, entries);
+	}
+
+	for (const [storageDirectory, entries] of byStorageDirectory) {
+		try {
+			await recordTriage(storageDirectory, entries);
+		} catch {
+			// Triage signals are advisory display data; a write failure must not block analysis.
+		}
+	}
+}
+
 export async function runAnalyzeSessionsFlow(
 	requestPrompt: string,
 	workspaceFolders: readonly vscode.WorkspaceFolder[],
@@ -559,10 +619,32 @@ export async function runAnalyzeSessionsFlow(
 	const recommendationBaseline = await deps.loadRecommendationBaseline(workspaceFolders, filtered);
 	const batchCharBudget = Math.min(deps.batchCharBudget, deps.maxPromptChars ?? Number.POSITIVE_INFINITY);
 	const effectiveBatchBudget = Math.max(4000, batchCharBudget - recommendationBaseline.length);
-	const batches = deps.splitIntoBatches(filtered, effectiveBatchBudget);
+
+	const plan = triage && triage.size > 0 ? planAnalysisFromTriage(filtered, triage, effectiveBatchBudget) : undefined;
+	const analyzable = plan?.analyzable ?? filtered;
+	if (plan && triage && deps.recordTriage) {
+		await recordTriageSignals(deps.recordTriage, filtered, triage, plan);
+	}
+	if (plan && plan.skipped.length > 0) {
+		deps.streamMarkdown(`_Skipping ${plan.skipped.length} of ${filtered.length} sessions that triage flagged as low-signal._\n\n`);
+	}
+	if (!analyzable.length) {
+		deps.streamMarkdown('All matching saved sessions were skipped as low-signal by triage. No analysis report was generated.');
+		return;
+	}
+
+	const generationDeps: AnalyzeSessionsFlowDeps = plan
+		? {
+				...deps,
+				splitIntoBatches: (candidates, maxChars) => deps.splitIntoBatches(candidates, maxChars, plan.detailLevels),
+				buildPrompt: (promptSelection, candidates, baseline, detailLevel) =>
+					deps.buildPrompt(promptSelection, candidates, baseline, detailLevel, plan.detailLevels),
+		  }
+		: deps;
+	const batches = generationDeps.splitIntoBatches(analyzable, effectiveBatchBudget);
 	const generation = batches.length <= 1
-		? await generateSingleBatchAnalysis(selection, filtered, recommendationBaseline, deps)
-		: await generateBatchedAnalysis(selection, filtered, batches, recommendationBaseline, deps);
+		? await generateSingleBatchAnalysis(selection, analyzable, recommendationBaseline, generationDeps)
+		: await generateBatchedAnalysis(selection, analyzable, batches, recommendationBaseline, generationDeps);
 	if (generation.status === 'failed') {
 		deps.streamMarkdown(`\n\n${buildFailedAnalysisMessage(generation.warnings)}`);
 		return;
@@ -576,6 +658,21 @@ export async function runAnalyzeSessionsFlow(
 
 	const ownerStorageDirectory = deps.getStoragePath(ownerWorkspace);
 	const analyzedCandidates = generation.analyzedCandidates;
+	let reportContent = generation.content;
+	if (deps.verifyReport) {
+		try {
+			const verification = await deps.verifyReport(generation.content, analyzedCandidates);
+			reportContent = verification.content;
+			const { total, verified, unsupported, demoted } = verification.summary;
+			if (reportContent !== generation.content && total > 0) {
+				deps.streamMarkdown(
+					`\n\n_Report verification: ${verified} of ${total} recommendations verified, ${unsupported} flagged as unsupported, ${demoted} demoted. /implement uses only the verified ones._`,
+				);
+			}
+		} catch {
+			// Verification is advisory; an unverified report is still saved.
+		}
+	}
 	const reportInput: AnalysisWriteReportInput = {
 		selection,
 		promptVersion: ANALYSIS_PROMPT_VERSION,
@@ -595,7 +692,10 @@ export async function runAnalyzeSessionsFlow(
 		})),
 		status: generation.status,
 		...(generation.warnings.length === 0 ? {} : { warnings: generation.warnings }),
-		content: generation.content,
+		...(plan && triage
+			? { triage: { triaged: triage.size, analyzed: analyzedCandidates.length, skipped: plan.skipped.length } }
+			: {}),
+		content: reportContent,
 	};
 	const persisted = await deps.writeReport(ownerStorageDirectory, reportInput);
 

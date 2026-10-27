@@ -115,6 +115,82 @@ suite('analysisStore', () => {
 		}
 	});
 
+	test('writeReport renders the triage summary in the report header', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-analysis-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createAnalysisStore();
+		const baseInput = {
+			selection: createNeedsAnalysisSelection(),
+			promptVersion: '1',
+			contributingWorkspaces: ['workspace'],
+			analyzedFingerprints: ['fingerprint-a'],
+			status: 'complete' as const,
+			content: 'A useful finding.',
+		};
+
+		try {
+			const persisted = await store.writeReport(storageDirectory, {
+				...baseInput,
+				createdAt: '2026-05-17T12:00:00.000Z',
+				triage: { triaged: 3, analyzed: 2, skipped: 1 },
+			});
+			const withoutTriage = await store.writeReport(storageDirectory, {
+				...baseInput,
+				createdAt: '2026-05-17T12:01:00.000Z',
+			});
+
+			const reportContent = await fs.readFile(persisted.reportFilePath, 'utf8');
+			const header = reportContent.slice(0, reportContent.indexOf('## Findings'));
+			assert.equal(header.includes('- Triage: 3 triaged, 2 analyzed, 1 skipped as low-signal'), true);
+			assert.deepEqual(persisted.report.triage, { triaged: 3, analyzed: 2, skipped: 1 });
+			assert.equal((await fs.readFile(withoutTriage.reportFilePath, 'utf8')).includes('- Triage:'), false);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('recordTriage upserts triage signals and recordAnalysis preserves them', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-analysis-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const store = createAnalysisStore();
+
+		try {
+			await store.recordTriage(storageDirectory, [
+				{ fingerprint: 'fingerprint-a', sessionId: 'session-a', triagedAt: '2026-05-17T11:00:00.000Z', skipped: true, signals: { trivial: 0.9 } },
+			]);
+			await store.recordTriage(storageDirectory, [
+				{ fingerprint: 'fingerprint-a', sessionId: 'session-a', triagedAt: '2026-05-17T12:00:00.000Z', skipped: false, priority: 0.4, signals: { friction: 2 } },
+				{ fingerprint: 'fingerprint-b', sessionId: 'session-b', triagedAt: '2026-05-17T12:00:00.000Z', skipped: true, signals: {} },
+			]);
+			const persisted = await store.writeReport(storageDirectory, {
+				selection: createNeedsAnalysisSelection(),
+				promptVersion: '1',
+				contributingWorkspaces: ['workspace'],
+				analyzedFingerprints: ['fingerprint-a'],
+				status: 'complete',
+				content: 'A useful finding.',
+				createdAt: '2026-05-17T12:00:00.000Z',
+			});
+			await store.recordAnalysis(storageDirectory, persisted.report, [
+				{ fingerprint: 'fingerprint-a', sessionId: 'session-a', title: 'Session A', savedAt: '2026-05-17T10:00:00.000Z' },
+			]);
+
+			const index = await store.readIndex(storageDirectory);
+			assert.equal(index.analyzedSessions.length, 1);
+			assert.equal(index.triagedSessions?.length, 2);
+			assert.deepEqual(index.triagedSessions?.find((entry) => entry.fingerprint === 'fingerprint-a'), {
+				fingerprint: 'fingerprint-a',
+				sessionId: 'session-a',
+				triagedAt: '2026-05-17T12:00:00.000Z',
+				skipped: false,
+				priority: 0.4,
+				signals: { friction: 2 },
+			});
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
 	test('readReport returns the persisted markdown report content', async () => {
 		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-analysis-store-'));
 		const storageDirectory = path.join(tempRoot, '.chat');

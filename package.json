@@ -207,6 +207,11 @@
         "category": "Session Control Pro"
       },
       {
+        "command": "session-control-pro.previewHarvest",
+        "title": "Preview Knowledge Harvest (Dry Run)",
+        "category": "Session Control Pro"
+      },
+      {
         "command": "session-control-pro.harvestDocument",
         "title": "Import and Harvest Word Document...",
         "category": "Session Control Pro",
@@ -350,12 +355,14 @@
           "enum": [
             "summarize",
             "truncate",
-            "recent-only"
+            "recent-only",
+            "relevant"
           ],
           "enumDescriptions": [
             "Summarize older turns into a preamble using the LLM, then include the most recent turns verbatim.",
             "Silently drop the oldest turns until within the limit.",
-            "Load only the most recent N turns with a note about omitted turns."
+            "Load only the most recent N turns with a note about omitted turns.",
+            "Keep the most recent N turns, then fill the remaining resume.maxContextChars with the earlier turns TypeSafe scores as most relevant to your follow-up, in turn order. Falls back to summarize when TypeSafe is off or unavailable."
           ],
           "default": "summarize",
           "description": "What to do when a session exceeds resume.maxTurns or resume.maxContextChars.",
@@ -630,6 +637,17 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "session-control.sessionExplorer",
+        "contents": "No saved sessions yet. Save the current chat to keep it with this workspace.\n[Save Session](command:session-control.saveSessionFromProvider)\nOr save every chat response automatically: [Toggle Auto-Save](command:session-control.toggleAutoSave)"
+      },
+      {
+        "view": "session-control.sessionExplorer",
+        "contents": "Unlock search, Git sync and knowledge harvest — [Get Session Control Pro](command:session-control.upgradeToPro)",
+        "when": "!session-control.hasProLicense"
+      }
+    ],
     "menus": {
       "commandPalette": [
         {
@@ -683,6 +701,10 @@
         },
         {
           "command": "session-control-pro.harvestKnowledge"
+        },
+        {
+          "command": "session-control-pro.previewHarvest",
+          "when": "session-control.proFeaturesLoaded && !session-control.hasProLicense"
         },
         {
           "command": "session-control-pro.harvestDocument"
@@ -772,14 +794,51 @@
           "group": "2_analysis@2"
         },
         {
+          "command": "session-control.diagnoseAutoSave",
+          "when": "view == session-control.sessionExplorer",
+          "group": "3_autosave@2"
+        },
+        {
+          "command": "session-control.cleanupOrphanedParts",
+          "when": "view == session-control.sessionExplorer",
+          "group": "3_autosave@3"
+        },
+        {
+          "command": "session-control-pro.harvestKnowledge",
+          "when": "view == session-control.sessionExplorer && session-control.proFeaturesLoaded",
+          "group": "4_knowledge@1"
+        },
+        {
+          "command": "session-control-pro.syncAiSkills",
+          "when": "view == session-control.sessionExplorer && session-control.proFeaturesLoaded",
+          "group": "4_knowledge@2"
+        },
+        {
+          "command": "session-control.upgradeToPro",
+          "when": "view == session-control.sessionExplorer && !session-control.hasProLicense",
+          "group": "9_pro@1"
+        },
+        {
+          "command": "session-control.enterProLicenseKey",
+          "when": "view == session-control.sessionExplorer && !session-control.hasProLicense",
+          "group": "9_pro@2"
+        },
+        {
           "command": "session-control-pro.gitSyncPush",
           "when": "view == session-control.sessionExplorer && session-control.proFeaturesLoaded",
-          "group": "gitSync@1"
+          "group": "5_gitSync@1"
         },
         {
           "command": "session-control-pro.gitSyncPull",
           "when": "view == session-control.sessionExplorer && session-control.proFeaturesLoaded",
-          "group": "gitSync@2"
+          "group": "5_gitSync@2"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "session-control-pro.harvestDocument",
+          "when": "resourceExtname == .docx && session-control.proFeaturesLoaded",
+          "group": "7_session-control@1"
         }
       ],
       "editor/title": [
@@ -834,6 +893,31 @@
           "command": "session-control-pro.exportSessionToControlFile",
           "when": "view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/ && session-control.proFeaturesLoaded",
           "group": "pro@1"
+        },
+        {
+          "command": "session-control.openSessionFromExplorer",
+          "when": "view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/",
+          "group": "1_open@1"
+        },
+        {
+          "command": "session-control.analyzeSessionFromExplorer",
+          "when": "view == session-control.sessionExplorer && viewItem == session-control.session",
+          "group": "2_analysis@1"
+        },
+        {
+          "command": "session-control.reanalyzeSessionFromExplorer",
+          "when": "view == session-control.sessionExplorer && viewItem == session-control.session.analyzed",
+          "group": "2_analysis@1"
+        },
+        {
+          "command": "session-control-pro.harvestSessionFromExplorer",
+          "when": "view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/ && session-control.proFeaturesLoaded",
+          "group": "pro@2"
+        },
+        {
+          "command": "session-control.deleteSessionFromExplorer",
+          "when": "view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/",
+          "group": "9_delete@1"
         }
       ]
     }
