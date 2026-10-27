@@ -7,9 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-10-26
+
+### Added
+
+- **Implement Analysis** in the Saved Sessions context menu opens the selected session's own analysis in the chat-or-agent picker.
+- **Preview Knowledge Harvest (Dry Run)** lets users without a Pro license inspect extracted knowledge in an unsaved editor without writing a bundle or harvest index. Includes Session Control Pro 0.10.0.
+- Optional TypeSafe analysis planning can skip low-signal sessions, prioritize stronger evidence, and show triage signals in Saved Sessions. Report verification flags unsupported recommendations and separates targets outside AI control files; implementation handoffs use the verified recommendations when verification is present.
+- The optional `relevant` resume overflow strategy keeps recent turns and fills remaining context with earlier turns scored against your follow-up, falling back to summarization when TypeSafe is unavailable. TypeSafe can also interpret natural-language analysis timeframes.
+
+### Changed
+
+- Saved Sessions has a welcome message, additional context-menu actions, and grouped shortcuts for analysis, auto-save, knowledge, and Git sync. Word documents can be harvested from the file explorer.
+- The one-time Pro upgrade notice appears after three user-initiated session saves rather than after a delay on activation. Licensed users never see it.
+
 ### Fixed
 
 - **Resume in Cursor loads the saved conversation when its original assistant is unavailable.** The viewer now uses the existing native Cursor handoff instead of inserting a VS Code participant command as plain text. Installed origin assistants and stock VS Code keep their existing routes.
+- **Pro:** harvest summaries safely render fenced excerpts and omit links to excluded concepts that do not already exist.
 
 ## [1.9.0] - 2026-10-18
 

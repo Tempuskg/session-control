@@ -100,6 +100,10 @@ and the Pro commands unlock in place.
 | Sync AI Skills Across Assistants | Keep the same repo guidance matching across Copilot, Cursor, Claude Code, and Codex copies, including edits made to any copy, and ask before overwriting |
 | Push Saved Sessions to Git / Pull Saved Sessions from Git | Sync saved sessions with a private Git repository you own, from the Saved Sessions title-bar menu. Both run only when you choose them, and a session changed on two machines is shown to you to resolve, never overwritten |
 
+**Preview Knowledge Harvest (Dry Run)** is available without a Pro license. It runs extraction
+with your chosen chat model or CLI and opens the proposed knowledge in an unsaved editor. It
+writes no bundle or harvest index; saving the knowledge through Harvest remains a Pro feature.
+
 How these differ from the free commands:
 
 - **Export Session to AI Control File...** starts from one saved session. The free **Analyze
@@ -121,7 +125,8 @@ command does. When TypeSafe is enabled, **Search Saved Sessions (All Workspaces)
 top 10 matches, which sends your query and the title, provider, workspace, date, and snippet of
 each of those matches to the TypeSafe AI provider. Git sync pushes only to the repository in
 `session-control-pro.gitSync.remoteUrl`. Saving, resuming, browsing, auto-save, document
-extraction, and AI skills sync stay entirely local.
+extraction, and AI skills sync stay local unless you enable an optional AI-assisted feature
+such as relevance-selected resume context.
 
 Run **Get Session Control Pro** from the Command Palette, or visit
 [sessioncontrol.dev/#pro](https://sessioncontrol.dev/#pro) for pricing and checkout. After
@@ -232,6 +237,11 @@ consolidation, or removal. When repeated workflows suggest a better reusable set
 recommend creating new AI skill files such as `SKILL.md`, `*.instructions.md`, `*.prompt.md`, or
 `*.agent.md`.
 
+When TypeSafe is enabled, triage can skip low-signal sessions and prioritize stronger evidence,
+with signals shown in Saved Sessions. Report verification flags unsupported recommendations and
+separates recommendations outside AI control files. These optional judgments send session evidence
+and recommendation text to the TypeSafe provider; failures leave analysis available.
+
 ### Implement recommendations
 
 `@session-control /implement` generates a compact implementation prompt that points a coding
@@ -244,6 +254,9 @@ uses its own model; choosing Chat opens the prompt in the in-editor chat for rev
 **Session Control: Implement Latest Analysis** does the same from the Command Palette — it looks
 across the open workspace folders, finds the newest saved analysis report still on disk, and
 opens the same chat-or-agent picker.
+
+Right-click an analyzed session and choose **Implement Analysis** to use that session's own
+report. For verified reports, the handoff includes only supported AI control file recommendations.
 
 ### Import Copilot guidance as Cursor, Codex, or Claude Code skills
 
@@ -262,8 +275,14 @@ title action appears only when the active file is a valid Session Control sessio
 your JSON does not match the schema, the viewer action is hidden and the command reports that the
 format is not recognized.
 
-When a session is open in the viewer, a ▶ **Resume** icon in the editor title bar opens the chat
-panel with `@session-control /resume <session-title>` pre-filled.
+When a session is open in the viewer, the **Resume** title action uses its original assistant
+when available. In Cursor, an unavailable original assistant falls back to a native Cursor
+handoff with the saved conversation.
+
+Set `session-control.resume.overflowStrategy` to `relevant` to keep recent turns and fill
+remaining context with earlier turns TypeSafe scores against your follow-up. This sends the
+follow-up and clipped earlier turns to the TypeSafe provider, and falls back to summarization
+when TypeSafe is off or unavailable.
 
 ### Continue a session in another assistant
 
