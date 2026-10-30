@@ -15,7 +15,7 @@
   },
   "homepage": "https://github.com/tempuskg/session-control#readme",
   "engines": {
-    "vscode": "^1.93.0"
+    "vscode": "^1.95.0"
   },
   "categories": [
     "AI",
@@ -45,12 +45,17 @@
     "cross-ide",
     "local-first",
     "transcript",
-    "resume"
+    "resume",
+    "agent-mode",
+    "mcp"
   ],
   "activationEvents": [
     "onStartupFinished"
   ],
   "main": "./dist/extension.js",
+  "bin": {
+    "session-control-mcp": "./dist/mcpServer.js"
+  },
   "contributes": {
     "commands": [
       {
@@ -593,6 +598,94 @@
         }
       }
     },
+    "languageModelTools": [
+      {
+        "name": "session-control_listSessions",
+        "toolReferenceName": "savedSessions",
+        "displayName": "List Saved Sessions",
+        "userDescription": "List chat sessions saved by Session Control in this workspace.",
+        "modelDescription": "Lists chat sessions that Session Control saved in the open workspace folders, newest first. Returns JSON with each session's id, title, date (ISO saved time), git branch, short commit, turn count, origin provider, and workspace folder. Use this when the user asks which sessions are saved, or to find the id of a session before calling session-control_resumeSession. Optionally filter by a title, id, or branch substring. When the user wants to resume a session without naming one, show the list and let them choose before resuming.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(history)",
+        "tags": ["session-control", "sessions"],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Optional case-insensitive substring matched against session title, id, or git branch."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Maximum number of sessions to return (default 20, maximum 100)."
+            }
+          }
+        }
+      },
+      {
+        "name": "session-control_resumeSession",
+        "toolReferenceName": "resumeSession",
+        "displayName": "Resume Saved Session",
+        "userDescription": "Load a saved Session Control chat session as context.",
+        "modelDescription": "Loads a chat session saved by Session Control and returns its transcript as text so you can continue that conversation. Pass the session id from session-control_listSessions, or a title; titles are fuzzy matched and ambiguous matches return candidate ids. If the user gives an exact id, call this directly without listing sessions first. If a title is ambiguous, ask the user which candidate they mean rather than picking one. The transcript is trimmed to the user's resume.maxTurns and resume.maxContextChars settings, with a note when earlier turns are omitted; tell the user when that happens. Use this when the user asks to resume, continue, or reload a previous or saved session.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(debug-continue)",
+        "tags": ["session-control", "sessions"],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "session": {
+              "type": "string",
+              "description": "Saved session id (preferred) or title to resume."
+            }
+          },
+          "required": ["session"]
+        }
+      },
+      {
+        "name": "session-control_analyzeSessions",
+        "toolReferenceName": "analyzeSessions",
+        "displayName": "Analyze Saved Sessions",
+        "userDescription": "Analyze saved Session Control chats and save a recommendations report.",
+        "modelDescription": "Runs Session Control's saved-chat analysis (the same flow as @session-control /analyze) and saves a markdown report of recommendations for repository AI control files such as AGENTS.md and .github/copilot-instructions.md. Omit timeframe to analyze every saved session not yet analyzed; pass timeframe 24h, 7d, or 30d to analyze sessions saved in that window, with onlyUnanalyzed to skip ones already analyzed. Uses a GitHub Copilot model through direct language-model requests and can take a minute or more. Returns JSON with the report status, the saved report path, and the verified/unsupported/demoted recommendation counts; when no report is saved, returns the reason instead.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(graph)",
+        "tags": ["session-control", "sessions"],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "timeframe": {
+              "type": "string",
+              "enum": ["24h", "7d", "30d"],
+              "description": "Analyze sessions saved in the last 24 hours, 7 days, or 30 days. Omit to analyze all sessions that have not been analyzed yet."
+            },
+            "onlyUnanalyzed": {
+              "type": "boolean",
+              "description": "With a timeframe, skip sessions that were already analyzed (default false). Ignored without a timeframe."
+            }
+          }
+        }
+      },
+      {
+        "name": "session-control_getImplementationPrompt",
+        "toolReferenceName": "implementationPrompt",
+        "displayName": "Get Implementation Prompt",
+        "userDescription": "Get the implementation prompt for a saved Session Control analysis report.",
+        "modelDescription": "Returns Session Control's implementation prompt (the same instructions @session-control /implement hands to a coding agent) for the latest saved analysis report, or for the report named by path. You are the implementer: after calling this, follow the returned instructions yourself in the current workspace, starting by reading the report file it names. The prompt limits the work to repository AI control files such as AGENTS.md, .github/copilot-instructions.md, and skill files, and lists the recommendations the report's verification left actionable. Use this when the user asks to implement, apply, or act on an analysis report or its recommendations. When no report exists, returns a message saying to run session-control_analyzeSessions first.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(wand)",
+        "tags": ["session-control", "sessions"],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "report": {
+              "type": "string",
+              "description": "Optional report path: the reportFilePath or reportPath returned by session-control_analyzeSessions, a workspace-relative path, or the report file name. Omit to use the latest saved report."
+            }
+          }
+        }
+      }
+    ],
     "chatParticipants": [
       {
         "id": "session-control.resume",
@@ -946,7 +1039,7 @@
     "@types/marked": "^5.0.2",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.0.0",
-    "@types/vscode": "^1.93.0",
+    "@types/vscode": "^1.95.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "@vscode/test-electron": "^2.4.1",

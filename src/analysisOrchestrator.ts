@@ -41,6 +41,8 @@ export interface AnalyzeSessionsFlowResult {
 	metadata: AnalysisReportResultMetadata;
 	/** Raw TypeSafe triage answers by fingerprint; omitted when triage did not run. */
 	triage?: AnalysisTriageResults;
+	/** Report verification counts; omitted when verification did not run or failed. */
+	verification?: ReportVerificationSummary;
 }
 
 export interface AnalyzeSessionsFlowDeps {
@@ -659,10 +661,12 @@ export async function runAnalyzeSessionsFlow(
 	const ownerStorageDirectory = deps.getStoragePath(ownerWorkspace);
 	const analyzedCandidates = generation.analyzedCandidates;
 	let reportContent = generation.content;
+	let verificationSummary: ReportVerificationSummary | undefined;
 	if (deps.verifyReport) {
 		try {
 			const verification = await deps.verifyReport(generation.content, analyzedCandidates);
 			reportContent = verification.content;
+			verificationSummary = verification.summary;
 			const { total, verified, unsupported, demoted } = verification.summary;
 			if (reportContent !== generation.content && total > 0) {
 				deps.streamMarkdown(
@@ -742,5 +746,6 @@ export async function runAnalyzeSessionsFlow(
 			analysisStorageDirectory: ownerStorageDirectory,
 		},
 		...(triage && triage.size > 0 ? { triage } : {}),
+		...(verificationSummary ? { verification: verificationSummary } : {}),
 	};
 }

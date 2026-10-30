@@ -2,7 +2,7 @@
 title: "Architecture"
 type: entity
 created: 2026-04-12
-updated: 2026-07-30
+updated: 2026-10-29
 sources:
   - raw/plan.md
 tags:
@@ -33,7 +33,7 @@ graph TB
         Adapters["Source adapters<br/>normalize + prove project ownership"]
         Controllers["Per-workspace auto-save controllers<br/>reconcile + settle + checkpoint"]
         SaveSystem["Writer + store<br/>normalize + staged upsert"]
-        ResumeSystem["Resume System<br/>(@session-control participant)"]
+        ResumeSystem["Resume System<br/>(agent-mode tools, MCP server,<br/>legacy @session-control participant)"]
         SessionViewer["Session Viewer<br/>(webview panel)"]
         GitIntegration["Git Integration<br/>(branch, SHA, dirty state)"]
         Diagnostics["Source diagnostics<br/>report + status tooltip"]
@@ -62,7 +62,7 @@ graph TB
 Reads supported local provider stores, transforms them into the [Session Format](session-format.md), enriches with git metadata via [Git Integration](git-integration.md), and writes to the configured storage directory. Manual saves use explicit user selection. Auto-save requires positive workspace ownership and adds automatic origin metadata before an ownership-scoped upsert. Both paths apply bloat controls. See [Save System](save-system.md).
 
 ### Resume System
-A registered VS Code chat participant (`@session-control`) that reads saved sessions from `.chat/`, applies context limits (max turns, max chars), and injects prior conversation as LLM context. See [Resume System](resume-system.md) and [Chat Participant](chat-participant.md).
+Language-model tools for Copilot agent mode (`#savedSessions`, `#resumeSession`, `src/sessionTools.ts`), a stdio MCP server for other assistants (`src/mcpServer.ts`), and the legacy classic-chat participant (`@session-control`). Each reads saved sessions from `.chat/`, applies context limits (max turns, max chars), and injects prior conversation as LLM context. See [Resume System](resume-system.md) and [Chat Participant](chat-participant.md).
 
 ### Session Store
 CRUD layer for saved session files in `.chat/`. Handles file naming, searching, fuzzy matching, archival, and deletion. Used by both Save and Resume systems.
@@ -122,7 +122,7 @@ See [Session Format](session-format.md) for the full schema.
 
 ## Technology Constraints
 
-- **VS Code `^1.93.0`** — Required for stable chat participant API
+- **VS Code `^1.95.0`** — Required for the language-model tools (the chat participant API stabilized at 1.93)
 - **TypeScript** — Extension language
 - **Webpack** — Bundling
 - **VS Code Git Extension API** — For git metadata (not shelling out to git CLI)

@@ -187,3 +187,7 @@ Pages touched: README.md, docs/auto-save.md, .vscodeignore, open-vsx-listing.md,
 ## [2026-10-04] create | Command GUI Access Plan
 Inventoried all 34 contributed commands, the `@session-control` slash commands (including the undeclared `handoff` alias), and the existing palette, view-title, editor-title, tree-context and status bar surfaces. Classified each command as add GUI access, keep, or hide. Named proposed menu ids, groups and `when` clauses, and flagged two issues: `deleteSessionFromExplorer` crashes when run from the palette, and Pro buttons have no companion-loaded gate. Ended with prioritized follow-ups F1–F7. Analysis only; no source, test or package.json changes.
 Pages touched: command-gui-access-plan.md, index.md, log.md
+
+## [2026-10-29] update | Agent-Mode Tools Lead; @session-control Marked Legacy
+Following card-mvu3rtoq-3, README, CHANGELOG Unreleased, and the listing keywords now lead with the Copilot agent-mode language-model tools (`#savedSessions`, `#resumeSession`, `#analyzeSessions`, `#implementationPrompt`) and the stdio MCP server (`docs/mcp-server.md`). The `@session-control` participant stays registered and is labeled the legacy classic-chat path, not removed. Updated the minimum VS Code version to `^1.95.0`.
+Pages touched: chat-participant.md, resume-system.md, overview.md, architecture.md, index.md, log.md

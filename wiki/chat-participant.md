@@ -2,7 +2,7 @@
 title: "Chat Participant"
 type: entity
 created: 2026-04-12
-updated: 2026-05-17
+updated: 2026-10-29
 sources:
   - raw/plan.md
 tags:
@@ -16,7 +16,9 @@ related:
 
 # Chat Participant
 
-The `@session-control` chat participant is the user-facing interface for the Resume System. It's registered via the VS Code Chat Participant API.
+The `@session-control` chat participant is the legacy classic-chat interface for the Resume System and saved-chat analysis. It's registered via the VS Code Chat Participant API and stays registered.
+
+> ⚠️ Note: Since the language-model tools landed (2026-10, card-mvu3rtoq-3), the docs lead with the Copilot agent-mode tools `#savedSessions`, `#resumeSession`, `#analyzeSessions`, and `#implementationPrompt` (`src/sessionTools.ts`), plus the stdio MCP server for other assistants (`docs/mcp-server.md`). The participant is labeled legacy, not removed or scheduled for removal; `/resume`, `/list`, `/analyze`, and `/implement` keep working in classic chat, and vsce still derives the `chat-participant` tag.
 
 ## Registration
 
@@ -33,7 +35,7 @@ The `@session-control` chat participant is the user-facing interface for the Res
 
 Registered at activation via `vscode.chat.createChatParticipant()` in `src/chatParticipant.ts`.
 
-**Minimum VS Code version**: `^1.93.0` (chat participant API stabilized).
+**Minimum VS Code version**: `^1.95.0` (raised from `^1.93.0` for the language-model tools; the chat participant API stabilized at 1.93).
 
 ## Commands
 

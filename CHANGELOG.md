@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Language-model tools for Copilot agent mode.** Agent mode can call Session Control directly, so you can ask in plain language or reference a tool with `#`:
+  - `#savedSessions` lists saved sessions newest first, optionally filtered by title, id, or branch.
+  - `#resumeSession` loads a saved session by id or title and returns its transcript, trimmed to the resume limits.
+  - `#analyzeSessions` runs the saved-chat analysis for unanalyzed sessions or a `24h`, `7d`, or `30d` window, and returns the saved report path and recommendation counts.
+  - `#implementationPrompt` returns the implementation prompt for the latest analysis report, or one named by path, and the current agent implements it itself without a picker.
+- **MCP server for other assistants.** A stdio MCP server (`dist/mcpServer.js`, also available as the `session-control-mcp` bin) lets Claude Code, Cursor, Codex, and other MCP clients list and resume saved sessions with `list_sessions` and `resume_session`. Config snippets are in [docs/mcp-server.md](docs/mcp-server.md).
+
+### Changed
+
+- **`@session-control` is now the legacy classic-chat path.** The participant stays registered, and `/resume`, `/list`, `/analyze`, and `/implement` work as before in classic chat. The docs now lead with the agent-mode tools.
+- **Minimum VS Code version raised to 1.95.** `engines.vscode` is now `^1.95.0`, which the language-model tools need.
+
 ## [1.10.0] - 2026-10-26
 
 ### Added

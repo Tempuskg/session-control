@@ -5,7 +5,7 @@ Thank you for your interest in contributing! This document covers how to set up 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) 20+
-- [VS Code](https://code.visualstudio.com/) 1.93.0+
+- [VS Code](https://code.visualstudio.com/) 1.95.0+
 - GitHub Copilot extension installed and signed in (for manual testing)
 
 ## Dev Setup

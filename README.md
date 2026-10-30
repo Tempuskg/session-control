@@ -11,7 +11,9 @@
 Session Control is a cross-IDE session manager for AI chats. Every conversation with Cursor
 Agent, Claude Code, Codex, or Copilot can be captured as a structured JSON file in your repo,
 linked to the branch and commit it belongs to, and resumed later as context in a new chat —
-through the `@session-control` chat participant.
+through language-model tools such as `#savedSessions` and `#resumeSession` in Copilot agent
+mode, an [MCP server](docs/mcp-server.md) for Claude Code, Cursor, and Codex, or the legacy
+`@session-control` participant in classic chat.
 
 Session Control has no cloud of its own. Chats are read locally and saved as plain files in
 your repo, next to the code they produced, in source control you already trust. Content leaves
@@ -32,8 +34,9 @@ VS-Code-compatible editors via the Open VSX Registry, and inside stock VS Code.
 - **Lives in your repo, not in someone else's cloud.** Sessions are plain JSON in
   `.chat/`, reviewable in diffs and PRs. Optional `.gitignore` toggle if you would rather keep
   them local.
-- **Resume into a fresh chat.** `@session-control /resume <name>` reloads a saved conversation
-  as LLM context. No copy-paste, no lost decisions.
+- **Resume into a fresh chat.** Ask Copilot agent mode to resume a saved session (or reference
+  `#resumeSession`) and the conversation is reloaded as LLM context. No copy-paste, no lost
+  decisions.
 
 ## Quick start
 
@@ -41,8 +44,10 @@ VS-Code-compatible editors via the Open VSX Registry, and inside stock VS Code.
    Session...**. Pick the provider, pick the session. A JSON file appears in `.chat/`.
 2. **Browse it.** Open the **Session Control** view in the activity bar to see every saved
    session, or click one to open it in the built-in session viewer.
-3. **Resume it.** In chat, type `@session-control /resume <session-name>`. The conversation is
-   injected as context and you carry on where you left off.
+3. **Resume it.** In Copilot agent mode, ask to resume the session, or reference
+   `#savedSessions` and `#resumeSession` in your prompt. The conversation is loaded as context
+   and you carry on where you left off. In classic chat, the legacy
+   `@session-control /resume <session-name>` participant command does the same.
 
 Optional: turn on **Session Control: Toggle Auto-Save on Chat Response** and Session Control
 captures matching chats for the workspace automatically.
@@ -52,7 +57,7 @@ captures matching chats for the workspace automatically.
 | Save any chat | Resume as context |
 | :--: | :--: |
 | ![Session Control: Save Session running from the Command Palette in VS Code, with a saved JSON file appearing under .chat/ in the explorer.](https://raw.githubusercontent.com/tempuskg/session-control/main/media/screenshots/save-session.png) | ![@session-control /resume cursor-debug-loop selected in VS Code Chat, loading a prior Cursor Agent transcript as LLM context for a new conversation.](https://raw.githubusercontent.com/tempuskg/session-control/main/media/screenshots/resume-session.png) |
-| Capture a Cursor, Claude Code, Codex, or Copilot chat as JSON in `.chat/`, linked to the branch and commit you were on. | Type `@session-control /resume <name>` in chat to reload a saved session as context. Fuzzy match on the title. |
+| Capture a Cursor, Claude Code, Codex, or Copilot chat as JSON in `.chat/`, linked to the branch and commit you were on. | Reload a saved session as context. Shown here with the legacy `@session-control /resume <name>` participant command; `#resumeSession` does the same in agent mode. Fuzzy match on the title. |
 
 | Session Explorer | Cross-IDE provider picker |
 | :--: | :--: |
@@ -61,20 +66,31 @@ captures matching chats for the workspace automatically.
 
 ## Features
 
+- **Agent-mode tools** — Copilot agent mode can call `#savedSessions` (list saved sessions),
+  `#resumeSession` (load one as context), `#analyzeSessions` (run the saved-chat analysis), and
+  `#implementationPrompt` (get the implementation prompt for an analysis report, so the agent
+  implements it itself). Ask in plain language, or reference a tool with `#`.
+- **MCP server** — Claude Code, Cursor, Codex, and other MCP clients can list and resume saved
+  sessions through a stdio MCP server bundled with the extension. See the
+  [MCP server guide](docs/mcp-server.md).
+- **Legacy chat participant** — In classic chat, `@session-control` still provides `/resume`,
+  `/list`, `/analyze`, and `/implement`.
 - **Provider choice** — Keep Copilot as the default save source, switch to Codex or Claude Code
   for local transcript import, and let Session Control auto-detect Cursor, Codex, or Claude
   Code when running inside those hosts.
 - **Save sessions** — Capture Copilot, Cursor, Codex, or Claude Code chats as JSON files in
   `.chat/`, enriched with branch and commit metadata.
-- **Resume sessions** — Use `@session-control /resume <name>` to reload a saved conversation as
-  LLM context in a new chat.
+- **Resume sessions** — Use `#resumeSession` in agent mode (or the legacy
+  `@session-control /resume <name>`) to reload a saved conversation as LLM context in a new chat.
 - **Auto-save project chats** — Optionally monitor project-matched VS Code Copilot Chat,
   GitHub Copilot CLI, Cursor, Codex, or Claude Code transcript updates and save settled
   responses to the workspace that owns them.
-- **Analyze saved chats** — Use `@session-control /analyze` to review a timeframe of saved
-  sessions, or only chats that have not been analyzed yet.
-- **Implement recommendations** — Use `@session-control /implement` to open a generated
-  implementation prompt in chat or an agent session.
+- **Analyze saved chats** — Use `#analyzeSessions` in agent mode, the **Analyze Saved Chats**
+  command, or the legacy `@session-control /analyze` to review a timeframe of saved sessions, or
+  only chats that have not been analyzed yet.
+- **Implement recommendations** — Use `#implementationPrompt` in agent mode, the **Implement
+  Latest Analysis** command, or the legacy `@session-control /implement` to act on a generated
+  implementation prompt.
 - **Import AI skills** — Convert repository Copilot guidance into repo-scoped Cursor, Codex, or
   Claude Code skills under `.cursor/skills/`, `.agents/skills/`, or `.claude/skills/`.
 - **Browse, preview, delete** — Manage saved sessions via the Session Explorer and command
@@ -152,8 +168,9 @@ All commands are available from the Command Palette under the **Session Control*
 | Clean Up Orphaned Session Part Files | Remove leftover split-session parts |
 | Import Copilot Guidance as Cursor / Codex / Claude Code Skills | Convert repo guidance into repo-scoped skills |
 
-In chat, the `@session-control` participant provides `/resume`, `/list`, `/analyze`, and
-`/implement`.
+In Copilot agent mode, the language-model tools `#savedSessions`, `#resumeSession`,
+`#analyzeSessions`, and `#implementationPrompt` cover the same workflows. In classic chat, the
+legacy `@session-control` participant provides `/resume`, `/list`, `/analyze`, and `/implement`.
 
 ## Usage
 
@@ -181,12 +198,20 @@ ignored.
 
 ### Resume a session
 
-In chat, type `@session-control /resume <session-name>`. The extension does a fuzzy search on
-the session name; if multiple sessions match, you pick from the matches. The saved conversation
-is injected as context into the current chat.
+In Copilot agent mode, ask the agent to resume a saved session, or reference the tools
+directly: `#savedSessions` lists saved sessions newest first (optionally filtered by title, id,
+or branch), and `#resumeSession` loads one by id or title and returns its transcript as
+context. Titles are fuzzy matched; an ambiguous title returns candidate ids to retry with. The
+transcript is trimmed to your `resume.maxTurns` and `resume.maxContextChars` settings.
 
-`@session-control /list` lists saved sessions, as does **Session Control: Browse Saved
-Sessions**.
+**Legacy classic-chat path:** type `@session-control /resume <session-name>`. If multiple
+sessions match, you pick from the matches, and the saved conversation is injected as context
+into the current chat. `@session-control /list` lists saved sessions, as does **Session
+Control: Browse Saved Sessions**.
+
+Outside VS Code, Claude Code, Cursor, Codex, and other MCP clients can list and resume the same
+sessions through the bundled stdio MCP server. See the [MCP server guide](docs/mcp-server.md)
+for config snippets.
 
 ### Auto-save project chats
 
@@ -214,7 +239,14 @@ Code profiles, Remote SSH, dev containers, and WSL; and how to read the diagnost
 
 ### Analyze saved chats
 
-In chat, type `@session-control /analyze`. Choose a timeframe interactively or use a quick alias
+In Copilot agent mode, ask the agent to analyze your saved chats, or reference
+`#analyzeSessions`. With no timeframe it analyzes every saved session not yet analyzed; give it
+`24h`, `7d`, or `30d` to analyze that window instead. The tool runs the analysis with a Copilot
+model through direct language-model requests, saves the report, and returns the report path and
+recommendation counts.
+
+You can also run **Session Control: Analyze Saved Chats**, or, in classic chat, the legacy
+`@session-control /analyze`. Choose a timeframe interactively or use a quick alias
 such as `24h`, `7d`, `30d`, or `needs analysis`. For a date-based range, Session Control asks
 whether to analyze only chats in that range that have not been analyzed yet, or re-analyze
 everything in that range.
@@ -244,7 +276,12 @@ and recommendation text to the TypeSafe provider; failures leave analysis availa
 
 ### Implement recommendations
 
-`@session-control /implement` generates a compact implementation prompt that points a coding
+In Copilot agent mode, ask the agent to implement the latest analysis, or reference
+`#implementationPrompt`. The tool returns the implementation prompt for the latest saved report,
+or for a report you name by path, and the current agent carries it out itself — no picker.
+
+The legacy `@session-control /implement` participant command and the commands below hand the
+prompt to a chat or agent you choose instead. The prompt points a coding
 agent at the saved analysis report and keeps the next step focused on those AI control files.
 When the report recommends a new reusable AI skill, the generated prompt tells the next step to
 create that skill file and any supporting instruction assets. It uses the same chat-or-agent
@@ -342,7 +379,10 @@ Control falls back to the VS Code chat resume flow.
 
 ## Requirements
 
-- VS Code `^1.93.0`, or a VS-Code-compatible editor (Cursor, VSCodium, Windsurf, Positron, Trae)
+- VS Code `^1.95.0`, or a VS-Code-compatible editor (Cursor, VSCodium, Windsurf, Positron, Trae)
+- GitHub Copilot Chat in agent mode to use the `#savedSessions`, `#resumeSession`,
+  `#analyzeSessions`, and `#implementationPrompt` tools
+- Node.js 18 or later to run the MCP server for Claude Code, Cursor, Codex, or other MCP clients
 - GitHub Copilot extension installed and signed in to save VS Code Copilot Chat sessions
 - GitHub Copilot CLI installed and signed in to auto-save its local session event logs
 - Cursor installed locally to import or auto-save Cursor Agent transcript sessions
@@ -367,6 +407,8 @@ Search for **Session Control** in your editor's extensions view, or install from
 
 - [Auto-save reference](docs/auto-save.md) — sources, project matching, profiles, remote and WSL
   boundaries, diagnostics
+- [MCP server](docs/mcp-server.md) — list and resume saved sessions from Claude Code, Cursor,
+  Codex, and other MCP clients
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md) — dev setup, testing instructions, and PR guidelines
 

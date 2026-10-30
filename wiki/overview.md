@@ -2,7 +2,7 @@
 title: "Project Overview"
 type: overview
 created: 2026-04-12
-updated: 2026-07-30
+updated: 2026-10-29
 sources:
   - raw/plan.md
 tags:
@@ -16,7 +16,7 @@ related:
 
 # Project Overview
 
-**Session Control** is an open source (MIT-licensed) VS Code extension that saves supported Copilot, Cursor, Codex, and Claude Code sessions as structured JSON files in a configurable repository folder, linked to git commits and branches. Users can save explicitly or opt into project-scoped automatic snapshots, resume saved chats via the `@session-control` participant, and analyze saved history for recurring workflow and coding-agent insights. It is published to the VS Code Marketplace and Open VSX Registry.
+**Session Control** is an open source (MIT-licensed) VS Code extension that saves supported Copilot, Cursor, Codex, and Claude Code sessions as structured JSON files in a configurable repository folder, linked to git commits and branches. Users can save explicitly or opt into project-scoped automatic snapshots, resume saved chats via language-model tools in Copilot agent mode, a stdio MCP server for other assistants, or the legacy `@session-control` participant in classic chat, and analyze saved history for recurring workflow and coding-agent insights. It is published to the VS Code Marketplace and Open VSX Registry.
 
 ## Core Value Proposition
 
@@ -24,7 +24,7 @@ Assistant chat history is fragmented across editors and local CLI stores and can
 
 1. **Persisting conversations** — Saving chat sessions as JSON files alongside the code they relate to.
 2. **Linking to git context** — Each saved session captures the branch, commit SHA, and dirty state, tying the conversation to a point in the codebase's history.
-3. **Enabling resumption** — A chat participant (`@session-control`) can reload a saved session and inject it as context into a new conversation, allowing the LLM to "remember" prior work.
+3. **Enabling resumption** — The `#resumeSession` agent-mode tool, the MCP server, or the legacy `@session-control` chat participant can reload a saved session and inject it as context into a new conversation, allowing the LLM to "remember" prior work.
 4. **Analyzing workflow patterns** — Saved sessions can be re-read by the chat participant to identify repeated tool misuse, inefficiencies, and coding-agent preload insights across repositories, with persisted owner-workspace, repository, and source-session provenance for later follow-up or coding-agent handoff.
 5. **Living in source control** — Sessions and analysis artifacts are stored as files in the repo (`.chat/`), meaning they can be reviewed in PRs, shared with teammates, and versioned alongside code.
 
@@ -56,7 +56,7 @@ The plan is organized into ten incremental phases, each delivering a testable mi
 ## Key Design Decisions
 
 - **JSON as primary format** — Machine-parseable for resume; markdown summary embedded for human review.
-- **Minimum VS Code `^1.93.0`** — Chat participant API stabilized at this version.
+- **Minimum VS Code `^1.95.0`** — Needed for the language-model tools; the chat participant API stabilized at 1.93.
 - **Manual save + optional project auto-save** — Manual selection remains explicit. Auto-save is off by default, scoped per workspace folder, and monitors all selected provider groups concurrently after positive project matching.
 - **Auto-save is an upsert** — Semantic revisions and durable checkpoints maintain one current automatic file set per source session; manual snapshots are never replacement candidates.
 - **Read-only provider adapters** — Provider stores, hooks, settings, indexes, and retention state are not modified. Unclear ownership fails closed and remains diagnosable.

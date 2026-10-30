@@ -2,7 +2,7 @@
 title: "Resume System"
 type: entity
 created: 2026-04-12
-updated: 2026-04-12
+updated: 2026-10-29
 sources:
   - raw/plan.md
 tags:
@@ -18,7 +18,7 @@ related:
 
 # Resume System
 
-The Resume System enables users to load a previously saved chat session and continue the conversation with full context. It operates through the [Chat Participant](chat-participant.md) (`@session-control`).
+The Resume System enables users to load a previously saved chat session and continue the conversation with full context. In Copilot agent mode it operates through the `#savedSessions` and `#resumeSession` language-model tools (`src/sessionTools.ts`); other MCP clients use the stdio MCP server (`list_sessions` and `resume_session`, see `docs/mcp-server.md`); and classic chat uses the legacy [Chat Participant](chat-participant.md) (`@session-control /resume`). All three share the same resume limits.
 
 ## Core Mechanism
 

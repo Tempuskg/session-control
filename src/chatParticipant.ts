@@ -15,7 +15,6 @@ import {
 	type AnalyzeSessionsFlowDeps,
 	type WorkspaceSessionMeta,
 } from './analysisOrchestrator';
-import { createSessionStore } from './sessionStore';
 import {
 	buildAnalysisPrompt,
 	buildAnalysisSynthesisPrompt,
@@ -39,13 +38,27 @@ import {
 	SessionProviderId,
 } from './types';
 import {
-	formatResumeProviderLabel,
 	resolveProviderFocusCommand,
 	resolveResumeTarget,
 	ResumeProviderCommands,
 	ResumeTarget,
 } from './resumeTarget';
-import { fuzzyMatchSessions } from './utils';
+import {
+	applyResumeOverflowStrategy,
+	DEFAULT_STORAGE_PATH,
+	formatProviderLabel,
+	listSessionsAcrossRoots,
+	loadReassembledSession,
+	resolveResumeOverflow,
+	resolveStorageDirectory,
+	selectSessionForResume,
+	splitRecentAndOmittedTurns,
+	SUMMARIZE_FALLBACK_NOTE,
+	turnsToContextBlock,
+	type ReassembledSessionResult,
+	type ResumeOverflowStrategy,
+	type TurnRelevanceScorer,
+} from './sessionLibrary';
 import { ANALYSIS_TRIAGE_QUESTION_SET_VERSION, triageAnalysisCandidates } from './typesafe/analysisTriage';
 import type { JudgmentService } from './typesafe/judgmentService';
 import { scoreResumeTurnRelevance } from './typesafe/resumeRelevance';
@@ -63,12 +76,25 @@ import {
 
 export { runAnalyzeSessionsFlow } from './analysisOrchestrator';
 export type { AnalyzeSessionsFlowDeps, AnalyzeSessionsFlowResult, WorkspaceSessionMeta } from './analysisOrchestrator';
+export {
+	applyResumeOverflowStrategy,
+	buildResumeContextText,
+	loadReassembledSession,
+	RELEVANT_FALLBACK_STRATEGY,
+	resolveResumeOverflow,
+	selectSessionForResume,
+	trimTurnsForResume,
+} from './sessionLibrary';
+export type {
+	ReassembledSessionResult,
+	ResolvedResumeOverflow,
+	ResumeOverflowStrategy,
+	TurnRelevanceScorer,
+} from './sessionLibrary';
 
-const chatSessionStore = createSessionStore();
 const analysisStore = createAnalysisStore();
 
 const CHAT_PARTICIPANT_ID = 'session-control.resume';
-const MIN_AUTO_SELECT_SCORE = 60;
 const AI_RECOMMENDATION_FILE_PATTERNS = [
 	'AGENTS.md',
 	'.github/copilot-instructions.md',
@@ -93,27 +119,11 @@ const CURSOR_PASTE_SETTLE_MS = 250;
 const CURSOR_PASTE_RETRY_DELAY_MS = 150;
 const CURSOR_PASTE_MAX_ATTEMPTS = 6;
 
-export type ResumeOverflowStrategy = 'summarize' | 'truncate' | 'recent-only' | 'relevant';
-/** Strategy used when `relevant` has no relevance scores (TypeSafe off or failed). */
-export const RELEVANT_FALLBACK_STRATEGY: ResumeOverflowStrategy = 'summarize';
-/** Scores omitted turns against the resume prompt from zero to one; undefined means unavailable. */
-export type TurnRelevanceScorer = (omittedTurns: SavedTurn[], prompt: string) => Promise<readonly number[] | undefined>;
 export type ResumeTargetMode = 'origin-agent' | 'vscode-chat';
-const SUMMARIZE_FALLBACK_NOTE = 'Summary generation failed - showing most recent turns only.';
 
 export interface ResumeSelection {
 	session?: SessionMeta;
 	candidates?: SessionMeta[];
-}
-
-interface SessionReadDeps {
-	readSession(storageDirectory: string, fileName: string): Promise<ChatSession>;
-}
-
-export interface ReassembledSessionResult {
-	session: ChatSession;
-	rootFileName: string;
-	partFiles: string[];
 }
 
 export interface ResumeIntoOriginAgentConfig {
@@ -229,26 +239,12 @@ export interface ImplementationHandoffFlowDeps {
 	streamMarkdown: (markdown: string) => void;
 }
 
-function getStoragePath(workspaceFolder: vscode.WorkspaceFolder): string {
+export function getStoragePath(workspaceFolder: vscode.WorkspaceFolder): string {
 	const configured = vscode.workspace
 		.getConfiguration('session-control', workspaceFolder.uri)
-		.get<string>('storagePath', '.chat');
+		.get<string>('storagePath', DEFAULT_STORAGE_PATH);
 
-	if (!configured.trim()) {
-		throw new Error('session-control.storagePath must not be empty.');
-	}
-
-	if (path.isAbsolute(configured)) {
-		throw new Error('session-control.storagePath must be relative to the workspace folder.');
-	}
-
-	const resolved = path.resolve(workspaceFolder.uri.fsPath, configured);
-	const relative = path.relative(workspaceFolder.uri.fsPath, resolved);
-	if (relative.startsWith('..') || path.isAbsolute(relative)) {
-		throw new Error('session-control.storagePath must stay within the workspace folder.');
-	}
-
-	return resolved;
+	return resolveStorageDirectory(workspaceFolder.uri.fsPath, configured);
 }
 
 function pickWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
@@ -366,27 +362,18 @@ async function loadRecommendationBaseline(
 	return lines.join('\n').trim();
 }
 
-async function listSessionsAcrossWorkspaceFolders(
+export async function listSessionsAcrossWorkspaceFolders(
 	workspaceFolders: readonly vscode.WorkspaceFolder[] | undefined,
 ): Promise<WorkspaceSessionMeta[]> {
 	if (!workspaceFolders?.length) {
 		return [];
 	}
 
-	const results = await Promise.all(
-		workspaceFolders.map(async (workspaceFolder) => {
-			const storageDirectory = getStoragePath(workspaceFolder);
-			const sessions = await chatSessionStore.listSessions(storageDirectory);
-			return sessions.map((session) => ({
-				...session,
-				workspaceFolder,
-				storageDirectory,
-				displayTitle: `[${workspaceFolder.name}] ${session.title}`,
-			}));
-		}),
-	);
-
-	return results.flat().sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt));
+	return listSessionsAcrossRoots(workspaceFolders.map((workspaceFolder) => ({
+		root: workspaceFolder,
+		name: workspaceFolder.name,
+		storageDirectory: getStoragePath(workspaceFolder),
+	})));
 }
 
 export function renderSessionListMarkdown(sessions: SessionMeta[]): string {
@@ -815,20 +802,6 @@ export async function collectModelTextFromModel(
 	return trimmed;
 }
 
-async function collectModelText(
-	model: vscode.LanguageModelChat,
-	stream: vscode.ChatResponseStream | undefined,
-	token: vscode.CancellationToken,
-	prompt: string,
-): Promise<string> {
-	return collectModelTextFromModel(
-		model,
-		stream ? (markdown) => stream.markdown(markdown) : undefined,
-		token,
-		prompt,
-	);
-}
-
 function findLatestAnalysisReportMeta(history: readonly (vscode.ChatRequestTurn | vscode.ChatResponseTurn)[]): {
 	analysisReportPath: string;
 	analysisStorageDirectory: string;
@@ -941,18 +914,27 @@ export function createAnalyzeSessionsFlowDeps(overrides: AnalyzeSessionsFlowDeps
 	};
 }
 
-function createDefaultAnalyzeSessionsFlowDeps(
+export interface AnalysisFlowOutput {
+	markdown: (markdown: string) => void;
+	/** When false, model text is collected but not streamed; defaults to true. */
+	streamModelOutput?: boolean;
+}
+
+/** Analyze deps backed by a direct `vscode.lm` model, for callers with or without a chat response stream. */
+export function createModelAnalyzeSessionsFlowDeps(
 	model: vscode.LanguageModelChat,
-	stream: vscode.ChatResponseStream,
+	output: AnalysisFlowOutput,
 	token: vscode.CancellationToken,
 	selection: import('./types').AnalysisSelection,
 	judgment?: JudgmentService,
 	log?: (message: string) => void,
 ): AnalyzeSessionsFlowDeps {
+	const streamModelOutput = output.streamModelOutput ?? true;
 	return createAnalyzeSessionsFlowDeps({
 		resolveSelection: async () => selection,
-		runModelPrompt: async (prompt: string, streamOutput: boolean) => collectModelText(model, streamOutput ? stream : undefined, token, prompt),
-		streamMarkdown: (markdown: string) => stream.markdown(markdown),
+		runModelPrompt: async (prompt: string, streamOutput: boolean) =>
+			collectModelTextFromModel(model, streamOutput && streamModelOutput ? output.markdown : undefined, token, prompt),
+		streamMarkdown: output.markdown,
 		...getModelPromptLimit(model, token, log),
 		...(judgment
 			? {
@@ -985,10 +967,6 @@ function createDefaultAnalyzeSessionsFlowDeps(
 			  }
 			: {}),
 	});
-}
-
-function formatProviderLabel(provider: SessionProviderId | string): string {
-	return formatResumeProviderLabel(provider) ?? (provider.trim() || 'Assistant');
 }
 
 function createDefaultResumeIntoOriginAgentDeps(
@@ -1252,190 +1230,6 @@ export interface ChatParticipantDeps {
 	readonly log?: (message: string) => void;
 }
 
-export function trimTurnsForResume(turns: SavedTurn[], maxTurns: number, maxContextChars: number): SavedTurn[] {
-	if (maxTurns <= 0 || maxContextChars <= 0) {
-		return [];
-	}
-
-	const byTurnBudget = turns.slice(Math.max(0, turns.length - maxTurns));
-	const selected: SavedTurn[] = [];
-	let charCount = 0;
-
-	for (let index = byTurnBudget.length - 1; index >= 0; index -= 1) {
-		const turn = byTurnBudget[index];
-		if (!turn) {
-			continue;
-		}
-
-		const turnText = turn.type === 'request' ? turn.prompt : turn.content;
-		const projected = charCount + turnText.length;
-		if (projected > maxContextChars && selected.length > 0) {
-			break;
-		}
-
-		if (projected <= maxContextChars || selected.length === 0) {
-			selected.unshift(turn);
-			charCount = projected;
-		}
-	}
-
-	return selected;
-}
-
-function summarizeTurns(omittedTurns: SavedTurn[]): string {
-	if (!omittedTurns.length) {
-		return '';
-	}
-
-	const requestCount = omittedTurns.filter((turn) => turn.type === 'request').length;
-	const responseCount = omittedTurns.length - requestCount;
-	const first = omittedTurns[0];
-	const last = omittedTurns[omittedTurns.length - 1];
-	const firstSnippet = first
-		? (first.type === 'request' ? first.prompt : first.content).slice(0, 100)
-		: '';
-	const lastSnippet = last
-		? (last.type === 'request' ? last.prompt : last.content).slice(0, 100)
-		: '';
-
-	return [
-		`Summary of omitted context: ${omittedTurns.length} earlier turns (${requestCount} user, ${responseCount} assistant).`,
-		`Earliest omitted snippet: ${firstSnippet}`,
-		`Latest omitted snippet: ${lastSnippet}`,
-	].join(' ');
-}
-
-function splitRecentAndOmittedTurns(turns: SavedTurn[], maxTurns: number): { recent: SavedTurn[]; omitted: SavedTurn[] } {
-	const recent = turns.slice(Math.max(0, turns.length - maxTurns));
-	const omitted = turns.slice(0, Math.max(0, turns.length - recent.length));
-	return { recent, omitted };
-}
-
-function turnCharLength(turn: SavedTurn): number {
-	return (turn.type === 'request' ? turn.prompt : turn.content).length;
-}
-
-// Keeps the last `maxTurns` (trimmed to the budget), then spends the remaining
-// `maxContextChars` on the most relevant omitted turns, emitted in turn order.
-function selectRelevantTurns(
-	turns: SavedTurn[],
-	maxTurns: number,
-	maxContextChars: number,
-	relevanceScores: readonly number[],
-): { turns: SavedTurn[]; note?: string } {
-	const split = splitRecentAndOmittedTurns(turns, maxTurns);
-	const recent = trimTurnsForResume(split.recent, split.recent.length || maxTurns, maxContextChars);
-	let remaining = maxContextChars - recent.reduce((total, turn) => total + turnCharLength(turn), 0);
-
-	const ranked = split.omitted
-		.map((turn, index) => ({ turn, index, relevance: relevanceScores[index] ?? 0 }))
-		.filter((entry) => entry.relevance > 0)
-		.sort((left, right) => right.relevance - left.relevance || right.index - left.index);
-	const chosen = new Set<number>();
-	for (const entry of ranked) {
-		const length = turnCharLength(entry.turn);
-		if (length <= remaining) {
-			chosen.add(entry.index);
-			remaining -= length;
-		}
-	}
-
-	const selected = split.omitted.filter((_turn, index) => chosen.has(index));
-	const omittedCount = split.omitted.length;
-	const note = omittedCount > 0
-		? `Included ${selected.length} of ${omittedCount} earlier turns selected by relevance to the follow-up; the rest were omitted.`
-		: undefined;
-	return {
-		turns: [...selected, ...recent],
-		...(note ? { note } : {}),
-	};
-}
-
-export function applyResumeOverflowStrategy(
-	turns: SavedTurn[],
-	maxTurns: number,
-	maxContextChars: number,
-	strategy: ResumeOverflowStrategy,
-	relevanceScores?: readonly number[],
-): { turns: SavedTurn[]; note?: string } {
-	if (strategy === 'relevant') {
-		if (relevanceScores && maxTurns > 0 && maxContextChars > 0) {
-			return selectRelevantTurns(turns, maxTurns, maxContextChars, relevanceScores);
-		}
-		return applyResumeOverflowStrategy(turns, maxTurns, maxContextChars, RELEVANT_FALLBACK_STRATEGY);
-	}
-
-	if (strategy === 'recent-only') {
-		const split = splitRecentAndOmittedTurns(turns, maxTurns);
-		const recent = split.recent;
-		const omitted = split.omitted.length;
-		const constrained = trimTurnsForResume(recent, recent.length || maxTurns, maxContextChars);
-		const note = omitted > 0 ? `Earlier turns omitted (${omitted} total).` : undefined;
-		return {
-			turns: constrained,
-			...(note ? { note } : {}),
-		};
-	}
-
-	if (strategy === 'summarize') {
-		const split = splitRecentAndOmittedTurns(turns, maxTurns);
-		const recent = split.recent;
-		const omittedTurns = split.omitted;
-		const constrained = trimTurnsForResume(recent, recent.length || maxTurns, maxContextChars);
-		const summary = summarizeTurns(omittedTurns);
-		return {
-			turns: constrained,
-			...(summary ? { note: summary } : {}),
-		};
-	}
-
-	return {
-		turns: trimTurnsForResume(turns, maxTurns, maxContextChars),
-	};
-}
-
-export interface ResolvedResumeOverflow {
-	turns: SavedTurn[];
-	note?: string;
-	/** The strategy actually applied; `relevant` falls back when no scores are available. */
-	strategy: ResumeOverflowStrategy;
-}
-
-/**
- * Applies the overflow strategy, scoring omitted turns first for `relevant`.
- * Without a scorer, or when it returns nothing or throws, `relevant` falls back
- * to `RELEVANT_FALLBACK_STRATEGY`.
- */
-export async function resolveResumeOverflow(
-	turns: SavedTurn[],
-	prompt: string,
-	maxTurns: number,
-	maxContextChars: number,
-	strategy: ResumeOverflowStrategy,
-	scorer?: TurnRelevanceScorer,
-): Promise<ResolvedResumeOverflow> {
-	if (strategy === 'relevant') {
-		const omitted = splitRecentAndOmittedTurns(turns, maxTurns).omitted;
-		let scores: readonly number[] | undefined;
-		if (scorer && omitted.length > 0) {
-			try {
-				scores = await scorer(omitted, prompt);
-			} catch {
-				scores = undefined;
-			}
-		}
-		if (scores || (scorer && omitted.length === 0)) {
-			return { ...applyResumeOverflowStrategy(turns, maxTurns, maxContextChars, 'relevant', scores ?? []), strategy };
-		}
-		return {
-			...applyResumeOverflowStrategy(turns, maxTurns, maxContextChars, RELEVANT_FALLBACK_STRATEGY),
-			strategy: RELEVANT_FALLBACK_STRATEGY,
-		};
-	}
-
-	return { ...applyResumeOverflowStrategy(turns, maxTurns, maxContextChars, strategy), strategy };
-}
-
 function createJudgmentTurnRelevanceScorer(
 	judgment: JudgmentService,
 	token?: vscode.CancellationToken,
@@ -1448,18 +1242,6 @@ function createJudgmentTurnRelevanceScorer(
 		...(token ? { token } : {}),
 		...(log ? { log } : {}),
 	});
-}
-
-function turnsToContextBlock(turns: SavedTurn[]): string {
-	return turns
-		.map((turn) => {
-			if (turn.type === 'request') {
-				return `User: ${turn.prompt}`;
-			}
-
-			return `${formatProviderLabel(turn.participant)}: ${turn.content}`;
-		})
-		.join('\n\n');
 }
 
 // Tells the receiving assistant that the transcript came from a different
@@ -1543,133 +1325,6 @@ export function buildResumePrompt(
 	);
 
 	return composeResumePrompt(constrained.turns, prompt, constrained.note);
-}
-
-export function selectSessionForResume<T extends SessionMeta>(query: string, sessions: T[]): { session?: T; candidates?: T[] } {
-	const normalizedQuery = query.trim();
-	if (!normalizedQuery) {
-		return {};
-	}
-
-	const scored = fuzzyMatchSessions(
-		normalizedQuery,
-		sessions.map((session) => {
-			const displayTitle = 'displayTitle' in session && typeof session.displayTitle === 'string'
-				? session.displayTitle
-				: session.title;
-			return {
-				...session,
-				title: displayTitle,
-			};
-		}),
-	);
-	if (!scored.length) {
-		return {};
-	}
-
-	const findOriginal = (scoredSession: SessionMeta): T | undefined =>
-		sessions.find((session) => session.fileName === scoredSession.fileName && session.savedAt === scoredSession.savedAt);
-
-	if (scored.length === 1) {
-		const single = scored[0];
-		if (!single) {
-			return {};
-		}
-
-		const onlyMatch = findOriginal(single);
-		return onlyMatch ? { session: onlyMatch } : {};
-	}
-
-	const best = scored[0];
-	if (best && best.score >= MIN_AUTO_SELECT_SCORE) {
-		const match = findOriginal(best);
-		return match ? { session: match } : {};
-	}
-
-	return {
-		candidates: scored.slice(0, 5).map((session) => findOriginal(session)).filter((session): session is T => Boolean(session)),
-	};
-}
-
-function mergeSessionParts(parts: ChatSession[]): ChatSession {
-	const first = parts[0];
-	if (!first) {
-		throw new Error('Cannot merge empty session parts.');
-	}
-
-	const mergedTurns = parts.flatMap((part) => part.turns);
-	const merged: ChatSession = {
-		...first,
-		part: null,
-		totalParts: null,
-		previousPartFile: null,
-		nextPartFile: null,
-		turns: mergedTurns,
-		totalTurns: mergedTurns.length,
-	};
-
-	return merged;
-}
-
-export async function loadReassembledSession(
-	storageDirectory: string,
-	startFileName: string,
-	depsOverrides: Partial<SessionReadDeps> = {},
-): Promise<ReassembledSessionResult> {
-	const deps: SessionReadDeps = {
-		readSession: (directory, fileName) => chatSessionStore.readSession(directory, fileName),
-		...depsOverrides,
-	};
-
-	const cache = new Map<string, ChatSession>();
-
-	const readPart = async (fileName: string): Promise<ChatSession> => {
-		const cached = cache.get(fileName);
-		if (cached) {
-			return cached;
-		}
-
-		const loaded = await deps.readSession(storageDirectory, fileName);
-		cache.set(fileName, loaded);
-		return loaded;
-	};
-
-	const visitedBackward = new Set<string>();
-	let rootFileName = startFileName;
-	let cursor = await readPart(startFileName);
-
-	while (cursor.previousPartFile) {
-		if (visitedBackward.has(rootFileName)) {
-			throw new Error('Detected cyclic previousPartFile chain while loading session parts.');
-		}
-
-		visitedBackward.add(rootFileName);
-		rootFileName = cursor.previousPartFile;
-		cursor = await readPart(rootFileName);
-	}
-
-	const partFiles: string[] = [];
-	const parts: ChatSession[] = [];
-	const visitedForward = new Set<string>();
-	let nextFileName: string | null = rootFileName;
-
-	while (nextFileName) {
-		if (visitedForward.has(nextFileName)) {
-			throw new Error('Detected cyclic nextPartFile chain while loading session parts.');
-		}
-
-		visitedForward.add(nextFileName);
-		partFiles.push(nextFileName);
-		const part = await readPart(nextFileName);
-		parts.push(part);
-		nextFileName = part.nextPartFile;
-	}
-
-	return {
-		session: mergeSessionParts(parts),
-		rootFileName,
-		partFiles,
-	};
 }
 
 function findResumedSessionMeta(history: readonly (vscode.ChatRequestTurn | vscode.ChatResponseTurn)[]): {
@@ -1863,7 +1518,14 @@ export function registerChatParticipant(context: vscode.ExtensionContext, deps: 
 					prompt,
 					workspaceFolders,
 					workspaceSessions,
-					createDefaultAnalyzeSessionsFlowDeps(analysisModel, stream, token, selection, deps.judgment, deps.log),
+					createModelAnalyzeSessionsFlowDeps(
+						analysisModel,
+						{ markdown: (markdown: string) => stream.markdown(markdown) },
+						token,
+						selection,
+						deps.judgment,
+						deps.log,
+					),
 				);
 			}
 

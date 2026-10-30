@@ -27,7 +27,7 @@ Session Control is a VS Code extension that saves and resumes GitHub Copilot Cha
 - TypeScript with **strict mode** (`strict`, `noImplicitAny`, `noImplicitReturns`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`).
 - Target: ES2022, module system: Node16.
 - Bundled via webpack (`dist/extension.js`). Tests compiled to `dist-test/`.
-- Node.js 20+, VS Code engine `^1.93.0`.
+- Node.js 20+, VS Code engine `^1.95.0`.
 
 ## Code Style
 

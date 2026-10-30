@@ -20,8 +20,8 @@ Master catalog of all wiki pages for the **session-control** VS Code extension.
 
 ## Entities
 - [Save System](save-system.md) — Provider adapters, manual snapshots, reliable auto-save reconciliation, diagnostics, and durable upserts
-- [Resume System](resume-system.md) — Chat participant that loads saved sessions as LLM context
-- [Chat Participant](chat-participant.md) — The `@session-control` VS Code chat participant: registration, commands, UX
+- [Resume System](resume-system.md) — Agent-mode tools, MCP server, and legacy chat participant that load saved sessions as LLM context
+- [Chat Participant](chat-participant.md) — The legacy `@session-control` classic-chat participant: registration, commands, UX
 - [Git Integration](git-integration.md) — Git metadata capture, branch/SHA tracking
 
 ## Concepts

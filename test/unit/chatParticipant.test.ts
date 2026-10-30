@@ -552,7 +552,7 @@ suite('chatParticipant analyze flow', () => {
 		const written: string[] = [];
 		const streamed: string[] = [];
 		const verifiedWith: string[][] = [];
-		await runAnalyzeSessionsFlow(
+		const result = await runAnalyzeSessionsFlow(
 			'needs analysis',
 			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
 			createFlowMeta(),
@@ -572,11 +572,12 @@ suite('chatParticipant analyze flow', () => {
 		assert.deepEqual(verifiedWith, [['fingerprint-1']]);
 		assert.deepEqual(written, ['## Findings\n\nReport content\n\nverified']);
 		assert.ok(streamed.some((markdown) => markdown.includes('1 of 3 recommendations verified, 1 flagged as unsupported, 1 demoted')));
+		assert.deepEqual(result?.verification, { total: 3, verified: 1, unsupported: 1, demoted: 1 });
 	});
 
 	test('saves the unverified report when verification throws', async () => {
 		const written: string[] = [];
-		await runAnalyzeSessionsFlow(
+		const result = await runAnalyzeSessionsFlow(
 			'needs analysis',
 			[createWorkspaceFolder('workspace', 'e:/workspace', 0)],
 			createFlowMeta(),
@@ -592,6 +593,7 @@ suite('chatParticipant analyze flow', () => {
 		);
 
 		assert.deepEqual(written, ['## Findings\n\nReport content']);
+		assert.equal(result?.verification, undefined);
 	});
 
 	test('the triage policy excludes trivial sessions and passes rank-based detail levels', async () => {

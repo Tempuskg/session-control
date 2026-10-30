@@ -47,6 +47,7 @@ import {
 	type ResumeOverflowStrategy,
 	type ResumeTargetMode,
 } from './chatParticipant';
+import { registerSessionTools } from './sessionTools';
 import {
 	createClaudeCodeSessionReader,
 	deriveClaudeCodeProjectSlug,
@@ -3057,6 +3058,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			log: (message) => output.appendLine(`[chat-routing] ${message}`),
 		}),
 		log: (message) => output.appendLine(`[chat-routing] ${message}`),
+	});
+	// Agent-mode harnesses that block chat participants reach /list, /resume, /analyze, and /implement through these tools.
+	registerSessionTools(context, {
+		judgment: createJudgmentService({
+			secrets: context.secrets,
+			consent: typeSafeConsentGate,
+			log: (message) => output.appendLine(`[analyze-tool] ${message}`),
+		}),
+		log: (message) => output.appendLine(`[analyze-tool] ${message}`),
 	});
 }
 
