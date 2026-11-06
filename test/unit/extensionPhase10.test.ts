@@ -15,6 +15,7 @@ import {
 	runImplementAnalysisFromExplorerCommand,
 	runImplementLatestAnalysisCommand,
 	runOpenSavedSessionCommand,
+	runResumeSessionFromExplorerCommand,
 	runResumeSessionFromViewerCommand,
 	runViewSessionFileCommand,
 	resolveManualWorkspaceFolder,
@@ -713,6 +714,138 @@ suite('runResumeSessionFromViewerCommand', () => {
 			(vscode.commands as any).executeCommand = originalExecuteCommand;
 			(vscode.commands as any).getCommands = originalGetCommands;
 			(vscode.window as any).showInformationMessage = originalShowInformationMessage;
+		}
+	});
+});
+
+suite('runResumeSessionFromExplorerCommand', () => {
+	function createItem(): SessionExplorerSessionItem {
+		const workspaceFolder = createWorkspaceFolder('C:/repo-a', 'alpha', 0);
+		const storageDirectory = path.join('C:/repo-a', '.chat');
+		const session = {
+			id: 'session-resume-1',
+			title: 'Explorer Resume Session',
+			savedAt: '2026-05-17T10:00:00.000Z',
+			fileName: 'explorer-resume.json',
+			turnCount: 2,
+			git: null,
+		};
+		return new SessionExplorerSessionItem(
+			{
+				workspaceFolder,
+				storageDirectory,
+				sessions: [session],
+				analyzedSessions: [],
+				harvestedSessions: [],
+			},
+			session,
+		);
+	}
+
+	test('shows a message and resumes nothing when there is no tree item', async () => {
+		const infoMessages: string[] = [];
+		let readCalled = false;
+		let clipboardText: string | undefined;
+
+		await runResumeSessionFromExplorerCommand(undefined, {
+			readSession: async () => {
+				readCalled = true;
+				throw new Error('should not read');
+			},
+			writeClipboard: async (text: string) => {
+				clipboardText = text;
+			},
+			showInformationMessage: async (message: string) => {
+				infoMessages.push(message);
+				return undefined;
+			},
+		});
+
+		assert.equal(readCalled, false);
+		assert.equal(clipboardText, undefined);
+		assert.equal(infoMessages.length, 1);
+		assert.match(infoMessages[0] ?? '', /Select a saved session/);
+	});
+
+	test('reports a load failure without opening chat', async () => {
+		const item = createItem();
+		const errors: string[] = [];
+		const executed: string[] = [];
+		const originalExecuteCommand = vscode.commands.executeCommand;
+
+		try {
+			(vscode.commands as { executeCommand: typeof vscode.commands.executeCommand }).executeCommand = (async (
+				commandId: string,
+			) => {
+				executed.push(commandId);
+				return undefined;
+			}) as typeof vscode.commands.executeCommand;
+
+			await runResumeSessionFromExplorerCommand(item, {
+				readSession: async () => {
+					throw new Error('ENOENT: explorer-resume.json');
+				},
+				showErrorMessage: async (message: string) => {
+					errors.push(message);
+					return undefined;
+				},
+			});
+		} finally {
+			(vscode.commands as { executeCommand: typeof vscode.commands.executeCommand }).executeCommand =
+				originalExecuteCommand;
+		}
+
+		assert.equal(executed.length, 0);
+		assert.equal(errors.length, 1);
+		assert.match(errors[0] ?? '', /Failed to load session for resume/);
+		assert.match(errors[0] ?? '', /ENOENT: explorer-resume\.json/);
+	});
+
+	test('resumes the clicked session through the shared viewer path without opening the viewer', async () => {
+		const item = createItem();
+		const session = createChatSession(createCopilotSession('Explorer Resume Session'), {
+			title: 'Explorer Resume Session',
+			savedAt: '2026-05-17T10:00:00.000Z',
+			vscodeVersion: '1.128.0',
+		});
+		const executed: { commandId: string; args?: unknown }[] = [];
+		const originalCommands = {
+			getCommands: vscode.commands.getCommands,
+			executeCommand: vscode.commands.executeCommand,
+		};
+		const originalPanel = SessionViewerPanel.currentPanel;
+		let readPath: { storageDirectory: string; fileName: string } | undefined;
+
+		try {
+			Object.assign(SessionViewerPanel, { currentPanel: undefined });
+			Object.assign(vscode.commands, {
+				getCommands: async () => ['workbench.action.chat.open'],
+				executeCommand: async (commandId: string, args?: unknown) => {
+					executed.push({ commandId, ...(args === undefined ? {} : { args }) });
+				},
+			});
+
+			await runResumeSessionFromExplorerCommand(item, {
+				getHostAppName: () => 'Visual Studio Code',
+				readSession: async (storageDirectory: string, fileName: string) => {
+					readPath = { storageDirectory, fileName };
+					return session;
+				},
+				writeClipboard: async () => undefined,
+			});
+
+			assert.deepEqual(readPath, {
+				storageDirectory: item.storageDirectory,
+				fileName: item.fileName,
+			});
+			assert.equal(SessionViewerPanel.currentPanel, undefined);
+			assert.deepEqual(executed, [{
+				commandId: 'workbench.action.chat.open',
+				args: { query: '@session-control /resume Explorer Resume Session' },
+			}]);
+		} finally {
+			Object.assign(SessionViewerPanel, { currentPanel: originalPanel });
+			Object.assign(vscode.commands, originalCommands);
 		}
 	});
 });

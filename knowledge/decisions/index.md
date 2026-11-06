@@ -1,5 +1,6 @@
 # Decision
 
+- [Decision on @session-control participant and MCP server implementation](decision-on-session-control-participant-and-mcp-server.md) - Decision made on the legacy status of the @session-control participant and the implementation of an MCP server.
 - [Authorize publication of release v1.4.0 to both marketplaces](authorize-publication-of-release-v1-4-0-to-both-marketplaces.md) - Decision to publish the validated release to both VS Marketplace and Open VSX.
 - [Launch with a Capped Founders-Lifetime Offer](launch-with-a-capped-founders-lifetime-offer.md) - Pair the recurring plan with a genuinely limited lifetime offer to obtain early cash, conversion evidence, and a bounded founding cohort.
 - [Make OKF Knowledge Harvesting the First Pro Slice](make-okf-knowledge-harvesting-the-first-pro-slice.md) - Use repo-local OKF knowledge harvesting as the first narrow Pro workflow instead of beginning with a broader search or skills-sync feature.

@@ -681,4 +681,100 @@ suite('sessionStore', () => {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}
 	});
+	test('upsertAutoSaveSessions treats a peer-deleted previous file as successful retire', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const sourceId = 'claude-code';
+		const sourceSessionId = 'provider-session-missing-export';
+		const withOrigin = (
+			title: string,
+			savedAt: string,
+			sourceRevision: string,
+			part: number,
+			totalParts: number,
+		): ChatSession => ({
+			...createSession(sourceSessionId, savedAt, title),
+			provider: 'claude-code',
+			part,
+			totalParts,
+			origin: {
+				saveKind: 'auto',
+				sourceId,
+				sourceSessionId,
+				sourceRevision,
+			},
+		});
+
+		try {
+			const seedStore = createSessionStore();
+			const previousFileNames = await seedStore.writeSessions(
+				storageDirectory,
+				[
+					withOrigin('Welcome content (Part 1/2)', '2026-10-22T18:49:00.000Z', 'sha256:old', 1, 2),
+					withOrigin('Welcome content (Part 2/2)', '2026-10-22T18:49:00.000Z', 'sha256:old', 2, 2),
+				],
+				{ includeTimestampInFileName: false },
+			);
+			const previousSet = new Set(previousFileNames.map((fileName) => fileName.toLowerCase()));
+			let published = false;
+			let peerDeleted = false;
+			const manualFile = await seedStore.writeSession(storageDirectory, {
+				...withOrigin('Manual snapshot', '2026-10-22T18:49:00.000Z', 'sha256:old', 1, 1),
+				origin: { saveKind: 'manual', sourceId, sourceSessionId, sourceRevision: 'sha256:old' },
+			});
+			const manualBefore = await fs.readFile(path.join(storageDirectory, manualFile), 'utf8');
+
+			const store = createSessionStore({
+				rename: async (fromPath, toPath) => {
+					await fs.rename(fromPath, toPath);
+					published = true;
+				},
+				readFile: async (filePath) => {
+					const content = await fs.readFile(filePath, 'utf8');
+					const baseName = path.basename(filePath);
+					if (published && !peerDeleted && previousSet.has(baseName.toLowerCase())) {
+						await fs.unlink(filePath);
+						peerDeleted = true;
+					}
+					return content;
+				},
+			});
+
+			const newFileNames = await store.upsertAutoSaveSessions(
+				storageDirectory,
+				[
+					withOrigin('Welcome content (Part 1/2)', '2026-10-22T20:52:00.000Z', 'sha256:new', 1, 2),
+					withOrigin('Welcome content (Part 2/2)', '2026-10-22T20:52:00.000Z', 'sha256:new', 2, 2),
+				],
+				{ sourceId, sourceSessionId },
+				{ includeTimestampInFileName: false },
+			);
+
+			assert.equal(peerDeleted, true);
+			assert.equal(await fs.readFile(path.join(storageDirectory, manualFile), 'utf8'), manualBefore);
+			assert.equal(newFileNames.length, 2);
+			for (const [index, fileName] of newFileNames.entries()) {
+				const saved = await seedStore.readSession(storageDirectory, fileName);
+				assert.equal(saved.previousPartFile, newFileNames[index - 1] ?? null);
+				assert.equal(saved.nextPartFile, newFileNames[index + 1] ?? null);
+				assert.equal(saved.origin?.sourceRevision, 'sha256:new');
+				assert.equal(saved.turns.length, 2);
+			}
+			const remaining = await fs.readdir(storageDirectory);
+			for (const previousFileName of previousFileNames) {
+				assert.equal(remaining.includes(previousFileName), false);
+			}
+			for (const newFileName of newFileNames) {
+				assert.equal(remaining.includes(newFileName), true);
+			}
+			assert.deepEqual(
+				(await store.findAutoSaveSessionFiles(storageDirectory, sourceId, sourceSessionId))
+					.map((file) => file.fileName)
+					.sort(),
+				[...newFileNames].sort(),
+			);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
 });

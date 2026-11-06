@@ -319,7 +319,7 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 				continue;
 			}
 
-			await deps.unlink(path.join(storageDirectory, previousFile.fileName));
+			await deleteSession(storageDirectory, previousFile.fileName);
 		}
 
 		return writePlan.map((entry) => entry.fileName);

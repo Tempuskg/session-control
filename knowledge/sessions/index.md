@@ -1,9 +1,20 @@
 # SessionSummary
 
-- [Session Score analysis candidates with TypeSafe triage](7f0c41fb-5f1d-4b81-bd77-bfa78a5bae27.md) - Citation anchor and summary for saved session 7f0c41fb-5f1d-4b81-bd77-bfa78a5bae27.
-- [Session Export session to AI control file command](1bff48ed-e135-435c-9bae-7e0e5bfe3425.md) - Citation anchor and summary for saved session 1bff48ed-e135-435c-9bae-7e0e5bfe3425.
-- [Session Route slash-less @session-control prompts with TypeSafe intent](ea159390-1aac-4bb6-a87e-a553037060b3.md) - Citation anchor and summary for saved session ea159390-1aac-4bb6-a87e-a553037060b3.
+- [Session Smoke 1.11.0 language-model tools](b5279750-9888-4fdc-8a29-baea290810e1.md) - Citation anchor and summary for saved session 4de4be20-74ae-493a-bf3f-1aeb787d18f0.
+- [Session list my saved sessions](8c5d3cad-1c38-413a-991e-a1d60396a171.md) - Citation anchor and summary for saved session d64dad8c-81d7-4fe9-9f13-d52cfca4de5d.
+- [Session Session-control getImplementationPrompt tool](2b35646f-2f03-4d55-98a1-082e94e1607e.md) - Citation anchor and summary for saved session 2247d449-df5c-4826-a113-501ea9a04b9e.
+- [Session Session-control language model tools](5a892ecc-cee9-4d63-8695-5e954315143d.md) - Citation anchor and summary for saved session 82efb4ed-3d99-4807-98b4-298cea6f7b1e.
+- [Session Got this message](0293c99f-f71c-435f-a365-911dd7a4ef09.md) - Citation anchor and summary for saved session 0293c99f-f71c-435f-a365-911dd7a4ef09.
+- [Session Standalone stdio MCP server for sessions](d6ecb625-a23c-49bc-ac6d-241188bb04ec.md) - Citation anchor and summary for saved session d6ecb625-a23c-49bc-ac6d-241188bb04ec.
+- [Session Session list and resume tools](ac874f07-a7a4-49f7-b196-0bd7b5956bdb.md) - Citation anchor and summary for saved session ac874f07-a7a4-49f7-b196-0bd7b5956bdb.
+- [Session Session list and resume logic module](76fa5912-e7d5-43bf-a9aa-18710d419482.md) - Citation anchor and summary for saved session 76fa5912-e7d5-43bf-a9aa-18710d419482.
+- [Session implement the latest Session Control analysis](64cf74b7-5afd-4e75-aeba-d378b1a3e9eb.md) - Citation anchor and summary for saved session 64cf74b7-5afd-4e75-aeba-d378b1a3e9eb.
+- [Session Session-control chat participant replacement](0b24b7f8-055c-487b-a803-fd56867c1c5d.md) - Citation anchor and summary for saved session 0b24b7f8-055c-487b-a803-fd56867c1c5d.
+- [Session *Use #analyzeSessions to analyze my saved sessions from the la](b05c3f17-9449-4668-92b1-4b4606a50c5a.md) - Citation anchor and summary for saved session b05c3f17-9449-4668-92b1-4b4606a50c5a.
 - [Session <recommended_plugins> Here is a list of plugins that are avail](01a0e2e9-ea29-7252-9185-0931fb366ac8.md) - Citation anchor and summary for saved session 01a0e2e9-ea29-7252-9185-0931fb366ac8.
+- [Session Export session to AI control file command](1bff48ed-e135-435c-9bae-7e0e5bfe3425.md) - Citation anchor and summary for saved session 1bff48ed-e135-435c-9bae-7e0e5bfe3425.
+- [Session Score analysis candidates with TypeSafe triage](7f0c41fb-5f1d-4b81-bd77-bfa78a5bae27.md) - Citation anchor and summary for saved session 7f0c41fb-5f1d-4b81-bd77-bfa78a5bae27.
+- [Session Route slash-less @session-control prompts with TypeSafe intent](ea159390-1aac-4bb6-a87e-a553037060b3.md) - Citation anchor and summary for saved session ea159390-1aac-4bb6-a87e-a553037060b3.
 - [Session Smoke test 1.9.0 - Pending changes commit message](1b16a05f-c05b-4bcb-ae0e-a266f3ed1f27.md) - Citation anchor and summary for saved session 1b16a05f-c05b-4bcb-ae0e-a266f3ed1f27.
 - [Session b4c387d4-974d-4de0-8d4f-06d5e81aee9f](b4c387d4-974d-4de0-8d4f-06d5e81aee9f.md) - Citation anchor and summary for saved session b4c387d4-974d-4de0-8d4f-06d5e81aee9f.
 - [Session Pro harvest and control-file export picker](8b7c40b5-234e-493e-bccf-4f60c26580cf.md) - Citation anchor and summary for saved session 8b7c40b5-234e-493e-bccf-4f60c26580cf.

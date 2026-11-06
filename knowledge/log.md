@@ -1,5 +1,30 @@
 # Log
 
+## 2026-10-30
+
+Harvest run `2026-10-30T14:08:39.869Z` - scope: Last 24 Hours (17 sessions),
+Execution: destination: `Chat extension`; provider/backend: `copilot`; model: `GPT-4o mini`; model source: `Explicit VS Code chat-extension selection`; reasoning behavior: `Unknown reasoning behavior (provider does not expose it)`; reasoning source: `Unknown reasoning behavior (provider does not expose it)`; configuration: `Model source: Explicit VS Code chat-extension selection; reasoning source: Unknown reasoning behavior (provider does not expose it)`; by session-control-pro@1.11.0+harvest-v1.
+Result: 12 created, 6 updated, 2 skipped (0 duplicates, 0 below confidence).
+
+- **Creation** [/decisions/decision-on-session-control-participant-and-mcp-server.md](decisions/decision-on-session-control-participant-and-mcp-server.md) — source sessions: [/sessions/0b24b7f8-055c-487b-a803-fd56867c1c5d.md](sessions/0b24b7f8-055c-487b-a803-fd56867c1c5d.md)
+- **Creation** [/sessions/b5279750-9888-4fdc-8a29-baea290810e1.md](sessions/b5279750-9888-4fdc-8a29-baea290810e1.md) — source sessions: [/sessions/b5279750-9888-4fdc-8a29-baea290810e1.md](sessions/b5279750-9888-4fdc-8a29-baea290810e1.md)
+- **Creation** [/sessions/0293c99f-f71c-435f-a365-911dd7a4ef09.md](sessions/0293c99f-f71c-435f-a365-911dd7a4ef09.md) — source sessions: [/sessions/0293c99f-f71c-435f-a365-911dd7a4ef09.md](sessions/0293c99f-f71c-435f-a365-911dd7a4ef09.md)
+- **Creation** [/sessions/8c5d3cad-1c38-413a-991e-a1d60396a171.md](sessions/8c5d3cad-1c38-413a-991e-a1d60396a171.md) — source sessions: [/sessions/8c5d3cad-1c38-413a-991e-a1d60396a171.md](sessions/8c5d3cad-1c38-413a-991e-a1d60396a171.md)
+- **Creation** [/sessions/d6ecb625-a23c-49bc-ac6d-241188bb04ec.md](sessions/d6ecb625-a23c-49bc-ac6d-241188bb04ec.md) — source sessions: [/sessions/d6ecb625-a23c-49bc-ac6d-241188bb04ec.md](sessions/d6ecb625-a23c-49bc-ac6d-241188bb04ec.md)
+- **Creation** [/sessions/ac874f07-a7a4-49f7-b196-0bd7b5956bdb.md](sessions/ac874f07-a7a4-49f7-b196-0bd7b5956bdb.md) — source sessions: [/sessions/ac874f07-a7a4-49f7-b196-0bd7b5956bdb.md](sessions/ac874f07-a7a4-49f7-b196-0bd7b5956bdb.md)
+- **Creation** [/sessions/76fa5912-e7d5-43bf-a9aa-18710d419482.md](sessions/76fa5912-e7d5-43bf-a9aa-18710d419482.md) — source sessions: [/sessions/76fa5912-e7d5-43bf-a9aa-18710d419482.md](sessions/76fa5912-e7d5-43bf-a9aa-18710d419482.md)
+- **Creation** [/sessions/2b35646f-2f03-4d55-98a1-082e94e1607e.md](sessions/2b35646f-2f03-4d55-98a1-082e94e1607e.md) — source sessions: [/sessions/2b35646f-2f03-4d55-98a1-082e94e1607e.md](sessions/2b35646f-2f03-4d55-98a1-082e94e1607e.md)
+- **Creation** [/sessions/64cf74b7-5afd-4e75-aeba-d378b1a3e9eb.md](sessions/64cf74b7-5afd-4e75-aeba-d378b1a3e9eb.md) — source sessions: [/sessions/64cf74b7-5afd-4e75-aeba-d378b1a3e9eb.md](sessions/64cf74b7-5afd-4e75-aeba-d378b1a3e9eb.md)
+- **Creation** [/sessions/0b24b7f8-055c-487b-a803-fd56867c1c5d.md](sessions/0b24b7f8-055c-487b-a803-fd56867c1c5d.md) — source sessions: [/sessions/0b24b7f8-055c-487b-a803-fd56867c1c5d.md](sessions/0b24b7f8-055c-487b-a803-fd56867c1c5d.md)
+- **Creation** [/sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md](sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md) — source sessions: [/sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md](sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md)
+- **Creation** [/sessions/b05c3f17-9449-4668-92b1-4b4606a50c5a.md](sessions/b05c3f17-9449-4668-92b1-4b4606a50c5a.md) — source sessions: [/sessions/b05c3f17-9449-4668-92b1-4b4606a50c5a.md](sessions/b05c3f17-9449-4668-92b1-4b4606a50c5a.md)
+- **Update** [/sessions/b5279750-9888-4fdc-8a29-baea290810e1.md](sessions/b5279750-9888-4fdc-8a29-baea290810e1.md) — source sessions: [/sessions/b5279750-9888-4fdc-8a29-baea290810e1.md](sessions/b5279750-9888-4fdc-8a29-baea290810e1.md)
+- **Update** [/sessions/2b35646f-2f03-4d55-98a1-082e94e1607e.md](sessions/2b35646f-2f03-4d55-98a1-082e94e1607e.md) — source sessions: [/sessions/2b35646f-2f03-4d55-98a1-082e94e1607e.md](sessions/2b35646f-2f03-4d55-98a1-082e94e1607e.md)
+- **Update** [/sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md](sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md) — source sessions: [/sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md](sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md)
+- **Update** [/sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md](sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md) — source sessions: [/sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md](sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md)
+- **Update** [/sessions/8c5d3cad-1c38-413a-991e-a1d60396a171.md](sessions/8c5d3cad-1c38-413a-991e-a1d60396a171.md) — source sessions: [/sessions/8c5d3cad-1c38-413a-991e-a1d60396a171.md](sessions/8c5d3cad-1c38-413a-991e-a1d60396a171.md)
+- **Update** [/sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md](sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md) — source sessions: [/sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md](sessions/5a892ecc-cee9-4d63-8695-5e954315143d.md)
+
 ## 2026-10-23
 
 Harvest run `2026-10-23T12:14:34.666Z` - scope: 2026-10-03T15:05:02.680Z to 2026-10-04T16:25:15.544Z (5 sessions),

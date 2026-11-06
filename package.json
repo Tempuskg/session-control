@@ -105,6 +105,12 @@
         "icon": "$(debug-start)"
       },
       {
+        "command": "session-control.resumeSessionFromExplorer",
+        "title": "Resume in Chat",
+        "category": "Session Control",
+        "icon": "$(debug-start)"
+      },
+      {
         "command": "session-control.continueSessionWithProvider",
         "title": "Continue This Session In...",
         "category": "Session Control",
@@ -861,6 +867,10 @@
           "when": "false"
         },
         {
+          "command": "session-control.resumeSessionFromExplorer",
+          "when": "false"
+        },
+        {
           "command": "session-control.viewSessionFile",
           "when": "(resourceExtname == .json || resourceExtname == .jsonl) && session-control.isSessionFile"
         },
@@ -976,14 +986,19 @@
           "group": "inline@1"
         },
         {
+          "command": "session-control.resumeSessionFromExplorer",
+          "when": "view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/",
+          "group": "inline@2"
+        },
+        {
           "command": "session-control.analyzeSessionFromExplorer",
           "when": "view == session-control.sessionExplorer && viewItem == session-control.session",
-          "group": "inline@2"
+          "group": "inline@3"
         },
         {
           "command": "session-control.reanalyzeSessionFromExplorer",
           "when": "view == session-control.sessionExplorer && viewItem == session-control.session.analyzed",
-          "group": "inline@2"
+          "group": "inline@3"
         },
         {
           "command": "session-control.implementAnalysisFromExplorer",
@@ -993,12 +1008,12 @@
         {
           "command": "session-control-pro.harvestSessionFromExplorer",
           "when": "view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/ && session-control.proFeaturesLoaded",
-          "group": "inline@3"
+          "group": "inline@4"
         },
         {
           "command": "session-control.deleteSessionFromExplorer",
           "when": "view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/",
-          "group": "inline@4"
+          "group": "inline@5"
         },
         {
           "command": "session-control-pro.exportSessionToControlFile",

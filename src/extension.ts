@@ -104,6 +104,7 @@ import {
 	type AnalysisIndexEntry,
 	type AnalysisReportReference,
 	type AnalysisSelection,
+	type ChatSession,
 	isChatSession,
 	isSessionProviderId,
 	SessionMeta,
@@ -233,6 +234,13 @@ interface ImportCopilotGuidanceCommandOptions {
 interface ResumeSessionFromViewerCommandDeps {
 	writeClipboard: (text: string) => Promise<void>;
 	getHostAppName: () => string;
+}
+
+interface ResumeSessionFromExplorerCommandDeps extends ResumeSessionFromViewerCommandDeps {
+	readSession: (storageDirectory: string, fileName: string) => Promise<ChatSession>;
+	showInformationMessage: (message: string) => Thenable<string | undefined>;
+	showWarningMessage: (message: string) => Thenable<string | undefined>;
+	showErrorMessage: (message: string) => Thenable<string | undefined>;
 }
 
 interface ContinueSessionWithProviderCommandDeps {
@@ -2620,34 +2628,22 @@ export async function runContinueSessionWithProviderCommand(
 	}
 }
 
-export async function runResumeSessionFromViewerCommand(
-	depsOverrides: Partial<ResumeSessionFromViewerCommandDeps> = {},
+async function resumeLoadedSessionInChat(
+	input: {
+		session: ChatSession | undefined;
+		sessionTitle: string;
+		provider: ChatSession['provider'];
+		filePath: string;
+	},
+	deps: ResumeSessionFromViewerCommandDeps,
 ): Promise<void> {
-	const deps: ResumeSessionFromViewerCommandDeps = {
-		writeClipboard: async (text: string) => vscode.env.clipboard.writeText(text),
-		getHostAppName: () => vscode.env.appName,
-		...depsOverrides,
-	};
-	const panel = SessionViewerPanel.currentPanel;
-	if (!panel) {
-		await vscode.window.showInformationMessage('No session viewer is currently open.');
-		return;
-	}
-
-	const sessionTitle = panel.getSessionTitle();
-	if (!sessionTitle) {
-		await vscode.window.showWarningMessage('Unable to determine session title.');
-		return;
-	}
-
-	const session = panel.getSession();
-	const provider = panel.getSessionProvider();
+	const { session, sessionTitle, provider, filePath } = input;
 
 	// Cursor's chat.open only prefills a native draft; it does not invoke our
 	// VS Code chat participant. Keep installed origin agents, otherwise hand
 	// the actual saved context to Cursor through the existing native route.
 	if (session && /cursor/i.test(deps.getHostAppName())) {
-		const configuration = readResumeSessionConfiguration(panel.getFilePath());
+		const configuration = readResumeSessionConfiguration(filePath);
 		const availableCommands = await vscode.commands.getCommands(true);
 		const originTarget = configuration.resumeTargetMode === 'origin-agent' && provider && provider !== 'copilot'
 			? resolveResumeTarget(provider, availableCommands, configuration.providerCommands)
@@ -2677,7 +2673,7 @@ export async function runResumeSessionFromViewerCommand(
 		}
 	}
 	if (session && provider && provider !== 'copilot') {
-		const configuration = readResumeSessionConfiguration(panel.getFilePath());
+		const configuration = readResumeSessionConfiguration(filePath);
 		if (configuration.resumeTargetMode === 'origin-agent') {
 			const openedOriginAgent = await runResumeIntoOriginAgent(
 				session,
@@ -2703,6 +2699,91 @@ export async function runResumeSessionFromViewerCommand(
 		const message = error instanceof Error ? error.message : String(error);
 		await vscode.window.showErrorMessage(`Failed to open chat: ${message}`);
 	}
+}
+
+export async function runResumeSessionFromViewerCommand(
+	depsOverrides: Partial<ResumeSessionFromViewerCommandDeps> = {},
+): Promise<void> {
+	const deps: ResumeSessionFromViewerCommandDeps = {
+		writeClipboard: async (text: string) => vscode.env.clipboard.writeText(text),
+		getHostAppName: () => vscode.env.appName,
+		...depsOverrides,
+	};
+	const panel = SessionViewerPanel.currentPanel;
+	if (!panel) {
+		await vscode.window.showInformationMessage('No session viewer is currently open.');
+		return;
+	}
+
+	const sessionTitle = panel.getSessionTitle();
+	if (!sessionTitle) {
+		await vscode.window.showWarningMessage('Unable to determine session title.');
+		return;
+	}
+
+	await resumeLoadedSessionInChat(
+		{
+			session: panel.getSession(),
+			sessionTitle,
+			provider: panel.getSessionProvider(),
+			filePath: panel.getFilePath(),
+		},
+		deps,
+	);
+}
+
+function createDefaultResumeSessionFromExplorerCommandDeps(): ResumeSessionFromExplorerCommandDeps {
+	return {
+		writeClipboard: async (text: string) => vscode.env.clipboard.writeText(text),
+		getHostAppName: () => vscode.env.appName,
+		readSession: (storageDirectory: string, fileName: string) =>
+			sessionStore.readSession(storageDirectory, fileName),
+		showInformationMessage: (message: string) => vscode.window.showInformationMessage(message),
+		showWarningMessage: (message: string) => vscode.window.showWarningMessage(message),
+		showErrorMessage: (message: string) => vscode.window.showErrorMessage(message),
+	};
+}
+
+export async function runResumeSessionFromExplorerCommand(
+	item: SessionExplorerSessionItem | undefined,
+	depsOverrides: Partial<ResumeSessionFromExplorerCommandDeps> = {},
+): Promise<void> {
+	const deps: ResumeSessionFromExplorerCommandDeps = {
+		...createDefaultResumeSessionFromExplorerCommandDeps(),
+		...depsOverrides,
+	};
+
+	if (!item) {
+		await deps.showInformationMessage(
+			'Select a saved session in the Session Control explorer to resume it in chat.',
+		);
+		return;
+	}
+
+	let session: ChatSession;
+	try {
+		session = await deps.readSession(item.storageDirectory, item.fileName);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		await deps.showErrorMessage(`Failed to load session for resume: ${message}`);
+		return;
+	}
+
+	const sessionTitle = session.title.trim() || String(item.label);
+	if (!sessionTitle) {
+		await deps.showWarningMessage('Unable to determine session title.');
+		return;
+	}
+
+	await resumeLoadedSessionInChat(
+		{
+			session,
+			sessionTitle,
+			provider: session.provider,
+			filePath: path.join(item.storageDirectory, item.fileName),
+		},
+		deps,
+	);
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -2913,6 +2994,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		vscode.commands.registerCommand('session-control.resumeSessionFromViewer', async () => {
 			await runResumeSessionFromViewerCommand();
 		}),
+		vscode.commands.registerCommand(
+			'session-control.resumeSessionFromExplorer',
+			async (item: SessionExplorerSessionItem | undefined) => {
+				await runResumeSessionFromExplorerCommand(item);
+			},
+		),
 		vscode.commands.registerCommand('session-control.continueSessionWithProvider', async () => {
 			await runContinueSessionWithProviderCommand();
 		}),
