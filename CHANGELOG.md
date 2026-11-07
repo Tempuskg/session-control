@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.1] - 2026-11-06
+
+### Fixed
+
+- **Pro:** Knowledge Harvest synthesis no longer instructs the model to invent observed error text for Pitfalls when a source only describes a hypothetical or silent failure. Includes Session Control Pro 0.10.2.
+
 ## [1.12.0] - 2026-11-06
 
 ### Added
