@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-11-06
+
+### Added
+
+- **Resume in Chat from the Session Explorer.** Each saved session has an inline Resume in Chat button, so you can resume it without opening the viewer first. It uses the same resume route as the viewer's Resume This Session in Chat.
+
+### Fixed
+
+- Auto-save no longer fails when an export it is retiring was already deleted.
+- **Pro:** Harvest review removes links to excluded concepts from merged session summaries even when the model annotates the links or repeats the Harvested Concepts section. Includes Session Control Pro 0.10.1.
+
 ## [1.11.0] - 2026-10-29
 
 ### Added

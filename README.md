@@ -93,8 +93,9 @@ captures matching chats for the workspace automatically.
   implementation prompt.
 - **Import AI skills** — Convert repository Copilot guidance into repo-scoped Cursor, Codex, or
   Claude Code skills under `.cursor/skills/`, `.agents/skills/`, or `.claude/skills/`.
-- **Browse, preview, delete** — Manage saved sessions via the Session Explorer and command
-  palette, with a built-in session viewer and a one-click Resume from the editor title bar.
+- **Browse, preview, resume, delete** — Manage saved sessions via the Session Explorer and command
+  palette, with a built-in session viewer, a one-click Resume from the editor title bar, and an
+  inline **Resume in Chat** button on each session in the Session Explorer.
 - **Lives in source control** — Sessions are plain JSON files tracked alongside your code,
   reviewable in diffs and PRs.
 - **Bloat controls** — Configurable file size limits, session splitting, tool output
