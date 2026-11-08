@@ -106,6 +106,51 @@ Cursor / Claude Code / Codex / Copilot should all be visible. Highlight Cursor o
    <https://marketplace.visualstudio.com/items?itemName=darrenjmcleod.session-control>.
 5. Sign off the Step 2 row in `wiki/open-vsx-listing.md` → §4 approval checklist.
 
+## Pro screenshot additions (capture in progress)
+
+The original five-asset completion above does not include these Pro screenshots.
+Both additions use the same Dark+ theme, privacy checklist, and static-image cap
+of 400 KB. Target 1280×800, or 1600×1000 when the UI remains readable.
+
+| File | Required content | State |
+| :-- | :-- | :-- |
+| `harvest-preview.png` | Knowledge Harvest dry-run preview alongside the resulting `knowledge/` bundle in Explorer | Not captured |
+| `global-search.png` | Global Session Search quick pick with `provider:` and `branch:` filters visible and matching results | Captured candidate: 1280×800; final framing review pending |
+
+For `harvest-preview.png`, use a clean demo session and show the actual preview
+with its proposed knowledge output. Expand the resulting bundle in Explorer.
+Do not apply a harvest to production knowledge just to stage the screenshot.
+
+For `global-search.png`, run **Search Saved Sessions (All Workspaces)** and enter
+filters that match the demo sessions, keeping both filter tokens visible.
+Use generic demo titles and exclude unrelated workspaces or private content.
+Inspect both final PNGs for legibility, dimensions, file size, and privacy before
+committing. The harvest filename remains planned until its PNG is captured.
+
+The Global Search candidate was captured from the installed extension using the
+synthetic session below. The account/avatar bar and status bar are excluded.
+It retains the native centered quick pick; its right edge extends beyond the
+left-two-thirds safe area, so framing remains an open capture exception.
+The native window capture is cropped to 16:10, resized to 1280×800, and encoded
+as a 256-color PNG to stay below 400 KB. No product UI or results were fabricated.
+
+### Synthetic harvest source (approved 2026-11-07)
+
+Use a fictional session titled `refactor-auth-middleware`, with provider `copilot`
+and branch `demo/auth-middleware`. Its full proposed transcript is:
+
+> User: Refactor the demo authentication middleware so token parsing is separate
+> from authorization checks. Keep the public middleware signature unchanged.
+>
+> Assistant: Decision: keep `authenticate(request, next)` as the public entry point.
+> Move token parsing into `parseBearerToken`, and test missing, malformed, and
+> expired tokens separately. Return 401 for invalid authentication and 403 for
+> authenticated requests without the required permission.
+
+This is staged example content, not evidence of implementation or a real user
+session. The owner approved sending only this synthetic transcript to GitHub Copilot
+through Knowledge Harvest in the coworking chat on 2026-11-07.
+
 ## Files currently present in this folder
 
 All five image assets are checked in alongside this brief: `demo.gif` (~2.4 MB),
@@ -113,3 +158,6 @@ All five image assets are checked in alongside this brief: `demo.gif` (~2.4 MB),
 (each well under the 400 KB static-image target). They are referenced from the top-level
 `README.md` `## Screenshots` section and render on the Open VSX and VS Marketplace listing
 pages as of v1.3.4.
+
+The additional `global-search.png` candidate (1280×800, 186,178 bytes) is present.
+Its framing review is still open; `harvest-preview.png` is not yet present.
