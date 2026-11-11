@@ -94,8 +94,9 @@ captures matching chats for the workspace automatically.
 - **Import AI skills** — Convert repository Copilot guidance into repo-scoped Cursor, Codex, or
   Claude Code skills under `.cursor/skills/`, `.agents/skills/`, or `.claude/skills/`.
 - **Browse, preview, resume, delete** — Manage saved sessions via the Session Explorer and command
-  palette, with a built-in session viewer, a one-click Resume from the editor title bar, and an
-  inline **Resume in Chat** button on each session in the Session Explorer.
+  palette, with a built-in session viewer, a one-click Resume from the editor title bar, and
+  inline **Resume in Chat** and **Continue This Session In...** buttons on each session in the
+  Session Explorer.
 - **Lives in source control** — Sessions are plain JSON files tracked alongside your code,
   reviewable in diffs and PRs.
 - **Bloat controls** — Configurable file size limits, session splitting, tool output
@@ -273,7 +274,8 @@ recommend creating new AI skill files such as `SKILL.md`, `*.instructions.md`, `
 When TypeSafe is enabled, triage can skip low-signal sessions and prioritize stronger evidence,
 with signals shown in Saved Sessions. Report verification flags unsupported recommendations and
 separates recommendations outside AI control files. These optional judgments send session evidence
-and recommendation text to the TypeSafe provider; failures leave analysis available.
+(including clipped user prompts and tool names with call counts, never tool outputs) and
+recommendation text to the TypeSafe provider; failures leave analysis available.
 
 ### Implement recommendations
 
@@ -325,7 +327,8 @@ when TypeSafe is off or unavailable.
 ### Continue a session in another assistant
 
 A saved session is not tied to the assistant that produced it. With a session open in the viewer,
-use the **Continue This Session In...** title-bar action (also on the Command Palette) to pick
+use the **Continue This Session In...** title-bar action (also on the Command Palette), or the
+same inline button on a session in the Session Explorer without opening it first, to pick
 which assistant should receive the transcript. The picker lists only the providers whose chat
 command is registered in the current editor, so a Cursor session can be continued in Claude Code,
 Codex, or Copilot whenever those are installed. Copilot targets get the transcript prefilled into

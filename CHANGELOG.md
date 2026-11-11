@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-11-11
+
+### Added
+
+- **Continue This Session In... from the Session Explorer.** Each saved session has an inline Continue button, so you can hand it to any installed assistant without opening the viewer first. It uses the same provider picker and delivery as the viewer's Continue This Session In....
+
+### Changed
+
+- **TypeSafe analysis triage** now also sends clipped user prompts and tool names with call counts (never tool outputs) as evidence, so it can spot friction and tool-failure signals. Cached triage answers from the previous evidence shape are not reused.
+
+### Fixed
+
+- Auto-save no longer writes duplicate exports of the same session when several editor windows or profiles watch the same workspace. Hosts now coordinate through a short-lived lock and adopt an export a peer already published.
+- **Pro:** Knowledge Harvest recovers concept documents that are missing only their closing frontmatter delimiter, without inventing content, instead of dropping them; other malformed output is still skipped with a warning. Includes Session Control Pro 0.10.3.
+
 ## [1.12.1] - 2026-11-06
 
 ### Fixed
