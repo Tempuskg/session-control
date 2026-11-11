@@ -153,6 +153,39 @@ session. The owner approved sending only this synthetic transcript to GitHub Cop
 through Knowledge Harvest in the coworking chat on 2026-11-07, and explicitly
 approved the repeat harvest for capturing the preview on the same date.
 
+## Pro demo GIF (captured 2026-11-11)
+
+| File | Content | Dimensions | Length | Size |
+| :-- | :-- | :-- | :-- | :-- |
+| `pro-demo.gif` | Knowledge Harvest in one pass: **Harvest This Session**, the pre-write review, then the written `knowledge/` bundle and its decision file | 1280×800 | 16.3 s, 15 fps, loops | 2,961,386 bytes |
+
+Recorded from the installed Session Control 1.13.0 in the same clean demo
+workspace and synthetic `refactor-auth-middleware` session as the Pro
+screenshots above (Dark+, zoom level 1, status bar and activity bar hidden).
+The owner approved one more harvest of only that synthetic transcript through
+GitHub Copilot on 2026-11-11. Beats, in order:
+
+1. Saved Sessions view, right-click the session, **Harvest This Session**.
+2. Route picker with the in-editor Chat (Copilot) route selected.
+3. The send confirmation: 1 chunk from 1 source, GPT-4o mini via Copilot.
+4. **Review Knowledge Harvest**: 2 creates, 0 updates, 0 skips, 0 warnings,
+   scrolled to the two proposed concepts and back.
+5. **Write changes**, then the "Knowledge bundle written" notification.
+6. Explorer with the new `knowledge/` tree and the generated decision file open.
+
+This is one real harvest run, shown with the waits cut out: the model wait and
+idle time between steps are removed, and nothing is sped up or staged. Each
+step's UI and the generated file content are as the extension produced them.
+The review shown is the licensed pre-write review, as in `harvest-preview.png`,
+rather than the separate unlicensed Preview Knowledge Harvest command.
+
+The window was recorded with `ffmpeg` (`gdigrab`) at 1920×1200, cropped by 8
+pixels per edge to drop the desktop showing behind the window's rounded
+corners, scaled to 1280×800, and encoded with a 128-color palette and no
+dithering. For a re-capture, first move the demo workspace's `knowledge/` and
+`.chat/harvest/` aside so the review proposes creates. Check the frames for
+legibility and privacy before committing.
+
 ## Files currently present in this folder
 
 The original five image assets are checked in alongside this brief: `demo.gif` (~2.4 MB),
@@ -164,3 +197,7 @@ pages as of v1.3.4.
 The two additional Pro images, `harvest-preview.png` and `global-search.png`,
 are present and listed above. Adding them to a public listing or publishing a
 release is a separate task.
+
+The Pro demo animation, `pro-demo.gif` (~3.0 MB), is present and listed above.
+It is intended for the landing page `#pro` section; placing it there is a
+separate task.
