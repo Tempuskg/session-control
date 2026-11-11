@@ -16,12 +16,20 @@ suite('Extension Test Suite', () => {
 			contributedCommands.some((command) => command.command === 'session-control.continueSessionWithProvider'),
 			'continueSessionWithProvider is missing from the extension manifest',
 		);
+		assert.ok(
+			contributedCommands.some((command) => command.command === 'session-control.continueSessionFromExplorer'),
+			'continueSessionFromExplorer is missing from the extension manifest',
+		);
 
 		await extension.activate();
 		const registeredCommands = await vscode.commands.getCommands(true);
 		assert.ok(
 			registeredCommands.includes('session-control.continueSessionWithProvider'),
 			'continueSessionWithProvider was not registered on activation',
+		);
+		assert.ok(
+			registeredCommands.includes('session-control.continueSessionFromExplorer'),
+			'continueSessionFromExplorer was not registered on activation',
 		);
 	});
 });

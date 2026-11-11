@@ -57,6 +57,7 @@ interface PackageManifest {
 			'view/title'?: MenuContribution[];
 			'view/item/context'?: MenuContribution[];
 			'explorer/context'?: MenuContribution[];
+			'editor/title'?: MenuContribution[];
 		};
 		viewsWelcome?: { view: string; contents: string; when?: string }[];
 	};
@@ -472,8 +473,8 @@ suite('session explorer', () => {
 			reanalyzeAction?.when,
 			'view == session-control.sessionExplorer && viewItem == session-control.session.analyzed',
 		);
-		assert.equal(analyzeAction?.group, 'inline@3');
-		assert.equal(reanalyzeAction?.group, 'inline@3');
+		assert.equal(analyzeAction?.group, 'inline@4');
+		assert.equal(reanalyzeAction?.group, 'inline@4');
 
 		const commandPalette = manifest.contributes.menus.commandPalette ?? [];
 		assert.equal(
@@ -501,6 +502,38 @@ suite('session explorer', () => {
 
 		const hidden = (manifest.contributes.menus.commandPalette ?? []).find((candidate) => candidate.command === command);
 		assert.equal(hidden?.when, 'false');
+	});
+
+	test('Continue This Session In... is an inline explorer action hidden from the palette', async () => {
+		const manifest = await readPackageManifest();
+		const command = 'session-control.continueSessionFromExplorer';
+		const contribution = manifest.contributes.commands.find((candidate) => candidate.command === command);
+		assert.equal(contribution?.title, 'Continue This Session In...');
+		assert.equal(contribution?.icon, '$(arrow-swap)');
+
+		const actions = (manifest.contributes.menus['view/item/context'] ?? []).filter(
+			(candidate) => candidate.command === command,
+		);
+		assert.equal(actions.length, 1);
+		assert.equal(
+			actions[0]?.when,
+			'view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/',
+		);
+		assert.equal(actions[0]?.group, 'inline@3');
+
+		const hidden = (manifest.contributes.menus.commandPalette ?? []).find((candidate) => candidate.command === command);
+		assert.equal(hidden?.when, 'false');
+
+		const viewerContinue = manifest.contributes.commands.find(
+			(candidate) => candidate.command === 'session-control.continueSessionWithProvider',
+		);
+		assert.equal(viewerContinue?.title, 'Continue This Session In...');
+		assert.equal(viewerContinue?.icon, '$(arrow-swap)');
+		const viewerTitleAction = (manifest.contributes.menus['editor/title'] ?? []).find(
+			(candidate) => candidate.command === 'session-control.continueSessionWithProvider',
+		);
+		assert.equal(viewerTitleAction?.when, "activeWebviewPanelId == 'session-control.sessionViewer'");
+		assert.equal(viewerTitleAction?.group, 'navigation');
 	});
 
 	test('empty Saved Sessions view shows welcome links with a license-gated upgrade line', async () => {
@@ -758,17 +791,21 @@ suite('session explorer', () => {
 
 		assert.equal(actionById.get('session-control.openSessionFromExplorer')?.group, 'inline@1');
 		assert.equal(actionById.get('session-control.resumeSessionFromExplorer')?.group, 'inline@2');
-		assert.equal(actionById.get(ANALYZE_SESSION_FROM_EXPLORER_COMMAND)?.group, 'inline@3');
-		assert.equal(actionById.get(REANALYZE_SESSION_FROM_EXPLORER_COMMAND)?.group, 'inline@3');
-		assert.equal(actionById.get('session-control-pro.harvestSessionFromExplorer')?.group, 'inline@4');
-		assert.equal(actionById.get('session-control.deleteSessionFromExplorer')?.group, 'inline@5');
+		assert.equal(actionById.get('session-control.continueSessionFromExplorer')?.group, 'inline@3');
+		assert.equal(actionById.get(ANALYZE_SESSION_FROM_EXPLORER_COMMAND)?.group, 'inline@4');
+		assert.equal(actionById.get(REANALYZE_SESSION_FROM_EXPLORER_COMMAND)?.group, 'inline@4');
+		assert.equal(actionById.get('session-control-pro.harvestSessionFromExplorer')?.group, 'inline@5');
+		assert.equal(actionById.get('session-control.deleteSessionFromExplorer')?.group, 'inline@6');
 
 		assert.equal(commandById.get('session-control.resumeSessionFromExplorer')?.icon, '$(debug-start)');
 		assert.equal(commandById.get('session-control.resumeSessionFromExplorer')?.title, 'Resume in Chat');
+		assert.equal(commandById.get('session-control.continueSessionFromExplorer')?.icon, '$(arrow-swap)');
+		assert.equal(commandById.get('session-control.continueSessionFromExplorer')?.title, 'Continue This Session In...');
 
 		const sessionActionContext = 'view == session-control.sessionExplorer && viewItem =~ /^session-control\\.session/';
 		assert.equal(actionById.get('session-control.openSessionFromExplorer')?.when, sessionActionContext);
 		assert.equal(actionById.get('session-control.resumeSessionFromExplorer')?.when, sessionActionContext);
+		assert.equal(actionById.get('session-control.continueSessionFromExplorer')?.when, sessionActionContext);
 		assert.equal(actionById.get('session-control.deleteSessionFromExplorer')?.when, sessionActionContext);
 
 		const alpha = createWorkspaceFolder('C:/alpha', 'alpha', 0);

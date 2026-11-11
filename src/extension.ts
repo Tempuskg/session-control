@@ -249,6 +249,14 @@ interface ContinueSessionWithProviderCommandDeps {
 	pickTargetProvider: (
 		choices: readonly ResumeProviderChoice[],
 	) => Promise<ResumeProviderChoice | undefined>;
+	showInformationMessage: (message: string) => Thenable<string | undefined>;
+	showErrorMessage: (message: string) => Thenable<string | undefined>;
+	openChatParticipantResume: (sessionTitle: string) => Promise<void>;
+}
+
+interface ContinueSessionFromExplorerCommandDeps extends ContinueSessionWithProviderCommandDeps {
+	readSession: (storageDirectory: string, fileName: string) => Promise<ChatSession>;
+	showWarningMessage: (message: string) => Thenable<string | undefined>;
 }
 
 interface SaveSourceSessionFlowDeps {
@@ -2559,32 +2567,30 @@ async function pickResumeTargetProvider(
 	return picked?.choice;
 }
 
-// Continues a saved session in any installed provider, independent of where it
-// was captured. Target discovery and delivery reuse the same resume plumbing
-// as origin-agent resume, so there is no second provider-command table.
-export async function runContinueSessionWithProviderCommand(
-	depsOverrides: Partial<ContinueSessionWithProviderCommandDeps> = {},
-): Promise<void> {
-	const deps: ContinueSessionWithProviderCommandDeps = {
+function createDefaultContinueSessionWithProviderCommandDeps(): ContinueSessionWithProviderCommandDeps {
+	return {
 		writeClipboard: async (text: string) => vscode.env.clipboard.writeText(text),
 		getCommands: async () => vscode.commands.getCommands(true),
 		pickTargetProvider: pickResumeTargetProvider,
-		...depsOverrides,
+		showInformationMessage: (message: string) => vscode.window.showInformationMessage(message),
+		showErrorMessage: (message: string) => vscode.window.showErrorMessage(message),
+		openChatParticipantResume,
 	};
-	const panel = SessionViewerPanel.currentPanel;
-	if (!panel) {
-		await vscode.window.showInformationMessage('No session viewer is currently open.');
-		return;
-	}
+}
 
-	const sessionTitle = panel.getSessionTitle();
-	if (!sessionTitle) {
-		await vscode.window.showWarningMessage('Unable to determine session title.');
-		return;
-	}
-
-	const session = panel.getSession();
-	const configuration = readResumeSessionConfiguration(panel.getFilePath());
+// Continues a loaded session in any installed provider, independent of where it
+// was captured. Target discovery and delivery reuse the same resume plumbing
+// as origin-agent resume, so there is no second provider-command table.
+async function continueLoadedSessionWithProvider(
+	input: {
+		session: ChatSession | undefined;
+		sessionTitle: string;
+		filePath: string;
+	},
+	deps: ContinueSessionWithProviderCommandDeps,
+): Promise<void> {
+	const { session, sessionTitle, filePath } = input;
+	const configuration = readResumeSessionConfiguration(filePath);
 	const choices = session
 		? buildResumeProviderChoices(
 			session.provider,
@@ -2615,17 +2621,99 @@ export async function runContinueSessionWithProviderCommand(
 			return;
 		}
 	} else {
-		await vscode.window.showInformationMessage(
+		await deps.showInformationMessage(
 			'No installed assistant could be found to continue this session in. Falling back to VS Code chat resume.',
 		);
 	}
 
 	try {
-		await openChatParticipantResume(sessionTitle);
+		await deps.openChatParticipantResume(sessionTitle);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		await vscode.window.showErrorMessage(`Failed to open chat: ${message}`);
+		await deps.showErrorMessage(`Failed to open chat: ${message}`);
 	}
+}
+
+// Continues the open session viewer in any installed provider.
+export async function runContinueSessionWithProviderCommand(
+	depsOverrides: Partial<ContinueSessionWithProviderCommandDeps> = {},
+): Promise<void> {
+	const deps: ContinueSessionWithProviderCommandDeps = {
+		...createDefaultContinueSessionWithProviderCommandDeps(),
+		...depsOverrides,
+	};
+	const panel = SessionViewerPanel.currentPanel;
+	if (!panel) {
+		await deps.showInformationMessage('No session viewer is currently open.');
+		return;
+	}
+
+	const sessionTitle = panel.getSessionTitle();
+	if (!sessionTitle) {
+		await vscode.window.showWarningMessage('Unable to determine session title.');
+		return;
+	}
+
+	await continueLoadedSessionWithProvider(
+		{
+			session: panel.getSession(),
+			sessionTitle,
+			filePath: panel.getFilePath(),
+		},
+		deps,
+	);
+}
+
+function createDefaultContinueSessionFromExplorerCommandDeps(): ContinueSessionFromExplorerCommandDeps {
+	return {
+		...createDefaultContinueSessionWithProviderCommandDeps(),
+		readSession: (storageDirectory: string, fileName: string) =>
+			sessionStore.readSession(storageDirectory, fileName),
+		showWarningMessage: (message: string) => vscode.window.showWarningMessage(message),
+	};
+}
+
+// Continues a Session Explorer row in any installed provider through the same
+// picker and delivery path as the viewer Continue This Session In... action.
+export async function runContinueSessionFromExplorerCommand(
+	item: SessionExplorerSessionItem | undefined,
+	depsOverrides: Partial<ContinueSessionFromExplorerCommandDeps> = {},
+): Promise<void> {
+	const deps: ContinueSessionFromExplorerCommandDeps = {
+		...createDefaultContinueSessionFromExplorerCommandDeps(),
+		...depsOverrides,
+	};
+
+	if (!item) {
+		await deps.showInformationMessage(
+			'Select a saved session in the Session Control explorer to continue it in another assistant.',
+		);
+		return;
+	}
+
+	let session: ChatSession;
+	try {
+		session = await deps.readSession(item.storageDirectory, item.fileName);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		await deps.showErrorMessage(`Failed to load session for continue: ${message}`);
+		return;
+	}
+
+	const sessionTitle = session.title.trim() || String(item.label);
+	if (!sessionTitle) {
+		await deps.showWarningMessage('Unable to determine session title.');
+		return;
+	}
+
+	await continueLoadedSessionWithProvider(
+		{
+			session,
+			sessionTitle,
+			filePath: path.join(item.storageDirectory, item.fileName),
+		},
+		deps,
+	);
 }
 
 async function resumeLoadedSessionInChat(
@@ -3003,6 +3091,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		vscode.commands.registerCommand('session-control.continueSessionWithProvider', async () => {
 			await runContinueSessionWithProviderCommand();
 		}),
+		vscode.commands.registerCommand(
+			'session-control.continueSessionFromExplorer',
+			async (item: SessionExplorerSessionItem | undefined) => {
+				await runContinueSessionFromExplorerCommand(item);
+			},
+		),
 		vscode.commands.registerCommand('session-control.analyzeSavedChats', async () => {
 			await runAnalyzeSavedChatsCommand();
 		}),

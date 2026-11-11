@@ -15,6 +15,7 @@ import {
 	runImplementAnalysisFromExplorerCommand,
 	runImplementLatestAnalysisCommand,
 	runOpenSavedSessionCommand,
+	runContinueSessionFromExplorerCommand,
 	runResumeSessionFromExplorerCommand,
 	runResumeSessionFromViewerCommand,
 	runViewSessionFileCommand,
@@ -847,6 +848,203 @@ suite('runResumeSessionFromExplorerCommand', () => {
 			Object.assign(SessionViewerPanel, { currentPanel: originalPanel });
 			Object.assign(vscode.commands, originalCommands);
 		}
+	});
+});
+
+suite('runContinueSessionFromExplorerCommand', () => {
+	function createItem(): SessionExplorerSessionItem {
+		const workspaceFolder = createWorkspaceFolder('C:/repo-a', 'alpha', 0);
+		const storageDirectory = path.join('C:/repo-a', '.chat');
+		const session = {
+			id: 'session-continue-1',
+			title: 'Explorer Continue Session',
+			savedAt: '2026-05-17T10:00:00.000Z',
+			fileName: 'explorer-continue.json',
+			turnCount: 2,
+			git: null,
+		};
+		return new SessionExplorerSessionItem(
+			{
+				workspaceFolder,
+				storageDirectory,
+				sessions: [session],
+				analyzedSessions: [],
+				harvestedSessions: [],
+			},
+			session,
+		);
+	}
+
+	test('shows a message and continues nothing when there is no tree item', async () => {
+		const infoMessages: string[] = [];
+		let readCalled = false;
+		let pickCalled = false;
+
+		await runContinueSessionFromExplorerCommand(undefined, {
+			readSession: async () => {
+				readCalled = true;
+				throw new Error('should not read');
+			},
+			pickTargetProvider: async () => {
+				pickCalled = true;
+				return undefined;
+			},
+			showInformationMessage: async (message: string) => {
+				infoMessages.push(message);
+				return undefined;
+			},
+		});
+
+		assert.equal(readCalled, false);
+		assert.equal(pickCalled, false);
+		assert.equal(infoMessages.length, 1);
+		assert.match(infoMessages[0] ?? '', /Select a saved session/);
+	});
+
+	test('reports a load failure without opening the provider picker', async () => {
+		const item = createItem();
+		const errors: string[] = [];
+		let pickCalled = false;
+
+		await runContinueSessionFromExplorerCommand(item, {
+			readSession: async () => {
+				throw new Error('ENOENT: explorer-continue.json');
+			},
+			pickTargetProvider: async () => {
+				pickCalled = true;
+				return undefined;
+			},
+			showErrorMessage: async (message: string) => {
+				errors.push(message);
+				return undefined;
+			},
+		});
+
+		assert.equal(pickCalled, false);
+		assert.equal(errors.length, 1);
+		assert.match(errors[0] ?? '', /Failed to load session for continue/);
+		assert.match(errors[0] ?? '', /ENOENT: explorer-continue\.json/);
+	});
+
+	test('continues the hovered session through the shared provider picker path', async () => {
+		const item = createItem();
+		const session = {
+			...createChatSession(createCopilotSession('Explorer Continue Session'), {
+				title: 'Explorer Continue Session',
+				savedAt: '2026-05-17T10:00:00.000Z',
+				vscodeVersion: '1.128.0',
+			}),
+			provider: 'cursor' as const,
+		};
+		const executed: { commandId: string; args?: unknown }[] = [];
+		const originalCommands = {
+			getCommands: vscode.commands.getCommands,
+			executeCommand: vscode.commands.executeCommand,
+		};
+		const originalPanel = SessionViewerPanel.currentPanel;
+		let readPath: { storageDirectory: string; fileName: string } | undefined;
+		let pickedProviders: string[] = [];
+		let resumeQueries: string[] = [];
+		let chatFallbackOpened = false;
+
+		try {
+			Object.assign(SessionViewerPanel, { currentPanel: undefined });
+			Object.assign(vscode.commands, {
+				getCommands: async () => [
+					'workbench.action.chat.open',
+					'aichat.newchataction',
+					'chatgpt.openSidebar',
+					'claude-vscode.sidebar.open',
+				],
+				executeCommand: async (commandId: string, args?: unknown) => {
+					executed.push({ commandId, ...(args === undefined ? {} : { args }) });
+					const query = (args as { query?: string } | undefined)?.query;
+					if (typeof query === 'string') {
+						resumeQueries.push(query);
+					}
+				},
+			});
+
+			await runContinueSessionFromExplorerCommand(item, {
+				readSession: async (storageDirectory: string, fileName: string) => {
+					readPath = { storageDirectory, fileName };
+					return session;
+				},
+				getCommands: async () => [
+					'workbench.action.chat.open',
+					'aichat.newchataction',
+					'chatgpt.openSidebar',
+					'claude-vscode.sidebar.open',
+				],
+				pickTargetProvider: async (choices) => {
+					pickedProviders = choices.map((choice) => choice.provider);
+					const codex = choices.find((choice) => choice.provider === 'codex');
+					assert.ok(codex);
+					return codex;
+				},
+				writeClipboard: async (text: string) => {
+					resumeQueries.push(text);
+				},
+				openChatParticipantResume: async () => {
+					chatFallbackOpened = true;
+				},
+			});
+
+			assert.deepEqual(readPath, {
+				storageDirectory: item.storageDirectory,
+				fileName: item.fileName,
+			});
+			assert.equal(SessionViewerPanel.currentPanel, undefined);
+			assert.equal(chatFallbackOpened, false);
+			assert.ok(pickedProviders.includes('codex'));
+			assert.ok(pickedProviders.includes('cursor'));
+			assert.equal(
+				resumeQueries.some((text) =>
+					text.includes('This conversation was originally held with Cursor, a different AI assistant.'),
+				),
+				true,
+			);
+			assert.equal(
+				resumeQueries.some((text) => text.includes('@session-control /resume')),
+				false,
+			);
+			assert.ok(executed.length > 0);
+		} finally {
+			Object.assign(SessionViewerPanel, { currentPanel: originalPanel });
+			Object.assign(vscode.commands, originalCommands);
+		}
+	});
+
+	test('falls back to VS Code chat resume when no installed continue target is available', async () => {
+		const item = createItem();
+		const session = createChatSession(createCopilotSession('Explorer Continue Session'), {
+			title: 'Explorer Continue Session',
+			savedAt: '2026-05-17T10:00:00.000Z',
+			vscodeVersion: '1.128.0',
+		});
+		const infoMessages: string[] = [];
+		const resumedTitles: string[] = [];
+		let pickCalled = false;
+
+		await runContinueSessionFromExplorerCommand(item, {
+			readSession: async () => session,
+			getCommands: async () => ['unrelated.command'],
+			pickTargetProvider: async () => {
+				pickCalled = true;
+				return undefined;
+			},
+			showInformationMessage: async (message: string) => {
+				infoMessages.push(message);
+				return undefined;
+			},
+			openChatParticipantResume: async (sessionTitle: string) => {
+				resumedTitles.push(sessionTitle);
+			},
+		});
+
+		assert.equal(pickCalled, false);
+		assert.match(infoMessages[0] ?? '', /No installed assistant could be found/);
+		assert.deepEqual(resumedTitles, ['Explorer Continue Session']);
 	});
 });
 
