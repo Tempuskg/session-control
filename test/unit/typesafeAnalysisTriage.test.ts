@@ -4,6 +4,7 @@ import { buildSessionEvidence, type AnalysisCandidateSession } from '../../src/s
 import type { ChatSession, SavedTurn } from '../../src/types';
 import {
 	ANALYSIS_TRIAGE_QUESTIONS,
+	ANALYSIS_TRIAGE_PAYLOAD_VERSION,
 	ANALYSIS_TRIAGE_PRIORITY_WEIGHTS,
 	ANALYSIS_TRIAGE_QUESTION_SET_VERSION,
 	ANALYSIS_TRIAGE_TRIVIAL_THRESHOLD,
@@ -90,19 +91,37 @@ suite('typesafe analysis triage', () => {
 		assert.equal(ANALYSIS_TRIAGE_QUESTIONS.trivial.type, 'noul');
 	});
 
-	test('state uses summaryOnly evidence plus the first and last turns', () => {
+	test('state keeps summary, tools, user prompts, and edge turns without tool outputs', () => {
 		const state = buildAnalysisTriageState(createCandidate('fp-1')) as Record<string, unknown>;
+		assert.equal(ANALYSIS_TRIAGE_PAYLOAD_VERSION, 'triage-payload-v2');
 		assert.equal(state.turnCount, 6);
-		assert.match(String(state.evidence), /condensed due to size/);
+		assert.equal(state.summary, '# Chat: Summary');
+		assert.equal('evidence' in state, false);
+		assert.deepEqual(state.tools, { total: 3, topTools: [{ name: 'runTests', count: 3 }] });
+		assert.deepEqual(state.userPrompts, ['prompt 2', 'prompt 4']);
 		assert.deepEqual(state.firstTurn, { role: 'user', text: 'prompt 0' });
 		assert.deepEqual(state.lastTurn, { role: 'assistant', text: 'response 5', tools: ['runTests'] });
-		assert.equal(JSON.stringify(state.lastTurn).includes('secret output'), false);
+		assert.equal(JSON.stringify(state).includes('secret output'), false);
 	});
 
 	test('single-turn sessions send only a first turn', () => {
 		const state = buildAnalysisTriageState(createCandidate('fp-1', createTurns(1))) as Record<string, unknown>;
 		assert.ok(state.firstTurn);
 		assert.equal('lastTurn' in state, false);
+		assert.equal('userPrompts' in state, false);
+	});
+
+	test('erroring judgment feature check falls back without results', async () => {
+		const judgment = createFakeJudgmentService({
+			enabled: true,
+			answers: triageAnswers(0.1),
+		});
+		judgment.isFeatureEnabled = () => {
+			throw new Error('feature gate failed');
+		};
+		const results = await triageAnalysisCandidates([createCandidate('fp-1')], { judgment });
+		assert.equal(results.size, 0);
+		assert.equal(judgment.calls.length, 0);
 	});
 
 	test('disabled TypeSafe sends nothing and returns no results', async () => {
@@ -165,6 +184,37 @@ suite('typesafe analysis triage', () => {
 		const options = judgment.calls[0]?.options as { feature: string; cache: JudgmentCacheTarget };
 		assert.equal(options.feature, 'triage');
 		assert.equal(options.cache.questionSetVersion, ANALYSIS_TRIAGE_QUESTION_SET_VERSION);
+	});
+
+	test('changed question-set or payload version misses the old cache entry', async () => {
+		let inferences = 0;
+		const judgment = createFakeJudgmentService({
+			handler: async () => {
+				inferences += 1;
+				return triageAnswers(0.4) as never;
+			},
+		});
+		const store = createMemoryCacheStore();
+		store.entries.set(`storage|fp-1|analysis-triage-v1`, triageAnswers(0.1));
+		const candidates = [createCandidate('fp-1')];
+		await triageAnalysisCandidates(candidates, {
+			judgment,
+			getCacheTarget: (candidate): JudgmentCacheTarget => ({
+				store,
+				storageDirectory: candidate.storageDirectory,
+				sessionFingerprint: candidate.fingerprint,
+				questionSetVersion: ANALYSIS_TRIAGE_QUESTION_SET_VERSION,
+			}),
+		});
+		assert.equal(ANALYSIS_TRIAGE_QUESTION_SET_VERSION, 'analysis-triage-v2');
+		assert.notEqual(ANALYSIS_TRIAGE_QUESTION_SET_VERSION, 'analysis-triage-v1');
+		assert.equal(inferences, 1);
+		assert.ok(store.entries.has(`storage|fp-1|analysis-triage-v1`));
+		assert.ok(store.entries.has(`storage|fp-1|${ANALYSIS_TRIAGE_QUESTION_SET_VERSION}`));
+		assert.notDeepEqual(
+			store.entries.get(`storage|fp-1|analysis-triage-v1`),
+			store.entries.get(`storage|fp-1|${ANALYSIS_TRIAGE_QUESTION_SET_VERSION}`),
+		);
 	});
 
 	test('a failing judgment drops only that candidate', async () => {

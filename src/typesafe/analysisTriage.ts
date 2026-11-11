@@ -16,9 +16,23 @@ import {
 	type JudgmentService,
 } from './judgmentService';
 
-export const ANALYSIS_TRIAGE_QUESTION_SET_VERSION = 'analysis-triage-v1';
+/**
+ * Cache key for triage judgments. Bump when question text/meaning changes OR when
+ * the triage evidence payload shape changes so stale answers are not reused.
+ * Policy-only changes (weights/thresholds) must not bump this version.
+ */
+export const ANALYSIS_TRIAGE_QUESTION_SET_VERSION = 'analysis-triage-v2';
+
+/** Documented triage state shape; included in question-set version bumps above. */
+export const ANALYSIS_TRIAGE_PAYLOAD_VERSION = 'triage-payload-v2';
 
 const MAX_EDGE_TURN_TEXT_LENGTH = 1200;
+const MAX_TRIAGE_SUMMARY_CHARS = 2500;
+const MAX_TRIAGE_USER_PROMPT_CHARS = 320;
+const MAX_TRIAGE_USER_PROMPTS = 12;
+const TRIAGE_USER_PROMPT_HEAD = 8;
+const TRIAGE_USER_PROMPT_TAIL = 4;
+const MAX_TRIAGE_TOP_TOOLS = 12;
 const MAX_CONCURRENT_TRIAGE_JUDGMENTS = 4;
 
 export const ANALYSIS_TRIAGE_QUESTIONS = {
@@ -56,8 +70,12 @@ export type AnalysisTriageAnswers = JudgmentAnswers<typeof ANALYSIS_TRIAGE_QUEST
 /** Raw triage answers keyed by candidate fingerprint; candidates without a judgment are absent. */
 export type AnalysisTriageResults = ReadonlyMap<string, AnalysisTriageAnswers>;
 
+function clipText(text: string, maxChars: number): string {
+	return text.length > maxChars ? `${text.slice(0, maxChars)}…` : text;
+}
+
 function clip(text: string): string {
-	return text.length > MAX_EDGE_TURN_TEXT_LENGTH ? `${text.slice(0, MAX_EDGE_TURN_TEXT_LENGTH)}…` : text;
+	return clipText(text, MAX_EDGE_TURN_TEXT_LENGTH);
 }
 
 function toEdgeTurn(turn: SavedTurn): JsonValue {
@@ -67,18 +85,71 @@ function toEdgeTurn(turn: SavedTurn): JsonValue {
 }
 
 /**
- * Builds compact triage state: the `summaryOnly` analysis evidence plus the
- * first and last turns, so triage stays cheap relative to full analysis.
+ * Clipped user prompts for friction / instruction-violation signals.
+ * Omits the first request when `firstTurn` already carries that text.
+ */
+function buildTriageUserPrompts(turns: readonly SavedTurn[]): string[] | undefined {
+	const prompts = turns
+		.filter((turn): turn is SavedTurn & { type: 'request' } => turn.type === 'request')
+		.map((turn) => clipText(turn.prompt, MAX_TRIAGE_USER_PROMPT_CHARS));
+	if (prompts.length === 0) {
+		return undefined;
+	}
+	const withoutFirstEdge = turns[0]?.type === 'request' ? prompts.slice(1) : prompts;
+	if (withoutFirstEdge.length === 0) {
+		return undefined;
+	}
+	if (withoutFirstEdge.length <= MAX_TRIAGE_USER_PROMPTS) {
+		return withoutFirstEdge;
+	}
+	return [
+		...withoutFirstEdge.slice(0, TRIAGE_USER_PROMPT_HEAD),
+		...withoutFirstEdge.slice(-TRIAGE_USER_PROMPT_TAIL),
+	];
+}
+
+/** Aggregate tool names/counts for tool-failure signals; never includes tool outputs. */
+function buildTriageToolSummary(turns: readonly SavedTurn[]): JsonValue | undefined {
+	const counts = new Map<string, number>();
+	let total = 0;
+	for (const turn of turns) {
+		if (turn.type !== 'response') {
+			continue;
+		}
+		for (const toolCall of turn.toolCalls) {
+			total += 1;
+			counts.set(toolCall.name, (counts.get(toolCall.name) ?? 0) + 1);
+		}
+	}
+	if (total === 0) {
+		return undefined;
+	}
+	const topTools = [...counts.entries()]
+		.sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+		.slice(0, MAX_TRIAGE_TOP_TOOLS)
+		.map(([name, count]) => ({ name, count }));
+	return { total, topTools };
+}
+
+/**
+ * Builds lean triage state: saved summary, aggregate tools, clipped user prompts,
+ * and first/last turns — without the heavy `summaryOnly` evidence blob or its
+ * transcript section that duplicated edge turns.
  */
 export function buildAnalysisTriageState(candidate: AnalysisCandidateSession): EntryType {
 	const turns = candidate.session.turns;
 	const firstTurn = turns[0];
 	const lastTurn = turns.length > 1 ? turns[turns.length - 1] : undefined;
+	const summary = clipText(candidate.session.markdownSummary ?? '', MAX_TRIAGE_SUMMARY_CHARS);
+	const tools = buildTriageToolSummary(turns);
+	const userPrompts = buildTriageUserPrompts(turns);
 	return {
 		title: candidate.session.title,
 		...(candidate.session.provider ? { provider: candidate.session.provider } : {}),
 		turnCount: turns.length,
-		evidence: buildSessionEvidence(candidate, 'summaryOnly'),
+		...(summary ? { summary } : {}),
+		...(tools ? { tools } : {}),
+		...(userPrompts ? { userPrompts } : {}),
 		...(firstTurn ? { firstTurn: toEdgeTurn(firstTurn) } : {}),
 		...(lastTurn ? { lastTurn: toEdgeTurn(lastTurn) } : {}),
 	};
