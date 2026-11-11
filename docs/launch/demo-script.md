@@ -13,7 +13,7 @@ agent session reads it → founders offer, with what lifetime does and does not 
   Chat model is excluded from this demo; do not demonstrate or claim the Chat review-panel flow
   in Cursor. Saving Cursor transcripts remains part of the supported provider story.
 
-- Session Control 1.11.0 with Session Control Pro 0.10.0 bundled, Pro license entered beforehand
+- The latest registry Session Control release (1.13.0 or newer, bundling Session Control Pro 0.10.3 or newer), Pro license entered beforehand
   (do not show the key or the license prompts).
 - Use a real repository with at least five real saved sessions across two or more providers. Do
   not stage fake chats. Review every frame for secrets, tokens, customer names, and private paths
@@ -45,7 +45,7 @@ seconds so it can be read without sound.
 
 ## Accuracy checks before publishing
 
-The recording targets registry Session Control 1.11.0 with bundled Pro 0.10.0. Commands are contributed by
+The recording targets the latest registry Session Control release (1.13.0 or newer) with its bundled Pro (0.10.3 or newer). Commands are contributed by
 `e:\chat-commit\package.json`, and the review panel wording comes from Pro's
 `src/knowledgeReviewPanel.ts`:
 
@@ -59,11 +59,13 @@ The recording targets registry Session Control 1.11.0 with bundled Pro 0.10.0. C
 | 8 | `knowledge/` bundle with relative links and citations, instruction-file pointer | `knowledge.bundlePath` default `./knowledge`; `knowledgeInstructions.ts` |
 | 10 | $49, first 100 buyers, four exclusions | Polar Founders checkout and `sessioncontrol.dev/terms` (verified 2026-10-11, card-mu6zm0m9-5) |
 
-Recording remains gated on the two 1.11.0 demo defects tracked on the Pro board:
-`card-mvkx2oxk-1` (malformed syntheses omit new Pitfall/Playbook candidates) and
-`card-mvkxnagl-1` (an excluded concept can retain an annotated session backlink).
-Fix and verify them in the intended build, or obtain explicit demo acceptance, before recording.
-Cursor's scope exclusion does not accept either defect. Existing knowledge pages and a locally
+Recording is gated on the fresh-install smoke test of the latest release (`card-mvf5ju3j-1` on the
+Pro board). Its demo defects are fixed in 1.12.0-1.13.0 and must be verified in that installed build:
+`card-mvkxnagl-1` (excluded-concept backlinks), `card-mvkfmco4-1` (auto-save pause on a missing
+export), `card-mvirxatk-1` (duplicate auto-save exports across editor windows) and
+`card-mvkx2oxk-1` (malformed syntheses; the missing-closing-delimiter case is repaired in Pro 0.10.3,
+and remaining omissions were accepted for the demo on 2026-10-30).
+Cursor's scope exclusion does not accept any defect. Existing knowledge pages and a locally
 repaired link must not be presented as successful fresh output from the registry harvest.
 
 Do not:
