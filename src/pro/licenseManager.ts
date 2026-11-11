@@ -62,9 +62,31 @@ export function createProLicenseManager(deps: ProLicenseManagerDeps): ProLicense
 		));
 
 	function getOrganizationId(workspaceFolder?: vscode.WorkspaceFolder): string {
-		return getConfiguration(workspaceFolder)
-			.get<string>('pro.polar.organizationId', DEFAULT_POLAR_ORGANIZATION_ID)
-			.trim();
+		const config = getConfiguration(workspaceFolder);
+		const inspected = typeof config.inspect === 'function'
+			? config.inspect<string>('pro.polar.organizationId')
+			: undefined;
+
+		// Explicit user/workspace clears must fail closed (sandbox / intentional empty).
+		// VS Code's get(key, fallback) ignores fallback when a contributed default is "",
+		// and Cursor can also surface an empty effective value for application-scoped
+		// settings when no user override exists — neither case should block production
+		// activation when the org ID was not intentionally cleared.
+		const explicitOverride = [
+			inspected?.workspaceFolderValue,
+			inspected?.workspaceValue,
+			inspected?.globalValue,
+		].find((value): value is string => typeof value === 'string');
+		if (explicitOverride !== undefined) {
+			return explicitOverride.trim();
+		}
+
+		const configured = config.get<string>(
+			'pro.polar.organizationId',
+			DEFAULT_POLAR_ORGANIZATION_ID,
+		);
+		const trimmed = (typeof configured === 'string' ? configured : '').trim();
+		return trimmed || DEFAULT_POLAR_ORGANIZATION_ID;
 	}
 
 	function getPolarApiBaseUrl(workspaceFolder?: vscode.WorkspaceFolder): string {
