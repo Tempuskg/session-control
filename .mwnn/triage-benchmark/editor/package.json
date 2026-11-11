@@ -7,6 +7,9 @@
   "main": "extension.cjs",
   "activationEvents": ["onStartupFinished"],
   "contributes": {
-    "commands": [{ "command": "mwnn.runApprovedTriageBenchmark", "title": "MWNN: Run Approved Triage Benchmark" }]
+    "commands": [
+      { "command": "mwnn.runApprovedTriageBenchmark", "title": "MWNN: Run Approved Triage Benchmark" },
+      { "command": "mwnn.runAdjustedTriageReeval", "title": "MWNN: Run Adjusted Triage Re-evaluation" }
+    ]
   }
 }

@@ -2873,7 +2873,7 @@ function fuzzyMatchSessions(query, sessions) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.UNTRIAGED_ANALYSIS_PRIORITY = exports.ANALYSIS_TRIAGE_TRIVIAL_THRESHOLD = exports.ANALYSIS_TRIAGE_PRIORITY_WEIGHTS = exports.ANALYSIS_TRIAGE_QUESTIONS = exports.ANALYSIS_TRIAGE_QUESTION_SET_VERSION = void 0;
+exports.UNTRIAGED_ANALYSIS_PRIORITY = exports.ANALYSIS_TRIAGE_TRIVIAL_THRESHOLD = exports.ANALYSIS_TRIAGE_PRIORITY_WEIGHTS = exports.ANALYSIS_TRIAGE_QUESTIONS = exports.ANALYSIS_TRIAGE_PAYLOAD_VERSION = exports.ANALYSIS_TRIAGE_QUESTION_SET_VERSION = void 0;
 exports.buildAnalysisTriageState = buildAnalysisTriageState;
 exports.triageAnalysisCandidates = triageAnalysisCandidates;
 exports.computeAnalysisPriority = computeAnalysisPriority;
@@ -2882,8 +2882,21 @@ exports.isTrivialAnalysisCandidate = isTrivialAnalysisCandidate;
 exports.planAnalysisFromTriage = planAnalysisFromTriage;
 const sessionAnalysis_1 = __webpack_require__(1);
 const judgmentService_1 = __webpack_require__(3);
-exports.ANALYSIS_TRIAGE_QUESTION_SET_VERSION = 'analysis-triage-v1';
+/**
+ * Cache key for triage judgments. Bump when question text/meaning changes OR when
+ * the triage evidence payload shape changes so stale answers are not reused.
+ * Policy-only changes (weights/thresholds) must not bump this version.
+ */
+exports.ANALYSIS_TRIAGE_QUESTION_SET_VERSION = 'analysis-triage-v2';
+/** Documented triage state shape; included in question-set version bumps above. */
+exports.ANALYSIS_TRIAGE_PAYLOAD_VERSION = 'triage-payload-v2';
 const MAX_EDGE_TURN_TEXT_LENGTH = 1200;
+const MAX_TRIAGE_SUMMARY_CHARS = 2500;
+const MAX_TRIAGE_USER_PROMPT_CHARS = 320;
+const MAX_TRIAGE_USER_PROMPTS = 12;
+const TRIAGE_USER_PROMPT_HEAD = 8;
+const TRIAGE_USER_PROMPT_TAIL = 4;
+const MAX_TRIAGE_TOP_TOOLS = 12;
 const MAX_CONCURRENT_TRIAGE_JUDGMENTS = 4;
 exports.ANALYSIS_TRIAGE_QUESTIONS = {
     friction: (0, judgmentService_1.score)('How much friction did the user experience with the AI agent in this chat session?', [
@@ -2902,8 +2915,11 @@ exports.ANALYSIS_TRIAGE_QUESTIONS = {
     controlFileLesson: (0, judgmentService_1.noul)('Would a change to an AI control file (such as AGENTS.md, copilot-instructions.md, a prompt, or a skill) plausibly prevent the issues seen in this chat session?'),
     trivial: (0, judgmentService_1.noul)('Is this chat session too short, trivial, or off-topic to be worth analyzing for AI workflow improvements?'),
 };
+function clipText(text, maxChars) {
+    return text.length > maxChars ? `${text.slice(0, maxChars)}…` : text;
+}
 function clip(text) {
-    return text.length > MAX_EDGE_TURN_TEXT_LENGTH ? `${text.slice(0, MAX_EDGE_TURN_TEXT_LENGTH)}…` : text;
+    return clipText(text, MAX_EDGE_TURN_TEXT_LENGTH);
 }
 function toEdgeTurn(turn) {
     return turn.type === 'request'
@@ -2911,18 +2927,69 @@ function toEdgeTurn(turn) {
         : { role: 'assistant', text: clip(turn.content), tools: turn.toolCalls.map((toolCall) => toolCall.name) };
 }
 /**
- * Builds compact triage state: the `summaryOnly` analysis evidence plus the
- * first and last turns, so triage stays cheap relative to full analysis.
+ * Clipped user prompts for friction / instruction-violation signals.
+ * Omits the first request when `firstTurn` already carries that text.
+ */
+function buildTriageUserPrompts(turns) {
+    const prompts = turns
+        .filter((turn) => turn.type === 'request')
+        .map((turn) => clipText(turn.prompt, MAX_TRIAGE_USER_PROMPT_CHARS));
+    if (prompts.length === 0) {
+        return undefined;
+    }
+    const withoutFirstEdge = turns[0]?.type === 'request' ? prompts.slice(1) : prompts;
+    if (withoutFirstEdge.length === 0) {
+        return undefined;
+    }
+    if (withoutFirstEdge.length <= MAX_TRIAGE_USER_PROMPTS) {
+        return withoutFirstEdge;
+    }
+    return [
+        ...withoutFirstEdge.slice(0, TRIAGE_USER_PROMPT_HEAD),
+        ...withoutFirstEdge.slice(-TRIAGE_USER_PROMPT_TAIL),
+    ];
+}
+/** Aggregate tool names/counts for tool-failure signals; never includes tool outputs. */
+function buildTriageToolSummary(turns) {
+    const counts = new Map();
+    let total = 0;
+    for (const turn of turns) {
+        if (turn.type !== 'response') {
+            continue;
+        }
+        for (const toolCall of turn.toolCalls) {
+            total += 1;
+            counts.set(toolCall.name, (counts.get(toolCall.name) ?? 0) + 1);
+        }
+    }
+    if (total === 0) {
+        return undefined;
+    }
+    const topTools = [...counts.entries()]
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+        .slice(0, MAX_TRIAGE_TOP_TOOLS)
+        .map(([name, count]) => ({ name, count }));
+    return { total, topTools };
+}
+/**
+ * Builds lean triage state: saved summary, aggregate tools, clipped user prompts,
+ * and first/last turns — without the heavy `summaryOnly` evidence blob or its
+ * transcript section that duplicated edge turns.
  */
 function buildAnalysisTriageState(candidate) {
     const turns = candidate.session.turns;
     const firstTurn = turns[0];
     const lastTurn = turns.length > 1 ? turns[turns.length - 1] : undefined;
+    const summary = clipText(candidate.session.markdownSummary ?? '', MAX_TRIAGE_SUMMARY_CHARS);
+    const tools = buildTriageToolSummary(turns);
+    const userPrompts = buildTriageUserPrompts(turns);
     return {
         title: candidate.session.title,
         ...(candidate.session.provider ? { provider: candidate.session.provider } : {}),
         turnCount: turns.length,
-        evidence: (0, sessionAnalysis_1.buildSessionEvidence)(candidate, 'summaryOnly'),
+        ...(summary ? { summary } : {}),
+        ...(tools ? { tools } : {}),
+        ...(userPrompts ? { userPrompts } : {}),
         ...(firstTurn ? { firstTurn: toEdgeTurn(firstTurn) } : {}),
         ...(lastTurn ? { lastTurn: toEdgeTurn(lastTurn) } : {}),
     };

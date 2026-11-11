@@ -35,3 +35,4 @@ telemetry and never will just to fill this table.
 | Date | Open VSX downloads | Marketplace installs | Marketplace downloads | GitHub stars | Open VSX reviews | Pro customers | Notes |
 | :-- | --: | --: | --: | --: | --: | --: | :-- |
 | 2026-09-08 | 5,334 (baseline) | 73 (baseline) | 567 (baseline) | 0 (baseline) | 0 (baseline) | 0 (baseline) | Baseline from marketing plan §1; v1.3.11 live |
+| 2026-11-11 | 11,009 (+5,675) | 116 (+43) | 1,025 (+458) | 1 (+1) | 0 (+0) | 0 (+0) | Phase 4 review pull; Pro count 0 from Polar.sh (user-reported) |

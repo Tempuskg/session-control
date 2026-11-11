@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "cardId": "card-mvq03qy7-3",
+  "runs": [
+    {
+      "pairId": "pair-1",
+      "cacheCondition": "cold-no-judgment-cache",
+      "path": "triage-pair-1-1794257499403.json",
+      "state": "complete",
+      "recall": 1,
+      "missedPositiveIds": [],
+      "skippedIds": [
+        "eval-13",
+        "eval-15",
+        "eval-24",
+        "eval-31",
+        "eval-37"
+      ],
+      "fallbackIds": [],
+      "wallTimeMs": 1246.4522000000002,
+      "usage": {
+        "input_tokens": 47549,
+        "output_tokens": 4180
+      },
+      "finishedAt": "2026-11-09T20:51:40.653Z"
+    },
+    {
+      "pairId": "pair-2",
+      "cacheCondition": "warm-immediate-repeat",
+      "path": "triage-pair-2-1794257507771.json",
+      "state": "complete",
+      "recall": 1,
+      "missedPositiveIds": [],
+      "skippedIds": [
+        "eval-13",
+        "eval-15",
+        "eval-24",
+        "eval-31",
+        "eval-37"
+      ],
+      "fallbackIds": [],
+      "wallTimeMs": 1254.5005999999998,
+      "usage": {
+        "input_tokens": 47549,
+        "output_tokens": 4180
+      },
+      "finishedAt": "2026-11-09T20:51:49.029Z"
+    },
+    {
+      "pairId": "pair-3",
+      "cacheCondition": "warm-immediate-repeat",
+      "path": "triage-pair-3-1794257509120.json",
+      "state": "complete",
+      "recall": 1,
+      "missedPositiveIds": [],
+      "skippedIds": [
+        "eval-13",
+        "eval-15",
+        "eval-24",
+        "eval-31",
+        "eval-37"
+      ],
+      "fallbackIds": [],
+      "wallTimeMs": 1154.8798,
+      "usage": {
+        "input_tokens": 47549,
+        "output_tokens": 4180
+      },
+      "finishedAt": "2026-11-09T20:51:50.278Z"
+    }
+  ]
+}

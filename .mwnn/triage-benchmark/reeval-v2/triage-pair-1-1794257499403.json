@@ -1,0 +1,2692 @@
+{
+  "schemaVersion": 1,
+  "cardId": "card-mvq03qy7-3",
+  "protocol": "reeval-protocol.md",
+  "pairId": "pair-1",
+  "cacheCondition": "cold-no-judgment-cache",
+  "cacheNote": "Local judgment cache is never read. cold-no-judgment-cache = first/isolated process; warm-immediate-repeat = consecutive live run (provider warmth only; still no persisted judgment reads).",
+  "startedAt": "2026-11-09T20:51:39.403Z",
+  "state": "complete",
+  "config": {
+    "analysisModelDisplayName": "GPT-6.1 Sol",
+    "batchCharBudget": 48000,
+    "promptVersion": "5",
+    "questionSetVersion": "analysis-triage-v2",
+    "payloadVersion": "triage-payload-v2",
+    "threshold": 0.7,
+    "baselineSha256": "b38cdc346ac97d6d2d34f766d51b9fd2ff571f4b4e984aa4232dcf46708dbe73",
+    "adapter": "Compact fixture prompts in recorded order, first/last response only; counts/tools in summary (not full fixture JSON); no fabricated tools or timestamps. Results apply to these redacted fixtures."
+  },
+  "requestedModel": "jev-latest",
+  "package": {
+    "name": "session-control",
+    "version": "1.12.1",
+    "typesafeSdk": "^0.6.0"
+  },
+  "runtime": {
+    "node": "v24.22.1",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "fixtureHashes": {
+    "labelsSha256": "3704f1c9b678608fefc46c5a54aecd75a1c56a94e2f91c1d1eff916de504cc69",
+    "fixtureCount": 44,
+    "fixturesSha256Concat": "3de43b1f4157810b69802c16cd60316ea0e35605cae6da2bfe9fb99dfbec3379"
+  },
+  "records": [
+    {
+      "id": "eval-01",
+      "fingerprint": "a90712b76d06289d9cec3b8bb8075829ef642cd66e25d5c64b818ff80a8ba52c",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 2.28,
+          "confidence": 0.41,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.05,
+            "1": 0.06,
+            "2": 0.46,
+            "3": 0.43
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.15,
+          "confidence": 0.85,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.93,
+            "1": 0.02,
+            "2": 0.02,
+            "3": 0.03
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.41
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.24
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.29
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1025,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 251.0879
+    },
+    {
+      "id": "eval-02",
+      "fingerprint": "0401180a0f9866ab28dd2f07f0074b82bfa55c5c76bc8c07207444365330d2d1",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 2,
+          "confidence": 0.46,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.07,
+            "1": 0.13,
+            "2": 0.53,
+            "3": 0.27
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 1.06,
+          "confidence": 0.76,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.09,
+            "1": 0.79,
+            "2": 0.09,
+            "3": 0.03
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.34
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.3
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.21
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 965,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 94.24549999999999
+    },
+    {
+      "id": "eval-03",
+      "fingerprint": "d213928f29613943cff5abaadb9da1b78d400f303da8a114f1ca0ae9d5a56672",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.27,
+          "confidence": 0.75,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.82,
+            "1": 0.11,
+            "2": 0.07,
+            "3": 0
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.01,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.21
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.2
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.45
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 787,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 137.28660000000002
+    },
+    {
+      "id": "eval-06",
+      "fingerprint": "be585e0cd87a1e093992ed25de02ffdb58099bb2425650c8b8b1439083a67950",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.18,
+          "confidence": 0.82,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.88,
+            "1": 0.06,
+            "2": 0.06,
+            "3": 0
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.01,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.2
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.17
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.37
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1031,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 58.781300000000044
+    },
+    {
+      "id": "eval-05",
+      "fingerprint": "84819cde75c33bb55b35e91209ce326817d0724ea849a21511a91b7318ab64ca",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.3,
+          "confidence": 0.71,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.73,
+            "1": 0.25,
+            "2": 0.02,
+            "3": 0
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.01,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.16
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.15
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.22
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1158,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 160.038
+    },
+    {
+      "id": "eval-04",
+      "fingerprint": "72615c1c5dedc1588e1219ab61e34f3f883a3310b1655046781718c141b2b1e9",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 2.81,
+          "confidence": 0.82,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0,
+            "1": 0,
+            "2": 0.18,
+            "3": 0.82
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.09,
+          "confidence": 0.9,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.95,
+            "1": 0.01,
+            "2": 0.03,
+            "3": 0.01
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.6
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.61
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.22
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 944,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 166.09490000000005
+    },
+    {
+      "id": "eval-07",
+      "fingerprint": "22e8a3ccec9e2b339ba3ddbe9be32497d2d2069b01a705a84d339abdbf398206",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.13,
+          "confidence": 0.88,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.91,
+            "1": 0.06,
+            "2": 0.03,
+            "3": 0
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.01,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.24
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.27
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.41
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 996,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 75.79450000000003
+    },
+    {
+      "id": "eval-08",
+      "fingerprint": "bbae3f44f3f0a6375ba6da09181ee8066eb268b6e3560334a468a180a74bb706",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.34,
+          "confidence": 0.67,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.75,
+            "1": 0.18,
+            "2": 0.06,
+            "3": 0.01
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.12,
+          "confidence": 0.86,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.93,
+            "1": 0.01,
+            "2": 0.05,
+            "3": 0.01
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.15
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.25
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.38
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 974,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 66.4513
+    },
+    {
+      "id": "eval-10",
+      "fingerprint": "cf679c67c13f607a87707741deeeb7530df8e3d4d370cc40b55a983a3ca1e496",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 1.82,
+          "confidence": 0.73,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.04,
+            "1": 0.15,
+            "2": 0.77,
+            "3": 0.04
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.08,
+          "confidence": 0.9,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.95,
+            "1": 0.01,
+            "2": 0.03,
+            "3": 0.01
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.46
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.49
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.12
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1336,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 88.89480000000003
+    },
+    {
+      "id": "eval-09",
+      "fingerprint": "3ddc286e112395e586d6c0bd0b2126e932159e45011df12e31e91018c343a1db",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 1.51,
+          "confidence": 0.48,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.09,
+            "1": 0.32,
+            "2": 0.57,
+            "3": 0.02
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.02,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.37
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.33
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.27
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 993,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 103.69800000000004
+    },
+    {
+      "id": "eval-12",
+      "fingerprint": "205e0610cd868af55ab019e00dde16e6ba6605d7d9565c3dae43034157ccc8d7",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.64,
+          "confidence": 0.36,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.55,
+            "1": 0.28,
+            "2": 0.15,
+            "3": 0.02
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.05,
+          "confidence": 0.95,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.97,
+            "1": 0.02,
+            "2": 0,
+            "3": 0.01
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.22
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.21
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.3
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1036,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 64.88390000000004
+    },
+    {
+      "id": "eval-11",
+      "fingerprint": "1221970002f2f565e5a84ea6a0c018ee5f333b807d311fbce1e8528e6d222076",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.06,
+          "confidence": 0.94,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.96,
+            "1": 0.02,
+            "2": 0.02,
+            "3": 0
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.01,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.12
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.31
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.58
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 843,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 76.14479999999998
+    },
+    {
+      "id": "eval-13",
+      "fingerprint": "61356b5c87c1fa3ef757449a2207e9a33a5d4fd546eaa94ca94b0124e15d14da",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.25,
+          "confidence": 0.77,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.88,
+            "1": 0.02,
+            "2": 0.09,
+            "3": 0.01
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.3
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.27
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.9
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 678,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 90.97410000000002
+    },
+    {
+      "id": "eval-15",
+      "fingerprint": "0b19734bde55223955985d4ac5c464c8c6fd247d92b3587340d98238a05e2e2a",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.15,
+          "confidence": 0.85,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.94,
+            "1": 0.01,
+            "2": 0.01,
+            "3": 0.04
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.07,
+          "confidence": 0.91,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.96,
+            "1": 0.01,
+            "2": 0.01,
+            "3": 0.02
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.11
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.35
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.86
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 993,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 63.85159999999996
+    },
+    {
+      "id": "eval-14",
+      "fingerprint": "721d717da7f75e9b0ba1ace53504cc99e0201a3e5dd4c0816ff38d0ebd63001a",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.01,
+          "confidence": 1,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.15
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.22
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.6
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 924,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 93.26740000000007
+    },
+    {
+      "id": "eval-16",
+      "fingerprint": "f20e028dd482040c9fdf5e1161c1364e0fe993f19e45be10f6d6979eeb00cf61",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 2.99,
+          "confidence": 0.99,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0,
+            "1": 0,
+            "2": 0.01,
+            "3": 0.99
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 1.34,
+          "confidence": 0,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.49,
+            "1": 0.01,
+            "2": 0.17,
+            "3": 0.33
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.33
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.47
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.1
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1243,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 92.38879999999995
+    },
+    {
+      "id": "eval-17",
+      "fingerprint": "40b6aab5e56e66b494e725e40ee2820c670a2d026bb4ba6af009dfe16440b618",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 1.86,
+          "confidence": 0.56,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.06,
+            "1": 0.17,
+            "2": 0.62,
+            "3": 0.15
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.09,
+          "confidence": 0.91,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.95,
+            "1": 0.03,
+            "2": 0,
+            "3": 0.02
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.24
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.65
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.15
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1045,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 73.82900000000006
+    },
+    {
+      "id": "eval-18",
+      "fingerprint": "43cb12b7aabc8c324e1f0c238c601262d4cc62a56b246e735c81bb8a0a3f42c1",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 2.28,
+          "confidence": 0.6,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.01,
+            "1": 0.04,
+            "2": 0.61,
+            "3": 0.34
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.07,
+          "confidence": 0.94,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.96,
+            "1": 0.02,
+            "2": 0.02,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.28
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.36
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.15
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 964,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 67.9778
+    },
+    {
+      "id": "eval-19",
+      "fingerprint": "ddfa2e9b2dd92104c858b7891d74d94cb1b2a2d736f5e46d590d02835a4af2c5",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 1.73,
+          "confidence": 0.51,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.09,
+            "1": 0.2,
+            "2": 0.6,
+            "3": 0.11
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.04,
+          "confidence": 0.96,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.98,
+            "1": 0.01,
+            "2": 0,
+            "3": 0.01
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.43
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.19
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.16
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1223,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 83.18309999999997
+    },
+    {
+      "id": "eval-20",
+      "fingerprint": "e900a7f12028705890d0524daa1145e2f9abe1d7f2095ffeafada0b9e335afab",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 1.05,
+          "confidence": 0.34,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.3,
+            "1": 0.4,
+            "2": 0.24,
+            "3": 0.06
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.02,
+          "confidence": 0.99,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.99,
+            "1": 0.01,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.16
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.2
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.28
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1055,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 85.78039999999999
+    },
+    {
+      "id": "eval-21",
+      "fingerprint": "051da48b7407a55a13cdd4201e1d0dae8decaa1ebc462a78cc811eb19298221a",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.22,
+          "confidence": 0.78,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.81,
+            "1": 0.16,
+            "2": 0.03,
+            "3": 0
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.01,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.2
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.32
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.17
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1114,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 83.37289999999996
+    },
+    {
+      "id": "eval-22",
+      "fingerprint": "07f8e698034e685e70140ad809cb5246b5c010c10eb969a49958abb43f14ea56",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.23,
+          "confidence": 0.75,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.84,
+            "1": 0.08,
+            "2": 0.07,
+            "3": 0.01
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.01,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.26
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.63
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.22
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1136,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 88.12360000000001
+    },
+    {
+      "id": "eval-23",
+      "fingerprint": "9b282af54d494eba626725c1cedb34b04ba920433e88f626c80e4d4d240ff72e",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 1.02,
+          "confidence": 0.33,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.32,
+            "1": 0.35,
+            "2": 0.31,
+            "3": 0.02
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.01,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.25
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.42
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.32
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1031,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 86.3252
+    },
+    {
+      "id": "eval-24",
+      "fingerprint": "5f6f279d5021cec07cf26d79b8fbb4a0f52779cf472e1af931a74ca412ea35a8",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0,
+          "confidence": 1,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.07
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.08
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.92
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 710,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 84.96669999999995
+    },
+    {
+      "id": "eval-25",
+      "fingerprint": "1cf67ef13a899bf301c5ed8eae26f16bd29a86442ee6c9640bbd43eab216e87f",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.04,
+          "confidence": 0.97,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.98,
+            "1": 0.01,
+            "2": 0.01,
+            "3": 0
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.01,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.26
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.25
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.16
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1197,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 73.8972
+    },
+    {
+      "id": "eval-26",
+      "fingerprint": "64e6ef2b4e3de938aa16564d9084a17afd1372d91cd9dd6f7ad9da8cfcedc6a9",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.62,
+          "confidence": 0.37,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.67,
+            "1": 0.11,
+            "2": 0.14,
+            "3": 0.08
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.97,
+          "confidence": 0.85,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.09,
+            "1": 0.86,
+            "2": 0.04,
+            "3": 0.01
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.27
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.27
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.3
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1061,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 70.62740000000008
+    },
+    {
+      "id": "eval-28",
+      "fingerprint": "213dbbe1d179b79a598c36bab999ba49174be71d9356814b149d750203789371",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 2.01,
+          "confidence": 0.83,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0,
+            "1": 0.08,
+            "2": 0.83,
+            "3": 0.09
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 1.1,
+          "confidence": 0.67,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.12,
+            "1": 0.71,
+            "2": 0.13,
+            "3": 0.04
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.28
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.29
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.16
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1174,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 73.2894
+    },
+    {
+      "id": "eval-27",
+      "fingerprint": "80c78eba800a68aca80cf201450b7fbbaf281720284babbe94a019a98036fc77",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 2.9,
+          "confidence": 0.92,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0,
+            "1": 0,
+            "2": 0.08,
+            "3": 0.92
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 2.77,
+          "confidence": 0.76,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.01,
+            "1": 0.01,
+            "2": 0.19,
+            "3": 0.79
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.37
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.23
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.13
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1705,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 115.05790000000002
+    },
+    {
+      "id": "eval-30",
+      "fingerprint": "48db8f41fe924ad0728f7444b380e5d95537ebe32ac2b296e032871144e713dc",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.46,
+          "confidence": 0.53,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.78,
+            "1": 0.04,
+            "2": 0.11,
+            "3": 0.07
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 2.66,
+          "confidence": 0.64,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.02,
+            "1": 0.01,
+            "2": 0.28,
+            "3": 0.69
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.31
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.23
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.16
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1492,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 78.49110000000007
+    },
+    {
+      "id": "eval-29",
+      "fingerprint": "33fef4040f2909274cad3cee79e3465179c094bffb2928b3a6164f2c02e3a458",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.93,
+          "confidence": 0.36,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.35,
+            "1": 0.38,
+            "2": 0.25,
+            "3": 0.02
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.98,
+          "confidence": 0.93,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.05,
+            "1": 0.94,
+            "2": 0,
+            "3": 0.01
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.22
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.38
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.19
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1196,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 104.67310000000009
+    },
+    {
+      "id": "eval-31",
+      "fingerprint": "def77c6a5ffecb6136ef90f3df1738c6020c78af0380592767d9feb825614a66",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.61,
+          "confidence": 0.38,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.74,
+            "1": 0.04,
+            "2": 0.08,
+            "3": 0.14
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.01,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.49
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.37
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.77
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1304,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 84.80719999999997
+    },
+    {
+      "id": "eval-33",
+      "fingerprint": "f55fb95bdf90e75b09480bad0cfc16cbf84c6c43e20c5751150f9ddbfb91b624",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.32,
+          "confidence": 0.68,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.8,
+            "1": 0.09,
+            "2": 0.1,
+            "3": 0.01
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.98,
+          "confidence": 0.96,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.03,
+            "1": 0.96,
+            "2": 0.01,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.16
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.11
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.18
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1048,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 67.35959999999989
+    },
+    {
+      "id": "eval-32",
+      "fingerprint": "6b3b0e670326b0590606b9ba2abc05db81a113fc26450084550b36082ba2bffe",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 1.15,
+          "confidence": 0,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.36,
+            "1": 0.21,
+            "2": 0.34,
+            "3": 0.09
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 1.21,
+          "confidence": 0.51,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.14,
+            "1": 0.59,
+            "2": 0.19,
+            "3": 0.08
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.46
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.32
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.25
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1264,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 99.74469999999997
+    },
+    {
+      "id": "eval-34",
+      "fingerprint": "084d24e69e700064bc29dc5ab2e7337087799c2793e762360e576c4f557515b5",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 1.02,
+          "confidence": 0.45,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.27,
+            "1": 0.46,
+            "2": 0.26,
+            "3": 0.01
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.98,
+          "confidence": 0.97,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.03,
+            "1": 0.97,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.39
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.36
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.26
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1084,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 79.08760000000007
+    },
+    {
+      "id": "eval-35",
+      "fingerprint": "b24b6139619fc7350d3704fc57568732f1b4c02318d29dcb1ac61675f8d0e04e",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.76,
+          "confidence": 0.23,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.43,
+            "1": 0.39,
+            "2": 0.16,
+            "3": 0.02
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.96,
+          "confidence": 0.94,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.05,
+            "1": 0.94,
+            "2": 0.01,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.27
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.41
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.29
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1098,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 75.17120000000011
+    },
+    {
+      "id": "eval-37",
+      "fingerprint": "ac05c19c24bcc504b15e5d37bdb62eaebc3162ba430afbbdbef53edfc386d39d",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0,
+          "confidence": 1,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.01,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.05
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.12
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.9
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 704,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 77.78759999999988
+    },
+    {
+      "id": "eval-36",
+      "fingerprint": "cf7e31aee95534232ed46c9e510bc2bba4ec0d900e03435e00ae48c6be1c947f",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.21,
+          "confidence": 0.79,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.88,
+            "1": 0.04,
+            "2": 0.07,
+            "3": 0.01
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.01,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.17
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.16
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.57
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 794,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 91.19800000000009
+    },
+    {
+      "id": "eval-38",
+      "fingerprint": "4e7fdec8fdf290f8240b135a09b283e2e2b72eddfe81a925513c62e91efe9e2b",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 2.6,
+          "confidence": 0.6,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0,
+            "1": 0.01,
+            "2": 0.38,
+            "3": 0.61
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 1.63,
+          "confidence": 0.45,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.05,
+            "1": 0.36,
+            "2": 0.5,
+            "3": 0.09
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.53
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.38
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.17
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1355,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 83.01970000000006
+    },
+    {
+      "id": "eval-39",
+      "fingerprint": "15014b2df1b81b67421e5edc2f5cb73256c83303621838ff8fed39117b18474a",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 1.1,
+          "confidence": 0.42,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.24,
+            "1": 0.44,
+            "2": 0.3,
+            "3": 0.02
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 1.03,
+          "confidence": 0.91,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.03,
+            "1": 0.92,
+            "2": 0.04,
+            "3": 0.01
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.29
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.23
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.14
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1339,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 70.85019999999986
+    },
+    {
+      "id": "eval-40",
+      "fingerprint": "648334027296d2558e5387fa7e692632f555192b4988c05021f372f41081e007",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.35,
+          "confidence": 0.65,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.72,
+            "1": 0.21,
+            "2": 0.07,
+            "3": 0
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.95,
+          "confidence": 0.86,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.1,
+            "1": 0.86,
+            "2": 0.04,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.32
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.33
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.24
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1137,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 84.81139999999982
+    },
+    {
+      "id": "eval-41",
+      "fingerprint": "82b9820e9b87f096dafc60306f708e053f8ef46375c7556f7b9195f696989ac1",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 1.24,
+          "confidence": 0.6,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.08,
+            "1": 0.6,
+            "2": 0.32,
+            "3": 0
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.98,
+          "confidence": 0.98,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.02,
+            "1": 0.98,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.3
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.45
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.22
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1121,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 89.96260000000007
+    },
+    {
+      "id": "eval-42",
+      "fingerprint": "43ae556d3f6b57dffe9b52c169dc6891eafbefbe3ef8b4eda8a604868080dbda",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.05,
+          "confidence": 0.95,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.96,
+            "1": 0.03,
+            "2": 0.01,
+            "3": 0
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.01,
+          "confidence": 0.99,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.99,
+            "1": 0.01,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.27
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.23
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.14
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1261,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 90.55069999999978
+    },
+    {
+      "id": "eval-43",
+      "fingerprint": "647377539a40ceb54b0f2fa7ed94ee4dbfdbcb4fd29622beff7714977ecf0466",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.35,
+          "confidence": 0.66,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.79,
+            "1": 0.09,
+            "2": 0.11,
+            "3": 0.01
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.01,
+          "confidence": 1,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 1,
+            "1": 0,
+            "2": 0,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.46
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.43
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.55
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 980,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 79.87109999999984
+    },
+    {
+      "id": "eval-44",
+      "fingerprint": "4f4da58dd0d82a55ad5b83519ec58e1e5db394ae93c833d954e49820d494dd12",
+      "answers": {
+        "friction": {
+          "type": "score",
+          "score": 0.16,
+          "confidence": 0.84,
+          "legend": {
+            "0": "Smooth: the agent did what was asked without corrections.",
+            "1": "Minor clarifications from the user.",
+            "2": "Some user corrections or redirections.",
+            "3": "Repeated user corrections, reverts, or restarts."
+          },
+          "probabilities": {
+            "0": 0.9,
+            "1": 0.05,
+            "2": 0.04,
+            "3": 0.01
+          }
+        },
+        "toolFailureLoops": {
+          "type": "score",
+          "score": 0.98,
+          "confidence": 0.96,
+          "legend": {
+            "0": "No failing tool or command cycles.",
+            "1": "An isolated tool or command failure.",
+            "2": "A few retries of failing tools or commands.",
+            "3": "Repeated failing tool or command cycles."
+          },
+          "probabilities": {
+            "0": 0.03,
+            "1": 0.96,
+            "2": 0.01,
+            "3": 0
+          }
+        },
+        "instructionViolation": {
+          "type": "noul",
+          "noul": 0.16
+        },
+        "controlFileLesson": {
+          "type": "noul",
+          "noul": 0.12
+        },
+        "trivial": {
+          "type": "noul",
+          "noul": 0.2
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1031,
+        "output_tokens": 95
+      },
+      "state": "success",
+      "wallTimeMs": 82.21820000000002
+    }
+  ],
+  "wallTimeMs": 1246.4522000000002,
+  "retainedIds": [
+    "eval-27",
+    "eval-38",
+    "eval-16",
+    "eval-04",
+    "eval-02",
+    "eval-28",
+    "eval-10",
+    "eval-01",
+    "eval-17",
+    "eval-18",
+    "eval-32",
+    "eval-30",
+    "eval-41",
+    "eval-34",
+    "eval-19",
+    "eval-39",
+    "eval-09",
+    "eval-29",
+    "eval-35",
+    "eval-26",
+    "eval-23",
+    "eval-40",
+    "eval-43",
+    "eval-22",
+    "eval-20",
+    "eval-33",
+    "eval-12",
+    "eval-44",
+    "eval-21",
+    "eval-08",
+    "eval-07",
+    "eval-03",
+    "eval-25",
+    "eval-42",
+    "eval-05",
+    "eval-06",
+    "eval-11",
+    "eval-36",
+    "eval-14"
+  ],
+  "skippedIds": [
+    "eval-13",
+    "eval-15",
+    "eval-24",
+    "eval-31",
+    "eval-37"
+  ],
+  "missedPositiveIds": [],
+  "fallbackIds": [],
+  "recall": 1,
+  "positiveLabelCount": 16,
+  "usage": {
+    "input_tokens": 47549,
+    "output_tokens": 4180
+  },
+  "finishedAt": "2026-11-09T20:51:40.653Z"
+}

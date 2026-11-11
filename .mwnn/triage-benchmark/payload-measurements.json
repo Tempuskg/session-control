@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-11-09T14:36:55.347Z",
+  "questionSetVersionBefore": "analysis-triage-v1",
+  "questionSetVersionAfter": "analysis-triage-v2",
+  "payloadVersionAfter": "triage-payload-v2",
+  "trivialSkipThreshold": 0.7,
+  "note": "Character counts of JSON-encoded triage state only. Not TypeSafe tokens, not billed cost, not recall.",
+  "rows": [
+    {
+      "label": "eval-v1: full-fixture adapter + legacy summaryOnly+edges builder",
+      "sessions": 44,
+      "totalChars": 187002,
+      "avgChars": 4250,
+      "medianChars": 4513,
+      "minChars": 1380,
+      "maxChars": 5664,
+      "summaryOrEvidenceChars": 141664,
+      "edgeTurnChars": 39500,
+      "questionChars": 1208
+    },
+    {
+      "label": "adapter-only fix: meta summary + legacy builder",
+      "sessions": 44,
+      "totalChars": 112309,
+      "avgChars": 2552,
+      "medianChars": 2706,
+      "minChars": 1048,
+      "maxChars": 4692,
+      "summaryOrEvidenceChars": 66971,
+      "edgeTurnChars": 39500,
+      "questionChars": 1208
+    },
+    {
+      "label": "eval-v2: revised adapter + triage-payload-v2 builder",
+      "sessions": 44,
+      "totalChars": 81376,
+      "avgChars": 1849,
+      "medianChars": 1837,
+      "minChars": 427,
+      "maxChars": 4088,
+      "summaryOrEvidenceChars": 22200,
+      "edgeTurnChars": 39500,
+      "questionChars": 1208
+    },
+    {
+      "label": "production-shaped: legacy summaryOnly+edges builder",
+      "sessions": 44,
+      "totalChars": 92042,
+      "avgChars": 2092,
+      "medianChars": 2197,
+      "minChars": 886,
+      "maxChars": 3182,
+      "summaryOrEvidenceChars": 49042,
+      "edgeTurnChars": 37140,
+      "questionChars": 1208
+    },
+    {
+      "label": "production-shaped: triage-payload-v2 builder",
+      "sessions": 44,
+      "totalChars": 66633,
+      "avgChars": 1514,
+      "medianChars": 1541,
+      "minChars": 402,
+      "maxChars": 2980,
+      "summaryOrEvidenceChars": 5378,
+      "edgeTurnChars": 37140,
+      "questionChars": 1208
+    }
+  ],
+  "reductions": {
+    "fixtureEvalPath": {
+      "beforeLabel": "eval-v1: full-fixture adapter + legacy summaryOnly+edges builder",
+      "afterLabel": "eval-v2: revised adapter + triage-payload-v2 builder",
+      "beforeTotalChars": 187002,
+      "afterTotalChars": 81376,
+      "charReduction": "56.48%"
+    },
+    "productionShapedPath": {
+      "beforeLabel": "production-shaped: legacy summaryOnly+edges builder",
+      "afterLabel": "production-shaped: triage-payload-v2 builder",
+      "beforeTotalChars": 92042,
+      "afterTotalChars": 66633,
+      "charReduction": "27.61%"
+    },
+    "adapterDuplicationIsolated": {
+      "beforeLabel": "eval-v1: full-fixture adapter + legacy summaryOnly+edges builder",
+      "afterLabel": "adapter-only fix: meta summary + legacy builder",
+      "beforeTotalChars": 187002,
+      "afterTotalChars": 112309,
+      "charReduction": "39.94%",
+      "note": "Same legacy builder; only fixture summary changed. This isolates adapter duplication from production builder overhead."
+    }
+  }
+}

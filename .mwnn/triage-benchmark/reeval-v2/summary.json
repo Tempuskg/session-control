@@ -1,0 +1,2120 @@
+{
+  "schemaVersion": 1,
+  "cardId": "card-mvq03qy7-3",
+  "generatedAt": "2026-11-09T21:12:43.953Z",
+  "protocol": "reeval-protocol.md",
+  "identities": {
+    "questionSetVersion": "analysis-triage-v2",
+    "payloadVersion": "triage-payload-v2",
+    "threshold": 0.7,
+    "package": {
+      "name": "session-control",
+      "version": "1.12.1",
+      "typesafeSdk": "^0.6.0"
+    },
+    "baselineSha256": "b38cdc346ac97d6d2d34f766d51b9fd2ff571f4b4e984aa4232dcf46708dbe73",
+    "fixtureHashes": {
+      "labelsSha256": "3704f1c9b678608fefc46c5a54aecd75a1c56a94e2f91c1d1eff916de504cc69",
+      "fixtureCount": 44,
+      "fixturesSha256Concat": "3de43b1f4157810b69802c16cd60316ea0e35605cae6da2bfe9fb99dfbec3379"
+    },
+    "typesafeModels": [
+      "jev-1.14.0"
+    ]
+  },
+  "triageRepetitions": [
+    {
+      "pairId": "pair-1",
+      "path": "triage-pair-1-1794257499403.json",
+      "cacheCondition": "cold-no-judgment-cache",
+      "state": "complete",
+      "wallTimeMs": 1246.4522000000002,
+      "usage": {
+        "input_tokens": 47549,
+        "output_tokens": 4180
+      },
+      "recall": 1,
+      "missedPositiveIds": [],
+      "skippedIds": [
+        "eval-13",
+        "eval-15",
+        "eval-24",
+        "eval-31",
+        "eval-37"
+      ],
+      "fallbackIds": []
+    },
+    {
+      "pairId": "pair-2",
+      "path": "triage-pair-2-1794257507771.json",
+      "cacheCondition": "warm-immediate-repeat",
+      "state": "complete",
+      "wallTimeMs": 1254.5005999999998,
+      "usage": {
+        "input_tokens": 47549,
+        "output_tokens": 4180
+      },
+      "recall": 1,
+      "missedPositiveIds": [],
+      "skippedIds": [
+        "eval-13",
+        "eval-15",
+        "eval-24",
+        "eval-31",
+        "eval-37"
+      ],
+      "fallbackIds": []
+    },
+    {
+      "pairId": "pair-3",
+      "path": "triage-pair-3-1794257509120.json",
+      "cacheCondition": "warm-immediate-repeat",
+      "state": "complete",
+      "wallTimeMs": 1154.8798,
+      "usage": {
+        "input_tokens": 47549,
+        "output_tokens": 4180
+      },
+      "recall": 1,
+      "missedPositiveIds": [],
+      "skippedIds": [
+        "eval-13",
+        "eval-15",
+        "eval-24",
+        "eval-31",
+        "eval-37"
+      ],
+      "fallbackIds": []
+    }
+  ],
+  "triageAggregates": {
+    "completeRuns": 3,
+    "meanWallTimeMs": 1218.6108666666667,
+    "meanInputTokens": 47549,
+    "meanOutputTokens": 4180,
+    "coldRuns": [
+      {
+        "pairId": "pair-1",
+        "wallTimeMs": 1246.4522000000002,
+        "usage": {
+          "input_tokens": 47549,
+          "output_tokens": 4180
+        }
+      }
+    ],
+    "warmRuns": [
+      {
+        "pairId": "pair-2",
+        "wallTimeMs": 1254.5005999999998,
+        "usage": {
+          "input_tokens": 47549,
+          "output_tokens": 4180
+        }
+      },
+      {
+        "pairId": "pair-3",
+        "wallTimeMs": 1154.8798,
+        "usage": {
+          "input_tokens": 47549,
+          "output_tokens": 4180
+        }
+      }
+    ]
+  },
+  "recallComparison": {
+    "originalAt0_7": {
+      "questionSetVersion": "analysis-triage-v1",
+      "recall": 1,
+      "missedPositiveIds": [],
+      "skippedIds": [
+        "eval-13",
+        "eval-15",
+        "eval-24",
+        "eval-31",
+        "eval-37"
+      ],
+      "typesafeInputTokens": 76385,
+      "typesafeOutputTokens": 4180,
+      "analysisFile": "analysis-1793062329161.json",
+      "triageFile": "triage-1793062000319.json"
+    },
+    "adjustedRuns": [
+      {
+        "pairId": "pair-1",
+        "cacheCondition": "cold-no-judgment-cache",
+        "recall": 1,
+        "retainedPositives": 16,
+        "missedPositiveIds": [],
+        "skippedIds": [
+          "eval-13",
+          "eval-15",
+          "eval-24",
+          "eval-31",
+          "eval-37"
+        ],
+        "fallbackIds": [],
+        "comparedToOriginal16of16": "no recall regression vs original 16/16 at threshold 0.7"
+      },
+      {
+        "pairId": "pair-2",
+        "cacheCondition": "warm-immediate-repeat",
+        "recall": 1,
+        "retainedPositives": 16,
+        "missedPositiveIds": [],
+        "skippedIds": [
+          "eval-13",
+          "eval-15",
+          "eval-24",
+          "eval-31",
+          "eval-37"
+        ],
+        "fallbackIds": [],
+        "comparedToOriginal16of16": "no recall regression vs original 16/16 at threshold 0.7"
+      },
+      {
+        "pairId": "pair-3",
+        "cacheCondition": "warm-immediate-repeat",
+        "recall": 1,
+        "retainedPositives": 16,
+        "missedPositiveIds": [],
+        "skippedIds": [
+          "eval-13",
+          "eval-15",
+          "eval-24",
+          "eval-31",
+          "eval-37"
+        ],
+        "fallbackIds": [],
+        "comparedToOriginal16of16": "no recall regression vs original 16/16 at threshold 0.7"
+      }
+    ],
+    "anyRegression": false
+  },
+  "analysisPairs": [
+    {
+      "file": "analysis-pair-1-1794257564319.json",
+      "state": "complete",
+      "pairId": "pair-1",
+      "armOrder": [
+        "baseline",
+        "triageEnabled"
+      ],
+      "cacheCondition": "cold",
+      "model": {
+        "name": "OpenAI: GPT-6.1 Sol",
+        "id": "openai/gpt-6.1-sol",
+        "vendor": "openrouter",
+        "version": "1.0.0",
+        "maxInputTokens": 922000
+      },
+      "triageResultPath": "reeval-v2/triage-pair-1-1794257499403.json",
+      "baseline": {
+        "analysisBatches": {
+          "inputTokens": 53500,
+          "outputTokens": 5641,
+          "callCount": 3
+        },
+        "synthesis": {
+          "inputTokens": 14199,
+          "outputTokens": 3047,
+          "callCount": 1
+        },
+        "wallTimeMs": 192609.4105,
+        "endToEndWallTimeMs": 192609.4105,
+        "inputTokens": 67699,
+        "outputTokens": 8688
+      },
+      "triageEnabled": {
+        "analysisBatches": {
+          "inputTokens": 38271,
+          "outputTokens": 4056,
+          "callCount": 2
+        },
+        "synthesis": {
+          "inputTokens": 12608,
+          "outputTokens": 2667,
+          "callCount": 1
+        },
+        "wallTimeMs": 139086.00449999998,
+        "endToEndWallTimeMs": 140332.45669999998,
+        "inputTokens": 50879,
+        "outputTokens": 6723
+      },
+      "costAccounting": {
+        "schemaVersion": 1,
+        "currency": "USD",
+        "ratesAsOf": "2026-11-08",
+        "ratesCatalog": {
+          "path": "cost-rates.json",
+          "recordedAt": "2026-11-08",
+          "rateIds": [
+            "typesafe-jev-input-2026-10",
+            "typesafe-jev-output-2026-10",
+            "openrouter-gpt-6.1-sol-input-2026-09",
+            "openrouter-gpt-6.1-sol-output-2026-09",
+            "openrouter-gpt-6.1-sol-cache-read-2026-09",
+            "openrouter-gpt-6.1-sol-cache-write-2026-09"
+          ]
+        },
+        "usageClasses": {
+          "before": {
+            "provider": {
+              "name": "openrouter",
+              "modelId": "openai/gpt-6.1-sol",
+              "modelName": "OpenAI: GPT-6.1 Sol",
+              "providerVersion": "1.0.0"
+            },
+            "tokenizerCounts": {
+              "usageSource": "vscode.LanguageModelChat.countTokens",
+              "classification": "tokenizerCount",
+              "analysisBatches": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 53500,
+                  "outputTokens": 5641,
+                  "callCount": 3
+                },
+                "unit": "tokens",
+                "note": "VS Code tokenizer counts on explicit user messages and returned text."
+              },
+              "synthesis": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 14199,
+                  "outputTokens": 3047,
+                  "callCount": 1
+                },
+                "unit": "tokens",
+                "note": "VS Code tokenizer counts on the synthesis prompt and returned text."
+              },
+              "armTotal": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 67699,
+                  "outputTokens": 8688
+                },
+                "unit": "tokens",
+                "note": "VS Code model.countTokens on the explicit user message and returned text. Provider billed usage, hidden reasoning, system overhead and provider caching are not exposed; these remain unknown."
+              }
+            },
+            "providerReportedUsage": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "VS Code LanguageModelChatResponse exposes text/stream only; no provider usage object is returned to extensions."
+            },
+            "actualBilledAmount": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "No provider invoice, statement line, or account billed amount was attached to this run. Do not treat tokenizer counts as charges."
+            },
+            "cacheUsage": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+            },
+            "retryOrFailedCharges": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+            }
+          },
+          "after": {
+            "provider": {
+              "name": "openrouter",
+              "modelId": "openai/gpt-6.1-sol",
+              "modelName": "OpenAI: GPT-6.1 Sol",
+              "providerVersion": "1.0.0"
+            },
+            "tokenizerCounts": {
+              "usageSource": "vscode.LanguageModelChat.countTokens",
+              "classification": "tokenizerCount",
+              "analysisBatches": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 38271,
+                  "outputTokens": 4056,
+                  "callCount": 2
+                },
+                "unit": "tokens",
+                "note": "VS Code tokenizer counts on explicit user messages and returned text."
+              },
+              "synthesis": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 12608,
+                  "outputTokens": 2667,
+                  "callCount": 1
+                },
+                "unit": "tokens",
+                "note": "VS Code tokenizer counts on the synthesis prompt and returned text."
+              },
+              "armTotal": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 50879,
+                  "outputTokens": 6723
+                },
+                "unit": "tokens",
+                "note": "VS Code model.countTokens on the explicit user message and returned text. Provider billed usage, hidden reasoning, system overhead and provider caching are not exposed; these remain unknown."
+              }
+            },
+            "providerReportedUsage": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "VS Code LanguageModelChatResponse exposes text/stream only; no provider usage object is returned to extensions."
+            },
+            "actualBilledAmount": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "No provider invoice, statement line, or account billed amount was attached to this run. Do not treat tokenizer counts as charges."
+            },
+            "cacheUsage": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+            },
+            "retryOrFailedCharges": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+            }
+          },
+          "typesafe": {
+            "provider": {
+              "name": "typesafe",
+              "modelIds": [
+                "jev-1.14.0"
+              ],
+              "requestedModel": "jev-latest",
+              "cacheTreatment": null
+            },
+            "tokenizerCounts": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "TypeSafe System One responses are not measured with VS Code countTokens in this benchmark."
+            },
+            "providerReportedUsage": {
+              "status": "measured",
+              "value": {
+                "inputTokens": 47549,
+                "outputTokens": 4180,
+                "successfulCalls": 44,
+                "failedCalls": 0
+              },
+              "usageSource": "typesafe.systemOne.response.usage",
+              "classification": "providerReported",
+              "unit": "tokens",
+              "note": "Provider-reported usage summed from successful records. Failed calls contribute neither tokens nor a verified billed amount."
+            },
+            "actualBilledAmount": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "TypeSafe console invoice/statement for this run was not supplied. Rate × provider-reported usage is an estimate until account evidence confirms the charge."
+            },
+            "cacheUsage": {
+              "status": "measured",
+              "value": {
+                "treatment": "unspecified",
+                "billedCacheTokens": null
+              },
+              "usageSource": "triage.cache",
+              "classification": "providerReported",
+              "note": "Run recorded cold; no persisted judgment reads. No separate cache token field is present on TypeSafe usage."
+            },
+            "retryOrFailedCharges": {
+              "status": "measured",
+              "value": {
+                "configuredMaxRetries": 0,
+                "failedCalls": 0,
+                "attributableRetryCharges": null,
+                "note": "Runner configured maxRetries: 0; no failed calls in the complete run."
+              },
+              "usageSource": "run.cjs TypeSafeClient retry config + triage.records[].state",
+              "classification": "providerReported"
+            }
+          }
+        },
+        "costComponents": {
+          "before": {
+            "analysisBatches": {
+              "status": "estimate",
+              "value": 0.16341,
+              "currency": "USD",
+              "usageSource": "tokenizerCounts.analysisBatches",
+              "classification": "estimate",
+              "ratesUsed": [
+                "openrouter-gpt-6.1-sol-input-2026-09",
+                "openrouter-gpt-6.1-sol-output-2026-09"
+              ],
+              "rateSources": [
+                "https://openrouter.ai/openai/gpt-6.1-sol",
+                "https://openrouter.ai/openai/gpt-6.1-sol"
+              ],
+              "formula": "(inputTokens/1e6)*inputRate + (outputTokens/1e6)*outputRate",
+              "note": "Estimate only: applies list rates to VS Code tokenizer counts, which are not provider-billed usage."
+            },
+            "synthesis": {
+              "status": "estimate",
+              "value": 0.058868,
+              "currency": "USD",
+              "usageSource": "tokenizerCounts.synthesis",
+              "classification": "estimate",
+              "ratesUsed": [
+                "openrouter-gpt-6.1-sol-input-2026-09",
+                "openrouter-gpt-6.1-sol-output-2026-09"
+              ],
+              "rateSources": [
+                "https://openrouter.ai/openai/gpt-6.1-sol",
+                "https://openrouter.ai/openai/gpt-6.1-sol"
+              ],
+              "formula": "(inputTokens/1e6)*inputRate + (outputTokens/1e6)*outputRate",
+              "note": "Estimate only: applies list rates to VS Code tokenizer counts for the synthesis call."
+            },
+            "typesafe": {
+              "status": "measured",
+              "value": 0,
+              "currency": "USD",
+              "classification": "actualBilled",
+              "usageSource": "baseline arm; TypeSafe disabled",
+              "note": "No TypeSafe requests were issued on the baseline arm."
+            },
+            "cache": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+            },
+            "retriesOrFailedCalls": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+            }
+          },
+          "after": {
+            "analysisBatches": {
+              "status": "estimate",
+              "value": 0.117102,
+              "currency": "USD",
+              "usageSource": "tokenizerCounts.analysisBatches",
+              "classification": "estimate",
+              "ratesUsed": [
+                "openrouter-gpt-6.1-sol-input-2026-09",
+                "openrouter-gpt-6.1-sol-output-2026-09"
+              ],
+              "rateSources": [
+                "https://openrouter.ai/openai/gpt-6.1-sol",
+                "https://openrouter.ai/openai/gpt-6.1-sol"
+              ],
+              "formula": "(inputTokens/1e6)*inputRate + (outputTokens/1e6)*outputRate",
+              "note": "Estimate only: applies list rates to VS Code tokenizer counts, which are not provider-billed usage."
+            },
+            "synthesis": {
+              "status": "estimate",
+              "value": 0.051886,
+              "currency": "USD",
+              "usageSource": "tokenizerCounts.synthesis",
+              "classification": "estimate",
+              "ratesUsed": [
+                "openrouter-gpt-6.1-sol-input-2026-09",
+                "openrouter-gpt-6.1-sol-output-2026-09"
+              ],
+              "rateSources": [
+                "https://openrouter.ai/openai/gpt-6.1-sol",
+                "https://openrouter.ai/openai/gpt-6.1-sol"
+              ],
+              "formula": "(inputTokens/1e6)*inputRate + (outputTokens/1e6)*outputRate",
+              "note": "Estimate only: applies list rates to VS Code tokenizer counts for the synthesis call."
+            },
+            "typesafe": {
+              "status": "estimate",
+              "value": 0.0019970580000000003,
+              "currency": "USD",
+              "usageSource": "typesafe.systemOne.response.usage",
+              "classification": "estimate",
+              "ratesUsed": [
+                "typesafe-jev-input-2026-10",
+                "typesafe-jev-output-2026-10"
+              ],
+              "rateSources": [
+                "https://docs.typesafe.ai/models",
+                "https://docs.typesafe.ai/models"
+              ],
+              "formula": "(inputTokens/1e6)*inputRate + (outputTokens/1e6)*outputRate",
+              "note": "Estimate from provider-reported usage × recorded TypeSafe list rates. Not an invoice-confirmed billed amount."
+            },
+            "cache": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "Attributable cache charges require provider cache usage. Analysis: VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests. TypeSafe: TypeSafe run recorded cold cache treatment, but no billed cache token field exists to price."
+            },
+            "retriesOrFailedCalls": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "Attributable retry/failed-call charges require billed retry evidence. Analysis: The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API. TypeSafe: Runner configured maxRetries: 0; no failed calls in the complete run."
+            }
+          }
+        },
+        "totals": {
+          "before": {
+            "total": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "Cannot form a verified attributable total while unavailable: cache, retriesOrFailedCalls."
+            },
+            "partialEstimateSum": {
+              "status": "estimate",
+              "value": 0.222278,
+              "currency": "USD",
+              "classification": "estimate",
+              "included": [
+                "analysisBatches",
+                "synthesis",
+                "typesafe"
+              ],
+              "excludedUnavailable": [
+                {
+                  "name": "cache",
+                  "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+                },
+                {
+                  "name": "retriesOrFailedCalls",
+                  "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+                }
+              ],
+              "note": "Partial sum of available estimates only. Not a verified savings figure."
+            },
+            "missing": [
+              {
+                "name": "cache",
+                "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+              },
+              {
+                "name": "retriesOrFailedCalls",
+                "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+              }
+            ]
+          },
+          "after": {
+            "total": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "Cannot form a verified attributable total while unavailable: cache, retriesOrFailedCalls."
+            },
+            "partialEstimateSum": {
+              "status": "estimate",
+              "value": 0.170985058,
+              "currency": "USD",
+              "classification": "estimate",
+              "included": [
+                "analysisBatches",
+                "synthesis",
+                "typesafe"
+              ],
+              "excludedUnavailable": [
+                {
+                  "name": "cache",
+                  "reason": "Attributable cache charges require provider cache usage. Analysis: VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests. TypeSafe: TypeSafe run recorded cold cache treatment, but no billed cache token field exists to price."
+                },
+                {
+                  "name": "retriesOrFailedCalls",
+                  "reason": "Attributable retry/failed-call charges require billed retry evidence. Analysis: The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API. TypeSafe: Runner configured maxRetries: 0; no failed calls in the complete run."
+                }
+              ],
+              "note": "Partial sum of available estimates only. Not a verified savings figure."
+            },
+            "missing": [
+              {
+                "name": "cache",
+                "reason": "Attributable cache charges require provider cache usage. Analysis: VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests. TypeSafe: TypeSafe run recorded cold cache treatment, but no billed cache token field exists to price."
+              },
+              {
+                "name": "retriesOrFailedCalls",
+                "reason": "Attributable retry/failed-call charges require billed retry evidence. Analysis: The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API. TypeSafe: Runner configured maxRetries: 0; no failed calls in the complete run."
+              }
+            ]
+          }
+        },
+        "verifiedSavingsClaim": {
+          "established": false,
+          "reason": "Unavailable cost components prevent a verified savings claim: before.cache, before.retriesOrFailedCalls, after.cache, after.retriesOrFailedCalls, before.actualBilledAmount, after.actualBilledAmount, typesafe.actualBilledAmount."
+        },
+        "financialSavingsEstablished": false,
+        "evidenceInventory": {
+          "obtainableWithoutCredentials": [
+            {
+              "artifact": "analysis tokenizer counts",
+              "source": "vscode.LanguageModelChat.countTokens via editor helper",
+              "present": true
+            },
+            {
+              "artifact": "analysis model identity",
+              "source": "vscode.lm.selectChatModels match fields",
+              "present": true
+            },
+            {
+              "artifact": "TypeSafe provider-reported usage",
+              "source": "systemOne response.usage on successful records",
+              "present": true
+            },
+            {
+              "artifact": "TypeSafe returned model ids",
+              "source": "systemOne response.model",
+              "present": true
+            },
+            {
+              "artifact": "TypeSafe cache treatment note",
+              "source": "triage.cache field",
+              "present": false
+            },
+            {
+              "artifact": "TypeSafe retry configuration",
+              "source": "run.cjs TypeSafeClient({ retry: { maxRetries: 0 } })",
+              "present": true
+            },
+            {
+              "artifact": "published list rates with source URLs",
+              "source": "cost-rates.json",
+              "present": true
+            }
+          ],
+          "unavailableFromSupportedApis": [
+            {
+              "artifact": "VS Code / OpenRouter provider-reported analysis usage",
+              "reason": "LanguageModelChatResponse has text/stream only; no usage or billing fields in @types/vscode LanguageModelChat API."
+            },
+            {
+              "artifact": "actual billed analysis amount",
+              "reason": "No extension API exposes invoice or statement charges for LanguageModelChat calls."
+            },
+            {
+              "artifact": "analysis cache-read/write token counts",
+              "reason": "Not exposed by VS Code LM API for this path."
+            },
+            {
+              "artifact": "analysis retry/failed-call billed usage",
+              "reason": "Not exposed by VS Code LM API; helper does not invent failed-call charges."
+            }
+          ],
+          "externalEvidenceStillRequired": [
+            {
+              "artifact": "OpenRouter or Copilot/OpenAI account statement covering analysis-1793062329161.json wall-clock window",
+              "purpose": "Confirm actual billed analysis (+ synthesis) charges, cache adjustments, and any retries.",
+              "humanWorkflow": "Export or screenshot the provider usage/billing page for 2026-10-27T00:52:09Z–2026-10-27T01:00:07Z without sharing credentials or unrelated customer records.",
+              "blocksVerifiedSavingsClaim": true
+            },
+            {
+              "artifact": "TypeSafe console usage/billing export for triage-1793062000319.json",
+              "purpose": "Confirm that provider-reported input tokens × list rate matched the account charge for this run.",
+              "humanWorkflow": "Export the TypeSafe organization Usage/Billing view for 2026-10-27T00:46:40Z–2026-10-27T00:46:41Z, redacting account identity if needed.",
+              "blocksVerifiedSavingsClaim": true
+            }
+          ],
+          "vscodeUsageInvestigation": {
+            "inspectedApi": "vscode.LanguageModelChat / LanguageModelChatResponse in @types/vscode",
+            "supportedEvidence": [
+              "model identity (name, id, vendor, version, maxInputTokens)",
+              "countTokens on request messages and returned text",
+              "returned text stream",
+              "request wall time measured locally"
+            ],
+            "notExposed": [
+              "provider billed token usage",
+              "cache hit/write counts",
+              "hidden reasoning tokens",
+              "invoice line amounts",
+              "retry surcharge fields"
+            ],
+            "conclusion": "Tokenizer counts may be recorded as tokenizerCount evidence. They must not be substituted as actualBilled amounts."
+          }
+        }
+      },
+      "quality": {
+        "baseline": {
+          "synthesisKind": "synthesis",
+          "inputTokens": 67699,
+          "outputTokens": 8688,
+          "wallTimeMs": 192609.4105,
+          "endToEndWallTimeMs": 192609.4105,
+          "charCount": 15404,
+          "bulletLikeLines": 12,
+          "citedSessionIds": [
+            "eval-01",
+            "eval-44",
+            "eval-04",
+            "eval-39",
+            "eval-41",
+            "eval-25",
+            "eval-42",
+            "eval-12",
+            "eval-21",
+            "eval-22",
+            "eval-32",
+            "eval-14",
+            "eval-35",
+            "eval-23",
+            "eval-43",
+            "eval-10",
+            "eval-08",
+            "eval-27",
+            "eval-28",
+            "eval-30",
+            "eval-38",
+            "eval-07",
+            "eval-29",
+            "eval-17",
+            "eval-09",
+            "eval-19",
+            "eval-33"
+          ],
+          "citedControlFilePatterns": [
+            "AGENTS.md",
+            "SKILL.md"
+          ],
+          "statesLimitation": true
+        },
+        "triageEnabled": {
+          "synthesisKind": "synthesis",
+          "inputTokens": 50879,
+          "outputTokens": 6723,
+          "wallTimeMs": 139086.00449999998,
+          "endToEndWallTimeMs": 140332.45669999998,
+          "charCount": 13903,
+          "bulletLikeLines": 4,
+          "citedSessionIds": [
+            "eval-12",
+            "eval-20",
+            "eval-21",
+            "eval-18",
+            "eval-35",
+            "eval-01",
+            "eval-04",
+            "eval-41",
+            "eval-14",
+            "eval-39",
+            "eval-28",
+            "eval-38",
+            "eval-25",
+            "eval-42",
+            "eval-27",
+            "eval-30",
+            "eval-33",
+            "eval-44",
+            "eval-10",
+            "eval-16",
+            "eval-26",
+            "eval-32"
+          ],
+          "citedControlFilePatterns": [
+            "AGENTS.md",
+            "SKILL.md"
+          ],
+          "statesLimitation": true
+        },
+        "notes": [
+          "Retained sessions do not guarantee equivalent recommendations.",
+          "Skipped-session evidence cannot appear in the triageEnabled arm.",
+          "Scores are structural proxies for human review, not automated pass/fail."
+        ]
+      },
+      "arithmetic": {
+        "beforeVisibleTokens": 76387,
+        "afterVisibleTokens": 57602,
+        "triageProviderTokens": 51729,
+        "arithmeticCombinedAfter": 109331,
+        "beforeCallSumMatchesArm": true,
+        "afterCallSumMatchesArm": true,
+        "triageUsageSumMatchesRecords": true
+      }
+    },
+    {
+      "file": "analysis-pair-2-1794257896028.json",
+      "state": "complete",
+      "pairId": "pair-2",
+      "armOrder": [
+        "triageEnabled",
+        "baseline"
+      ],
+      "cacheCondition": "cold",
+      "model": {
+        "name": "OpenAI: GPT-6.1 Sol",
+        "id": "openai/gpt-6.1-sol",
+        "vendor": "openrouter",
+        "version": "1.0.0",
+        "maxInputTokens": 922000
+      },
+      "triageResultPath": "reeval-v2/triage-pair-2-1794257507771.json",
+      "baseline": {
+        "analysisBatches": {
+          "inputTokens": 53500,
+          "outputTokens": 5649,
+          "callCount": 3
+        },
+        "synthesis": {
+          "inputTokens": 14206,
+          "outputTokens": 2901,
+          "callCount": 1
+        },
+        "wallTimeMs": 184343.85429999995,
+        "endToEndWallTimeMs": 184343.85429999995,
+        "inputTokens": 67706,
+        "outputTokens": 8550
+      },
+      "triageEnabled": {
+        "analysisBatches": {
+          "inputTokens": 38193,
+          "outputTokens": 4107,
+          "callCount": 2
+        },
+        "synthesis": {
+          "inputTokens": 12659,
+          "outputTokens": 2277,
+          "callCount": 1
+        },
+        "wallTimeMs": 137578.229,
+        "endToEndWallTimeMs": 138832.7296,
+        "inputTokens": 50852,
+        "outputTokens": 6384
+      },
+      "costAccounting": {
+        "schemaVersion": 1,
+        "currency": "USD",
+        "ratesAsOf": "2026-11-08",
+        "ratesCatalog": {
+          "path": "cost-rates.json",
+          "recordedAt": "2026-11-08",
+          "rateIds": [
+            "typesafe-jev-input-2026-10",
+            "typesafe-jev-output-2026-10",
+            "openrouter-gpt-6.1-sol-input-2026-09",
+            "openrouter-gpt-6.1-sol-output-2026-09",
+            "openrouter-gpt-6.1-sol-cache-read-2026-09",
+            "openrouter-gpt-6.1-sol-cache-write-2026-09"
+          ]
+        },
+        "usageClasses": {
+          "before": {
+            "provider": {
+              "name": "openrouter",
+              "modelId": "openai/gpt-6.1-sol",
+              "modelName": "OpenAI: GPT-6.1 Sol",
+              "providerVersion": "1.0.0"
+            },
+            "tokenizerCounts": {
+              "usageSource": "vscode.LanguageModelChat.countTokens",
+              "classification": "tokenizerCount",
+              "analysisBatches": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 53500,
+                  "outputTokens": 5649,
+                  "callCount": 3
+                },
+                "unit": "tokens",
+                "note": "VS Code tokenizer counts on explicit user messages and returned text."
+              },
+              "synthesis": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 14206,
+                  "outputTokens": 2901,
+                  "callCount": 1
+                },
+                "unit": "tokens",
+                "note": "VS Code tokenizer counts on the synthesis prompt and returned text."
+              },
+              "armTotal": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 67706,
+                  "outputTokens": 8550
+                },
+                "unit": "tokens",
+                "note": "VS Code model.countTokens on the explicit user message and returned text. Provider billed usage, hidden reasoning, system overhead and provider caching are not exposed; these remain unknown."
+              }
+            },
+            "providerReportedUsage": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "VS Code LanguageModelChatResponse exposes text/stream only; no provider usage object is returned to extensions."
+            },
+            "actualBilledAmount": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "No provider invoice, statement line, or account billed amount was attached to this run. Do not treat tokenizer counts as charges."
+            },
+            "cacheUsage": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+            },
+            "retryOrFailedCharges": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+            }
+          },
+          "after": {
+            "provider": {
+              "name": "openrouter",
+              "modelId": "openai/gpt-6.1-sol",
+              "modelName": "OpenAI: GPT-6.1 Sol",
+              "providerVersion": "1.0.0"
+            },
+            "tokenizerCounts": {
+              "usageSource": "vscode.LanguageModelChat.countTokens",
+              "classification": "tokenizerCount",
+              "analysisBatches": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 38193,
+                  "outputTokens": 4107,
+                  "callCount": 2
+                },
+                "unit": "tokens",
+                "note": "VS Code tokenizer counts on explicit user messages and returned text."
+              },
+              "synthesis": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 12659,
+                  "outputTokens": 2277,
+                  "callCount": 1
+                },
+                "unit": "tokens",
+                "note": "VS Code tokenizer counts on the synthesis prompt and returned text."
+              },
+              "armTotal": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 50852,
+                  "outputTokens": 6384
+                },
+                "unit": "tokens",
+                "note": "VS Code model.countTokens on the explicit user message and returned text. Provider billed usage, hidden reasoning, system overhead and provider caching are not exposed; these remain unknown."
+              }
+            },
+            "providerReportedUsage": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "VS Code LanguageModelChatResponse exposes text/stream only; no provider usage object is returned to extensions."
+            },
+            "actualBilledAmount": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "No provider invoice, statement line, or account billed amount was attached to this run. Do not treat tokenizer counts as charges."
+            },
+            "cacheUsage": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+            },
+            "retryOrFailedCharges": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+            }
+          },
+          "typesafe": {
+            "provider": {
+              "name": "typesafe",
+              "modelIds": [
+                "jev-1.14.0"
+              ],
+              "requestedModel": "jev-latest",
+              "cacheTreatment": null
+            },
+            "tokenizerCounts": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "TypeSafe System One responses are not measured with VS Code countTokens in this benchmark."
+            },
+            "providerReportedUsage": {
+              "status": "measured",
+              "value": {
+                "inputTokens": 47549,
+                "outputTokens": 4180,
+                "successfulCalls": 44,
+                "failedCalls": 0
+              },
+              "usageSource": "typesafe.systemOne.response.usage",
+              "classification": "providerReported",
+              "unit": "tokens",
+              "note": "Provider-reported usage summed from successful records. Failed calls contribute neither tokens nor a verified billed amount."
+            },
+            "actualBilledAmount": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "TypeSafe console invoice/statement for this run was not supplied. Rate × provider-reported usage is an estimate until account evidence confirms the charge."
+            },
+            "cacheUsage": {
+              "status": "measured",
+              "value": {
+                "treatment": "unspecified",
+                "billedCacheTokens": null
+              },
+              "usageSource": "triage.cache",
+              "classification": "providerReported",
+              "note": "Run recorded cold; no persisted judgment reads. No separate cache token field is present on TypeSafe usage."
+            },
+            "retryOrFailedCharges": {
+              "status": "measured",
+              "value": {
+                "configuredMaxRetries": 0,
+                "failedCalls": 0,
+                "attributableRetryCharges": null,
+                "note": "Runner configured maxRetries: 0; no failed calls in the complete run."
+              },
+              "usageSource": "run.cjs TypeSafeClient retry config + triage.records[].state",
+              "classification": "providerReported"
+            }
+          }
+        },
+        "costComponents": {
+          "before": {
+            "analysisBatches": {
+              "status": "estimate",
+              "value": 0.16349,
+              "currency": "USD",
+              "usageSource": "tokenizerCounts.analysisBatches",
+              "classification": "estimate",
+              "ratesUsed": [
+                "openrouter-gpt-6.1-sol-input-2026-09",
+                "openrouter-gpt-6.1-sol-output-2026-09"
+              ],
+              "rateSources": [
+                "https://openrouter.ai/openai/gpt-6.1-sol",
+                "https://openrouter.ai/openai/gpt-6.1-sol"
+              ],
+              "formula": "(inputTokens/1e6)*inputRate + (outputTokens/1e6)*outputRate",
+              "note": "Estimate only: applies list rates to VS Code tokenizer counts, which are not provider-billed usage."
+            },
+            "synthesis": {
+              "status": "estimate",
+              "value": 0.057422,
+              "currency": "USD",
+              "usageSource": "tokenizerCounts.synthesis",
+              "classification": "estimate",
+              "ratesUsed": [
+                "openrouter-gpt-6.1-sol-input-2026-09",
+                "openrouter-gpt-6.1-sol-output-2026-09"
+              ],
+              "rateSources": [
+                "https://openrouter.ai/openai/gpt-6.1-sol",
+                "https://openrouter.ai/openai/gpt-6.1-sol"
+              ],
+              "formula": "(inputTokens/1e6)*inputRate + (outputTokens/1e6)*outputRate",
+              "note": "Estimate only: applies list rates to VS Code tokenizer counts for the synthesis call."
+            },
+            "typesafe": {
+              "status": "measured",
+              "value": 0,
+              "currency": "USD",
+              "classification": "actualBilled",
+              "usageSource": "baseline arm; TypeSafe disabled",
+              "note": "No TypeSafe requests were issued on the baseline arm."
+            },
+            "cache": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+            },
+            "retriesOrFailedCalls": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+            }
+          },
+          "after": {
+            "analysisBatches": {
+              "status": "estimate",
+              "value": 0.117456,
+              "currency": "USD",
+              "usageSource": "tokenizerCounts.analysisBatches",
+              "classification": "estimate",
+              "ratesUsed": [
+                "openrouter-gpt-6.1-sol-input-2026-09",
+                "openrouter-gpt-6.1-sol-output-2026-09"
+              ],
+              "rateSources": [
+                "https://openrouter.ai/openai/gpt-6.1-sol",
+                "https://openrouter.ai/openai/gpt-6.1-sol"
+              ],
+              "formula": "(inputTokens/1e6)*inputRate + (outputTokens/1e6)*outputRate",
+              "note": "Estimate only: applies list rates to VS Code tokenizer counts, which are not provider-billed usage."
+            },
+            "synthesis": {
+              "status": "estimate",
+              "value": 0.048088,
+              "currency": "USD",
+              "usageSource": "tokenizerCounts.synthesis",
+              "classification": "estimate",
+              "ratesUsed": [
+                "openrouter-gpt-6.1-sol-input-2026-09",
+                "openrouter-gpt-6.1-sol-output-2026-09"
+              ],
+              "rateSources": [
+                "https://openrouter.ai/openai/gpt-6.1-sol",
+                "https://openrouter.ai/openai/gpt-6.1-sol"
+              ],
+              "formula": "(inputTokens/1e6)*inputRate + (outputTokens/1e6)*outputRate",
+              "note": "Estimate only: applies list rates to VS Code tokenizer counts for the synthesis call."
+            },
+            "typesafe": {
+              "status": "estimate",
+              "value": 0.0019970580000000003,
+              "currency": "USD",
+              "usageSource": "typesafe.systemOne.response.usage",
+              "classification": "estimate",
+              "ratesUsed": [
+                "typesafe-jev-input-2026-10",
+                "typesafe-jev-output-2026-10"
+              ],
+              "rateSources": [
+                "https://docs.typesafe.ai/models",
+                "https://docs.typesafe.ai/models"
+              ],
+              "formula": "(inputTokens/1e6)*inputRate + (outputTokens/1e6)*outputRate",
+              "note": "Estimate from provider-reported usage × recorded TypeSafe list rates. Not an invoice-confirmed billed amount."
+            },
+            "cache": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "Attributable cache charges require provider cache usage. Analysis: VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests. TypeSafe: TypeSafe run recorded cold cache treatment, but no billed cache token field exists to price."
+            },
+            "retriesOrFailedCalls": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "Attributable retry/failed-call charges require billed retry evidence. Analysis: The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API. TypeSafe: Runner configured maxRetries: 0; no failed calls in the complete run."
+            }
+          }
+        },
+        "totals": {
+          "before": {
+            "total": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "Cannot form a verified attributable total while unavailable: cache, retriesOrFailedCalls."
+            },
+            "partialEstimateSum": {
+              "status": "estimate",
+              "value": 0.220912,
+              "currency": "USD",
+              "classification": "estimate",
+              "included": [
+                "analysisBatches",
+                "synthesis",
+                "typesafe"
+              ],
+              "excludedUnavailable": [
+                {
+                  "name": "cache",
+                  "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+                },
+                {
+                  "name": "retriesOrFailedCalls",
+                  "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+                }
+              ],
+              "note": "Partial sum of available estimates only. Not a verified savings figure."
+            },
+            "missing": [
+              {
+                "name": "cache",
+                "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+              },
+              {
+                "name": "retriesOrFailedCalls",
+                "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+              }
+            ]
+          },
+          "after": {
+            "total": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "Cannot form a verified attributable total while unavailable: cache, retriesOrFailedCalls."
+            },
+            "partialEstimateSum": {
+              "status": "estimate",
+              "value": 0.167541058,
+              "currency": "USD",
+              "classification": "estimate",
+              "included": [
+                "analysisBatches",
+                "synthesis",
+                "typesafe"
+              ],
+              "excludedUnavailable": [
+                {
+                  "name": "cache",
+                  "reason": "Attributable cache charges require provider cache usage. Analysis: VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests. TypeSafe: TypeSafe run recorded cold cache treatment, but no billed cache token field exists to price."
+                },
+                {
+                  "name": "retriesOrFailedCalls",
+                  "reason": "Attributable retry/failed-call charges require billed retry evidence. Analysis: The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API. TypeSafe: Runner configured maxRetries: 0; no failed calls in the complete run."
+                }
+              ],
+              "note": "Partial sum of available estimates only. Not a verified savings figure."
+            },
+            "missing": [
+              {
+                "name": "cache",
+                "reason": "Attributable cache charges require provider cache usage. Analysis: VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests. TypeSafe: TypeSafe run recorded cold cache treatment, but no billed cache token field exists to price."
+              },
+              {
+                "name": "retriesOrFailedCalls",
+                "reason": "Attributable retry/failed-call charges require billed retry evidence. Analysis: The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API. TypeSafe: Runner configured maxRetries: 0; no failed calls in the complete run."
+              }
+            ]
+          }
+        },
+        "verifiedSavingsClaim": {
+          "established": false,
+          "reason": "Unavailable cost components prevent a verified savings claim: before.cache, before.retriesOrFailedCalls, after.cache, after.retriesOrFailedCalls, before.actualBilledAmount, after.actualBilledAmount, typesafe.actualBilledAmount."
+        },
+        "financialSavingsEstablished": false,
+        "evidenceInventory": {
+          "obtainableWithoutCredentials": [
+            {
+              "artifact": "analysis tokenizer counts",
+              "source": "vscode.LanguageModelChat.countTokens via editor helper",
+              "present": true
+            },
+            {
+              "artifact": "analysis model identity",
+              "source": "vscode.lm.selectChatModels match fields",
+              "present": true
+            },
+            {
+              "artifact": "TypeSafe provider-reported usage",
+              "source": "systemOne response.usage on successful records",
+              "present": true
+            },
+            {
+              "artifact": "TypeSafe returned model ids",
+              "source": "systemOne response.model",
+              "present": true
+            },
+            {
+              "artifact": "TypeSafe cache treatment note",
+              "source": "triage.cache field",
+              "present": false
+            },
+            {
+              "artifact": "TypeSafe retry configuration",
+              "source": "run.cjs TypeSafeClient({ retry: { maxRetries: 0 } })",
+              "present": true
+            },
+            {
+              "artifact": "published list rates with source URLs",
+              "source": "cost-rates.json",
+              "present": true
+            }
+          ],
+          "unavailableFromSupportedApis": [
+            {
+              "artifact": "VS Code / OpenRouter provider-reported analysis usage",
+              "reason": "LanguageModelChatResponse has text/stream only; no usage or billing fields in @types/vscode LanguageModelChat API."
+            },
+            {
+              "artifact": "actual billed analysis amount",
+              "reason": "No extension API exposes invoice or statement charges for LanguageModelChat calls."
+            },
+            {
+              "artifact": "analysis cache-read/write token counts",
+              "reason": "Not exposed by VS Code LM API for this path."
+            },
+            {
+              "artifact": "analysis retry/failed-call billed usage",
+              "reason": "Not exposed by VS Code LM API; helper does not invent failed-call charges."
+            }
+          ],
+          "externalEvidenceStillRequired": [
+            {
+              "artifact": "OpenRouter or Copilot/OpenAI account statement covering analysis-1793062329161.json wall-clock window",
+              "purpose": "Confirm actual billed analysis (+ synthesis) charges, cache adjustments, and any retries.",
+              "humanWorkflow": "Export or screenshot the provider usage/billing page for 2026-10-27T00:52:09Z–2026-10-27T01:00:07Z without sharing credentials or unrelated customer records.",
+              "blocksVerifiedSavingsClaim": true
+            },
+            {
+              "artifact": "TypeSafe console usage/billing export for triage-1793062000319.json",
+              "purpose": "Confirm that provider-reported input tokens × list rate matched the account charge for this run.",
+              "humanWorkflow": "Export the TypeSafe organization Usage/Billing view for 2026-10-27T00:46:40Z–2026-10-27T00:46:41Z, redacting account identity if needed.",
+              "blocksVerifiedSavingsClaim": true
+            }
+          ],
+          "vscodeUsageInvestigation": {
+            "inspectedApi": "vscode.LanguageModelChat / LanguageModelChatResponse in @types/vscode",
+            "supportedEvidence": [
+              "model identity (name, id, vendor, version, maxInputTokens)",
+              "countTokens on request messages and returned text",
+              "returned text stream",
+              "request wall time measured locally"
+            ],
+            "notExposed": [
+              "provider billed token usage",
+              "cache hit/write counts",
+              "hidden reasoning tokens",
+              "invoice line amounts",
+              "retry surcharge fields"
+            ],
+            "conclusion": "Tokenizer counts may be recorded as tokenizerCount evidence. They must not be substituted as actualBilled amounts."
+          }
+        }
+      },
+      "quality": {
+        "baseline": {
+          "synthesisKind": "synthesis",
+          "inputTokens": 67706,
+          "outputTokens": 8550,
+          "wallTimeMs": 184343.85429999995,
+          "endToEndWallTimeMs": 184343.85429999995,
+          "charCount": 15281,
+          "bulletLikeLines": 30,
+          "citedSessionIds": [
+            "eval-01",
+            "eval-44",
+            "eval-27",
+            "eval-33",
+            "eval-42",
+            "eval-04",
+            "eval-41",
+            "eval-21",
+            "eval-22",
+            "eval-12",
+            "eval-17",
+            "eval-14",
+            "eval-35",
+            "eval-07",
+            "eval-31",
+            "eval-23",
+            "eval-43",
+            "eval-28",
+            "eval-30",
+            "eval-08",
+            "eval-38",
+            "eval-19",
+            "eval-39"
+          ],
+          "citedControlFilePatterns": [
+            "AGENTS.md",
+            "SKILL.md"
+          ],
+          "statesLimitation": true
+        },
+        "triageEnabled": {
+          "synthesisKind": "synthesis",
+          "inputTokens": 50852,
+          "outputTokens": 6384,
+          "wallTimeMs": 137578.229,
+          "endToEndWallTimeMs": 138832.7296,
+          "charCount": 11926,
+          "bulletLikeLines": 0,
+          "citedSessionIds": [
+            "eval-01",
+            "eval-41",
+            "eval-04",
+            "eval-02",
+            "eval-32",
+            "eval-12",
+            "eval-22",
+            "eval-14",
+            "eval-35",
+            "eval-27",
+            "eval-30",
+            "eval-33",
+            "eval-44",
+            "eval-25",
+            "eval-42",
+            "eval-11",
+            "eval-08",
+            "eval-28",
+            "eval-19",
+            "eval-38"
+          ],
+          "citedControlFilePatterns": [
+            "AGENTS.md",
+            "SKILL.md"
+          ],
+          "statesLimitation": true
+        },
+        "notes": [
+          "Retained sessions do not guarantee equivalent recommendations.",
+          "Skipped-session evidence cannot appear in the triageEnabled arm.",
+          "Scores are structural proxies for human review, not automated pass/fail."
+        ]
+      },
+      "arithmetic": {
+        "beforeVisibleTokens": 76256,
+        "afterVisibleTokens": 57236,
+        "triageProviderTokens": 51729,
+        "arithmeticCombinedAfter": 108965,
+        "beforeCallSumMatchesArm": true,
+        "afterCallSumMatchesArm": true,
+        "triageUsageSumMatchesRecords": true
+      }
+    },
+    {
+      "file": "analysis-pair-3-1794258217954.json",
+      "state": "complete",
+      "pairId": "pair-3",
+      "armOrder": [
+        "baseline",
+        "triageEnabled"
+      ],
+      "cacheCondition": "warm",
+      "model": {
+        "name": "OpenAI: GPT-6.1 Sol",
+        "id": "openai/gpt-6.1-sol",
+        "vendor": "openrouter",
+        "version": "1.0.0",
+        "maxInputTokens": 922000
+      },
+      "triageResultPath": "reeval-v2/triage-pair-1-1794257499403.json",
+      "baseline": {
+        "analysisBatches": {
+          "inputTokens": 53500,
+          "outputTokens": 5320,
+          "callCount": 3
+        },
+        "synthesis": {
+          "inputTokens": 13877,
+          "outputTokens": 2418,
+          "callCount": 1
+        },
+        "wallTimeMs": 173623.70900000003,
+        "endToEndWallTimeMs": 173623.70900000003,
+        "inputTokens": 67377,
+        "outputTokens": 7738
+      },
+      "triageEnabled": {
+        "analysisBatches": {
+          "inputTokens": 38271,
+          "outputTokens": 3919,
+          "callCount": 2
+        },
+        "synthesis": {
+          "inputTokens": 12471,
+          "outputTokens": 2284,
+          "callCount": 1
+        },
+        "wallTimeMs": 130820.26080000005,
+        "endToEndWallTimeMs": 132066.71300000005,
+        "inputTokens": 50742,
+        "outputTokens": 6203
+      },
+      "costAccounting": {
+        "schemaVersion": 1,
+        "currency": "USD",
+        "ratesAsOf": "2026-11-08",
+        "ratesCatalog": {
+          "path": "cost-rates.json",
+          "recordedAt": "2026-11-08",
+          "rateIds": [
+            "typesafe-jev-input-2026-10",
+            "typesafe-jev-output-2026-10",
+            "openrouter-gpt-6.1-sol-input-2026-09",
+            "openrouter-gpt-6.1-sol-output-2026-09",
+            "openrouter-gpt-6.1-sol-cache-read-2026-09",
+            "openrouter-gpt-6.1-sol-cache-write-2026-09"
+          ]
+        },
+        "usageClasses": {
+          "before": {
+            "provider": {
+              "name": "openrouter",
+              "modelId": "openai/gpt-6.1-sol",
+              "modelName": "OpenAI: GPT-6.1 Sol",
+              "providerVersion": "1.0.0"
+            },
+            "tokenizerCounts": {
+              "usageSource": "vscode.LanguageModelChat.countTokens",
+              "classification": "tokenizerCount",
+              "analysisBatches": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 53500,
+                  "outputTokens": 5320,
+                  "callCount": 3
+                },
+                "unit": "tokens",
+                "note": "VS Code tokenizer counts on explicit user messages and returned text."
+              },
+              "synthesis": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 13877,
+                  "outputTokens": 2418,
+                  "callCount": 1
+                },
+                "unit": "tokens",
+                "note": "VS Code tokenizer counts on the synthesis prompt and returned text."
+              },
+              "armTotal": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 67377,
+                  "outputTokens": 7738
+                },
+                "unit": "tokens",
+                "note": "VS Code model.countTokens on the explicit user message and returned text. Provider billed usage, hidden reasoning, system overhead and provider caching are not exposed; these remain unknown."
+              }
+            },
+            "providerReportedUsage": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "VS Code LanguageModelChatResponse exposes text/stream only; no provider usage object is returned to extensions."
+            },
+            "actualBilledAmount": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "No provider invoice, statement line, or account billed amount was attached to this run. Do not treat tokenizer counts as charges."
+            },
+            "cacheUsage": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+            },
+            "retryOrFailedCharges": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+            }
+          },
+          "after": {
+            "provider": {
+              "name": "openrouter",
+              "modelId": "openai/gpt-6.1-sol",
+              "modelName": "OpenAI: GPT-6.1 Sol",
+              "providerVersion": "1.0.0"
+            },
+            "tokenizerCounts": {
+              "usageSource": "vscode.LanguageModelChat.countTokens",
+              "classification": "tokenizerCount",
+              "analysisBatches": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 38271,
+                  "outputTokens": 3919,
+                  "callCount": 2
+                },
+                "unit": "tokens",
+                "note": "VS Code tokenizer counts on explicit user messages and returned text."
+              },
+              "synthesis": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 12471,
+                  "outputTokens": 2284,
+                  "callCount": 1
+                },
+                "unit": "tokens",
+                "note": "VS Code tokenizer counts on the synthesis prompt and returned text."
+              },
+              "armTotal": {
+                "status": "measured",
+                "value": {
+                  "inputTokens": 50742,
+                  "outputTokens": 6203
+                },
+                "unit": "tokens",
+                "note": "VS Code model.countTokens on the explicit user message and returned text. Provider billed usage, hidden reasoning, system overhead and provider caching are not exposed; these remain unknown."
+              }
+            },
+            "providerReportedUsage": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "VS Code LanguageModelChatResponse exposes text/stream only; no provider usage object is returned to extensions."
+            },
+            "actualBilledAmount": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "No provider invoice, statement line, or account billed amount was attached to this run. Do not treat tokenizer counts as charges."
+            },
+            "cacheUsage": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+            },
+            "retryOrFailedCharges": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+            }
+          },
+          "typesafe": {
+            "provider": {
+              "name": "typesafe",
+              "modelIds": [
+                "jev-1.14.0"
+              ],
+              "requestedModel": "jev-latest",
+              "cacheTreatment": null
+            },
+            "tokenizerCounts": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "TypeSafe System One responses are not measured with VS Code countTokens in this benchmark."
+            },
+            "providerReportedUsage": {
+              "status": "measured",
+              "value": {
+                "inputTokens": 47549,
+                "outputTokens": 4180,
+                "successfulCalls": 44,
+                "failedCalls": 0
+              },
+              "usageSource": "typesafe.systemOne.response.usage",
+              "classification": "providerReported",
+              "unit": "tokens",
+              "note": "Provider-reported usage summed from successful records. Failed calls contribute neither tokens nor a verified billed amount."
+            },
+            "actualBilledAmount": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "TypeSafe console invoice/statement for this run was not supplied. Rate × provider-reported usage is an estimate until account evidence confirms the charge."
+            },
+            "cacheUsage": {
+              "status": "measured",
+              "value": {
+                "treatment": "unspecified",
+                "billedCacheTokens": null
+              },
+              "usageSource": "triage.cache",
+              "classification": "providerReported",
+              "note": "Run recorded cold; no persisted judgment reads. No separate cache token field is present on TypeSafe usage."
+            },
+            "retryOrFailedCharges": {
+              "status": "measured",
+              "value": {
+                "configuredMaxRetries": 0,
+                "failedCalls": 0,
+                "attributableRetryCharges": null,
+                "note": "Runner configured maxRetries: 0; no failed calls in the complete run."
+              },
+              "usageSource": "run.cjs TypeSafeClient retry config + triage.records[].state",
+              "classification": "providerReported"
+            }
+          }
+        },
+        "costComponents": {
+          "before": {
+            "analysisBatches": {
+              "status": "estimate",
+              "value": 0.1602,
+              "currency": "USD",
+              "usageSource": "tokenizerCounts.analysisBatches",
+              "classification": "estimate",
+              "ratesUsed": [
+                "openrouter-gpt-6.1-sol-input-2026-09",
+                "openrouter-gpt-6.1-sol-output-2026-09"
+              ],
+              "rateSources": [
+                "https://openrouter.ai/openai/gpt-6.1-sol",
+                "https://openrouter.ai/openai/gpt-6.1-sol"
+              ],
+              "formula": "(inputTokens/1e6)*inputRate + (outputTokens/1e6)*outputRate",
+              "note": "Estimate only: applies list rates to VS Code tokenizer counts, which are not provider-billed usage."
+            },
+            "synthesis": {
+              "status": "estimate",
+              "value": 0.051934,
+              "currency": "USD",
+              "usageSource": "tokenizerCounts.synthesis",
+              "classification": "estimate",
+              "ratesUsed": [
+                "openrouter-gpt-6.1-sol-input-2026-09",
+                "openrouter-gpt-6.1-sol-output-2026-09"
+              ],
+              "rateSources": [
+                "https://openrouter.ai/openai/gpt-6.1-sol",
+                "https://openrouter.ai/openai/gpt-6.1-sol"
+              ],
+              "formula": "(inputTokens/1e6)*inputRate + (outputTokens/1e6)*outputRate",
+              "note": "Estimate only: applies list rates to VS Code tokenizer counts for the synthesis call."
+            },
+            "typesafe": {
+              "status": "measured",
+              "value": 0,
+              "currency": "USD",
+              "classification": "actualBilled",
+              "usageSource": "baseline arm; TypeSafe disabled",
+              "note": "No TypeSafe requests were issued on the baseline arm."
+            },
+            "cache": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+            },
+            "retriesOrFailedCalls": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+            }
+          },
+          "after": {
+            "analysisBatches": {
+              "status": "estimate",
+              "value": 0.115732,
+              "currency": "USD",
+              "usageSource": "tokenizerCounts.analysisBatches",
+              "classification": "estimate",
+              "ratesUsed": [
+                "openrouter-gpt-6.1-sol-input-2026-09",
+                "openrouter-gpt-6.1-sol-output-2026-09"
+              ],
+              "rateSources": [
+                "https://openrouter.ai/openai/gpt-6.1-sol",
+                "https://openrouter.ai/openai/gpt-6.1-sol"
+              ],
+              "formula": "(inputTokens/1e6)*inputRate + (outputTokens/1e6)*outputRate",
+              "note": "Estimate only: applies list rates to VS Code tokenizer counts, which are not provider-billed usage."
+            },
+            "synthesis": {
+              "status": "estimate",
+              "value": 0.047782,
+              "currency": "USD",
+              "usageSource": "tokenizerCounts.synthesis",
+              "classification": "estimate",
+              "ratesUsed": [
+                "openrouter-gpt-6.1-sol-input-2026-09",
+                "openrouter-gpt-6.1-sol-output-2026-09"
+              ],
+              "rateSources": [
+                "https://openrouter.ai/openai/gpt-6.1-sol",
+                "https://openrouter.ai/openai/gpt-6.1-sol"
+              ],
+              "formula": "(inputTokens/1e6)*inputRate + (outputTokens/1e6)*outputRate",
+              "note": "Estimate only: applies list rates to VS Code tokenizer counts for the synthesis call."
+            },
+            "typesafe": {
+              "status": "estimate",
+              "value": 0.0019970580000000003,
+              "currency": "USD",
+              "usageSource": "typesafe.systemOne.response.usage",
+              "classification": "estimate",
+              "ratesUsed": [
+                "typesafe-jev-input-2026-10",
+                "typesafe-jev-output-2026-10"
+              ],
+              "rateSources": [
+                "https://docs.typesafe.ai/models",
+                "https://docs.typesafe.ai/models"
+              ],
+              "formula": "(inputTokens/1e6)*inputRate + (outputTokens/1e6)*outputRate",
+              "note": "Estimate from provider-reported usage × recorded TypeSafe list rates. Not an invoice-confirmed billed amount."
+            },
+            "cache": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "Attributable cache charges require provider cache usage. Analysis: VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests. TypeSafe: TypeSafe run recorded cold cache treatment, but no billed cache token field exists to price."
+            },
+            "retriesOrFailedCalls": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "Attributable retry/failed-call charges require billed retry evidence. Analysis: The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API. TypeSafe: Runner configured maxRetries: 0; no failed calls in the complete run."
+            }
+          }
+        },
+        "totals": {
+          "before": {
+            "total": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "Cannot form a verified attributable total while unavailable: cache, retriesOrFailedCalls."
+            },
+            "partialEstimateSum": {
+              "status": "estimate",
+              "value": 0.21213400000000002,
+              "currency": "USD",
+              "classification": "estimate",
+              "included": [
+                "analysisBatches",
+                "synthesis",
+                "typesafe"
+              ],
+              "excludedUnavailable": [
+                {
+                  "name": "cache",
+                  "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+                },
+                {
+                  "name": "retriesOrFailedCalls",
+                  "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+                }
+              ],
+              "note": "Partial sum of available estimates only. Not a verified savings figure."
+            },
+            "missing": [
+              {
+                "name": "cache",
+                "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+              },
+              {
+                "name": "retriesOrFailedCalls",
+                "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+              }
+            ]
+          },
+          "after": {
+            "total": {
+              "status": "unavailable",
+              "value": null,
+              "reason": "Cannot form a verified attributable total while unavailable: cache, retriesOrFailedCalls."
+            },
+            "partialEstimateSum": {
+              "status": "estimate",
+              "value": 0.165511058,
+              "currency": "USD",
+              "classification": "estimate",
+              "included": [
+                "analysisBatches",
+                "synthesis",
+                "typesafe"
+              ],
+              "excludedUnavailable": [
+                {
+                  "name": "cache",
+                  "reason": "Attributable cache charges require provider cache usage. Analysis: VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests. TypeSafe: TypeSafe run recorded cold cache treatment, but no billed cache token field exists to price."
+                },
+                {
+                  "name": "retriesOrFailedCalls",
+                  "reason": "Attributable retry/failed-call charges require billed retry evidence. Analysis: The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API. TypeSafe: Runner configured maxRetries: 0; no failed calls in the complete run."
+                }
+              ],
+              "note": "Partial sum of available estimates only. Not a verified savings figure."
+            },
+            "missing": [
+              {
+                "name": "cache",
+                "reason": "Attributable cache charges require provider cache usage. Analysis: VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests. TypeSafe: TypeSafe run recorded cold cache treatment, but no billed cache token field exists to price."
+              },
+              {
+                "name": "retriesOrFailedCalls",
+                "reason": "Attributable retry/failed-call charges require billed retry evidence. Analysis: The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API. TypeSafe: Runner configured maxRetries: 0; no failed calls in the complete run."
+              }
+            ]
+          }
+        },
+        "verifiedSavingsClaim": {
+          "established": false,
+          "reason": "Unavailable cost components prevent a verified savings claim: before.cache, before.retriesOrFailedCalls, after.cache, after.retriesOrFailedCalls, before.actualBilledAmount, after.actualBilledAmount, typesafe.actualBilledAmount."
+        },
+        "financialSavingsEstablished": false,
+        "evidenceInventory": {
+          "obtainableWithoutCredentials": [
+            {
+              "artifact": "analysis tokenizer counts",
+              "source": "vscode.LanguageModelChat.countTokens via editor helper",
+              "present": true
+            },
+            {
+              "artifact": "analysis model identity",
+              "source": "vscode.lm.selectChatModels match fields",
+              "present": true
+            },
+            {
+              "artifact": "TypeSafe provider-reported usage",
+              "source": "systemOne response.usage on successful records",
+              "present": true
+            },
+            {
+              "artifact": "TypeSafe returned model ids",
+              "source": "systemOne response.model",
+              "present": true
+            },
+            {
+              "artifact": "TypeSafe cache treatment note",
+              "source": "triage.cache field",
+              "present": false
+            },
+            {
+              "artifact": "TypeSafe retry configuration",
+              "source": "run.cjs TypeSafeClient({ retry: { maxRetries: 0 } })",
+              "present": true
+            },
+            {
+              "artifact": "published list rates with source URLs",
+              "source": "cost-rates.json",
+              "present": true
+            }
+          ],
+          "unavailableFromSupportedApis": [
+            {
+              "artifact": "VS Code / OpenRouter provider-reported analysis usage",
+              "reason": "LanguageModelChatResponse has text/stream only; no usage or billing fields in @types/vscode LanguageModelChat API."
+            },
+            {
+              "artifact": "actual billed analysis amount",
+              "reason": "No extension API exposes invoice or statement charges for LanguageModelChat calls."
+            },
+            {
+              "artifact": "analysis cache-read/write token counts",
+              "reason": "Not exposed by VS Code LM API for this path."
+            },
+            {
+              "artifact": "analysis retry/failed-call billed usage",
+              "reason": "Not exposed by VS Code LM API; helper does not invent failed-call charges."
+            }
+          ],
+          "externalEvidenceStillRequired": [
+            {
+              "artifact": "OpenRouter or Copilot/OpenAI account statement covering analysis-1793062329161.json wall-clock window",
+              "purpose": "Confirm actual billed analysis (+ synthesis) charges, cache adjustments, and any retries.",
+              "humanWorkflow": "Export or screenshot the provider usage/billing page for 2026-10-27T00:52:09Z–2026-10-27T01:00:07Z without sharing credentials or unrelated customer records.",
+              "blocksVerifiedSavingsClaim": true
+            },
+            {
+              "artifact": "TypeSafe console usage/billing export for triage-1793062000319.json",
+              "purpose": "Confirm that provider-reported input tokens × list rate matched the account charge for this run.",
+              "humanWorkflow": "Export the TypeSafe organization Usage/Billing view for 2026-10-27T00:46:40Z–2026-10-27T00:46:41Z, redacting account identity if needed.",
+              "blocksVerifiedSavingsClaim": true
+            }
+          ],
+          "vscodeUsageInvestigation": {
+            "inspectedApi": "vscode.LanguageModelChat / LanguageModelChatResponse in @types/vscode",
+            "supportedEvidence": [
+              "model identity (name, id, vendor, version, maxInputTokens)",
+              "countTokens on request messages and returned text",
+              "returned text stream",
+              "request wall time measured locally"
+            ],
+            "notExposed": [
+              "provider billed token usage",
+              "cache hit/write counts",
+              "hidden reasoning tokens",
+              "invoice line amounts",
+              "retry surcharge fields"
+            ],
+            "conclusion": "Tokenizer counts may be recorded as tokenizerCount evidence. They must not be substituted as actualBilled amounts."
+          }
+        }
+      },
+      "quality": {
+        "baseline": {
+          "synthesisKind": "synthesis",
+          "inputTokens": 67377,
+          "outputTokens": 7738,
+          "wallTimeMs": 173623.70900000003,
+          "endToEndWallTimeMs": 173623.70900000003,
+          "charCount": 12527,
+          "bulletLikeLines": 0,
+          "citedSessionIds": [
+            "eval-01",
+            "eval-44",
+            "eval-42",
+            "eval-41",
+            "eval-39",
+            "eval-14",
+            "eval-35",
+            "eval-22",
+            "eval-08",
+            "eval-23",
+            "eval-43",
+            "eval-31",
+            "eval-04",
+            "eval-27",
+            "eval-28",
+            "eval-30",
+            "eval-38",
+            "eval-40",
+            "eval-09",
+            "eval-12",
+            "eval-33",
+            "eval-17"
+          ],
+          "citedControlFilePatterns": [
+            "AGENTS.md",
+            "SKILL.md"
+          ],
+          "statesLimitation": true
+        },
+        "triageEnabled": {
+          "synthesisKind": "synthesis",
+          "inputTokens": 50742,
+          "outputTokens": 6203,
+          "wallTimeMs": 130820.26080000005,
+          "endToEndWallTimeMs": 132066.71300000005,
+          "charCount": 11631,
+          "bulletLikeLines": 10,
+          "citedSessionIds": [
+            "eval-01",
+            "eval-41",
+            "eval-04",
+            "eval-02",
+            "eval-39",
+            "eval-42",
+            "eval-25",
+            "eval-32",
+            "eval-14",
+            "eval-35",
+            "eval-28",
+            "eval-38",
+            "eval-33",
+            "eval-44",
+            "eval-30",
+            "eval-27",
+            "eval-11",
+            "eval-10",
+            "eval-17"
+          ],
+          "citedControlFilePatterns": [
+            "AGENTS.md",
+            "SKILL.md"
+          ],
+          "statesLimitation": true
+        },
+        "notes": [
+          "Retained sessions do not guarantee equivalent recommendations.",
+          "Skipped-session evidence cannot appear in the triageEnabled arm.",
+          "Scores are structural proxies for human review, not automated pass/fail."
+        ]
+      },
+      "arithmetic": {
+        "beforeVisibleTokens": 75115,
+        "afterVisibleTokens": 56945,
+        "triageProviderTokens": 51729,
+        "arithmeticCombinedAfter": 108674,
+        "beforeCallSumMatchesArm": true,
+        "afterCallSumMatchesArm": true,
+        "triageUsageSumMatchesRecords": true
+      }
+    }
+  ],
+  "analysisCompletePairCount": 3,
+  "representativenessLimits": [
+    "Compact redacted fixtures omit middle turns and individual tool events; adapter does not fabricate them.",
+    "v2 adapter summary is counts/tools only; production markdown summaries differ.",
+    "Results apply only to this 44-session redacted evaluation set.",
+    "VS Code exposes tokenizer counts only; provider billed usage, cache tokens, and hidden reasoning remain unavailable.",
+    "Warm TypeSafe repeats still do not read local judgment cache; warmth is process/provider-side only.",
+    "Instruction baseline SHA may differ from the 2026-10-26 v1 run if AGENTS.md / copilot-instructions.md changed; within-pair baseline is held fixed."
+  ],
+  "costClaim": {
+    "financialSavingsEstablished": false,
+    "note": "No monetary-savings claim while analysis and/or TypeSafe actual billed amounts remain unavailable."
+  },
+  "outcomeSummary": {
+    "recall": "Adjusted payload preserved 16/16 recall at threshold 0.7 across all complete triage repetitions; same five negatives skipped as original.",
+    "typesafeInputTokens": "Mean TypeSafe input tokens 47549 vs original 76385 (-37.75%).",
+    "latency": "See per-pair analysis end-to-end times; cold and warm labeled separately.",
+    "cost": "Partial list-rate estimates may exist per pair; verified financial savings remain unestablished.",
+    "reportQuality": "See per-pair quality structural comparison; human review still required (card-mvq03qy7-4).",
+    "improvedIntendedOutcomes": {
+      "typesafePayloadTokensReduced": true,
+      "analysisEndToEndFasterWithTriage": true,
+      "recallPreserved": true,
+      "verifiedMoneySaved": false,
+      "negativeOrCaveats": [
+        "Verified billed savings unavailable.",
+        "Report-quality equivalence is not assumed from retention alone."
+      ]
+    }
+  },
+  "analysisAggregates": {
+    "pairs": 3,
+    "meanBaselineEndToEndMs": 183525.65793333334,
+    "meanTriageEnabledEndToEndMs": 137077.29976666666,
+    "meanBaselineAnalysisTokens": 75919.33333333333,
+    "meanTriageEnabledAnalysisTokens": 57261
+  }
+}

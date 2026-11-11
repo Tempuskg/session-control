@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "cardId": "card-mvq03qy7-3",
+  "protocol": "reeval-protocol.md",
+  "state": "complete",
+  "startedAt": "2026-11-09T20:52:44.317Z",
+  "config": {
+    "analysisModelDisplayName": "GPT-6.1 Sol",
+    "batchCharBudget": 48000,
+    "promptVersion": "5",
+    "questionSetVersion": "analysis-triage-v2",
+    "payloadVersion": "triage-payload-v2",
+    "threshold": 0.7,
+    "baselineSha256": "b38cdc346ac97d6d2d34f766d51b9fd2ff571f4b4e984aa4232dcf46708dbe73",
+    "adapter": "Compact fixture prompts in recorded order, first/last response only; counts/tools in summary (not full fixture JSON); no fabricated tools or timestamps. Results apply to these redacted fixtures."
+  },
+  "model": {
+    "name": "OpenAI: GPT-6.1 Sol",
+    "id": "openai/gpt-6.1-sol",
+    "vendor": "openrouter",
+    "version": "1.0.0",
+    "maxInputTokens": 922000
+  },
+  "tokenMeasurement": "VS Code model.countTokens on the explicit user message and returned text. Provider billed usage, hidden reasoning, system overhead and provider caching are not exposed; these remain unknown.",
+  "providerReportedUsage": null,
+  "providerBilledUsage": null,
+  "actualBilledAmount": null,
+  "cacheUsage": null,
+  "retryOrFailedCharges": null,
+  "usageClassNotes": {
+    "tokenizerCounts": "measured via model.countTokens",
+    "providerReportedUsage": "unavailable: LanguageModelChatResponse exposes text/stream only",
+    "actualBilledAmount": "unavailable without an attached provider invoice/statement",
+    "cacheUsage": "unavailable: VS Code LM API does not expose cache tokens",
+    "retryOrFailedCharges": "unavailable: VS Code LM API does not expose retry billing"
+  },
+  "pairs": [
+    {
+      "pairId": "pair-1",
+      "path": "analysis-pair-1-1794257564319.json",
+      "armOrder": [
+        "baseline",
+        "triageEnabled"
+      ],
+      "cacheCondition": "cold",
+      "state": "complete",
+      "triageResultPath": "reeval-v2/triage-pair-1-1794257499403.json"
+    },
+    {
+      "pairId": "pair-2",
+      "path": "analysis-pair-2-1794257896028.json",
+      "armOrder": [
+        "triageEnabled",
+        "baseline"
+      ],
+      "cacheCondition": "cold",
+      "state": "complete",
+      "triageResultPath": "reeval-v2/triage-pair-2-1794257507771.json"
+    },
+    {
+      "pairId": "pair-3",
+      "path": "analysis-pair-3-1794258217954.json",
+      "armOrder": [
+        "baseline",
+        "triageEnabled"
+      ],
+      "cacheCondition": "warm",
+      "state": "complete",
+      "triageResultPath": "reeval-v2/triage-pair-1-1794257499403.json"
+    }
+  ],
+  "finishedAt": "2026-11-09T21:08:42.407Z"
+}

@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "currency": "USD",
+  "recordedAt": "2026-11-08",
+  "rates": [
+    {
+      "id": "typesafe-jev-input-2026-10",
+      "provider": "typesafe",
+      "modelIds": ["jev-1.14.0", "jev-1.13.0", "jev-latest"],
+      "component": "input",
+      "unit": "per_1m_tokens",
+      "amount": 0.042,
+      "effectiveFrom": "2026-10-14",
+      "effectiveTo": null,
+      "authoritativeSource": "https://docs.typesafe.ai/models",
+      "notes": "TypeSafe bills input tokens only; reported output tokens are free."
+    },
+    {
+      "id": "typesafe-jev-output-2026-10",
+      "provider": "typesafe",
+      "modelIds": ["jev-1.14.0", "jev-1.13.0", "jev-latest"],
+      "component": "output",
+      "unit": "per_1m_tokens",
+      "amount": 0,
+      "effectiveFrom": "2026-10-14",
+      "effectiveTo": null,
+      "authoritativeSource": "https://docs.typesafe.ai/models",
+      "notes": "Output tokens are reported by the API but not billed."
+    },
+    {
+      "id": "openrouter-gpt-6.1-sol-input-2026-09",
+      "provider": "openrouter",
+      "modelIds": ["openai/gpt-6.1-sol"],
+      "component": "input",
+      "unit": "per_1m_tokens",
+      "amount": 2.0,
+      "effectiveFrom": "2026-09-29",
+      "effectiveTo": null,
+      "authoritativeSource": "https://openrouter.ai/openai/gpt-6.1-sol",
+      "notes": "List price for prompts at or below the published long-context threshold. Applying this to VS Code tokenizer counts yields an estimate only."
+    },
+    {
+      "id": "openrouter-gpt-6.1-sol-output-2026-09",
+      "provider": "openrouter",
+      "modelIds": ["openai/gpt-6.1-sol"],
+      "component": "output",
+      "unit": "per_1m_tokens",
+      "amount": 10.0,
+      "effectiveFrom": "2026-09-29",
+      "effectiveTo": null,
+      "authoritativeSource": "https://openrouter.ai/openai/gpt-6.1-sol",
+      "notes": "List price for prompts at or below the published long-context threshold. Applying this to VS Code tokenizer counts yields an estimate only."
+    },
+    {
+      "id": "openrouter-gpt-6.1-sol-cache-read-2026-09",
+      "provider": "openrouter",
+      "modelIds": ["openai/gpt-6.1-sol"],
+      "component": "cache_read",
+      "unit": "per_1m_tokens",
+      "amount": 0.1,
+      "effectiveFrom": "2026-09-29",
+      "effectiveTo": null,
+      "authoritativeSource": "https://openrouter.ai/openai/gpt-6.1-sol",
+      "notes": "Cache-read list price. VS Code does not expose cache usage for this benchmark path."
+    },
+    {
+      "id": "openrouter-gpt-6.1-sol-cache-write-2026-09",
+      "provider": "openrouter",
+      "modelIds": ["openai/gpt-6.1-sol"],
+      "component": "cache_write",
+      "unit": "per_1m_tokens",
+      "amount": 2.5,
+      "effectiveFrom": "2026-09-29",
+      "effectiveTo": null,
+      "authoritativeSource": "https://openrouter.ai/openai/gpt-6.1-sol",
+      "notes": "Cache-write list price. VS Code does not expose cache usage for this benchmark path."
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "cardId": "card-mvq03qy7-3",
+  "protocol": "reeval-protocol.md",
+  "analysisModelDisplayName": "GPT-6.1 Sol",
+  "questionSetVersion": "analysis-triage-v2",
+  "payloadVersion": "triage-payload-v2",
+  "pairs": [
+    {
+      "id": "pair-1",
+      "armOrder": ["baseline", "triageEnabled"],
+      "cacheCondition": "cold",
+      "triagePreparedRelative": "prepared-comparison-analysis-triage-v2-pair-1.json",
+      "notes": "First analysis pair in host; baseline-first to match original order for one cold observation."
+    },
+    {
+      "id": "pair-2",
+      "armOrder": ["triageEnabled", "baseline"],
+      "cacheCondition": "cold",
+      "triagePreparedRelative": "prepared-comparison-analysis-triage-v2-pair-2.json",
+      "notes": "Reverse arm order to reduce baseline-first bias; still labeled cold for first pass of this order."
+    },
+    {
+      "id": "pair-3",
+      "armOrder": ["baseline", "triageEnabled"],
+      "cacheCondition": "warm",
+      "triagePreparedRelative": "prepared-comparison-analysis-triage-v2-pair-1.json",
+      "notes": "Immediate warm repeat of pair-1 prompt set in the same host session."
+    }
+  ]
+}

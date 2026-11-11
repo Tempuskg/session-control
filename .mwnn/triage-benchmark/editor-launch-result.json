@@ -1,4 +1,5 @@
 {
-  "state": "failed",
-  "name": "Canceled"
+  "state": "complete",
+  "mode": "reeval-v2",
+  "resultPath": "e:\\chat-commit\\.mwnn\\triage-benchmark\\reeval-v2\\analysis-host-1794257564317.json"
 }
