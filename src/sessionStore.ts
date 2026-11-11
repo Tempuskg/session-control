@@ -8,10 +8,17 @@ interface SessionStoreDeps {
 	readdir(directoryPath: string): Promise<string[]>;
 	readFile(filePath: string): Promise<string>;
 	writeFile(filePath: string, content: string): Promise<void>;
+	/** Exclusive create (`flag: 'wx'`). Used only for auto-save identity locks. */
+	writeFileExclusive(filePath: string, content: string): Promise<void>;
 	exists(filePath: string): Promise<boolean>;
 	rename(fromPath: string, toPath: string): Promise<void>;
 	unlink(filePath: string): Promise<void>;
+	wait(ms: number): Promise<void>;
 	logWarning(message: string): void;
+	autoSaveLockRetryMs: number;
+	autoSaveLockMaxAttempts: number;
+	autoSaveLockHeartbeatMs: number;
+	autoSaveLockRecoveryGraceMs: number;
 }
 
 export type SessionPruneAction = 'archive' | 'delete';
@@ -61,6 +68,8 @@ function createDefaultDeps(): SessionStoreDeps {
 		},
 		readFile: async (filePath: string) => fs.readFile(filePath, 'utf8'),
 		writeFile: async (filePath: string, content: string) => fs.writeFile(filePath, content, 'utf8'),
+		writeFileExclusive: async (filePath: string, content: string) =>
+			fs.writeFile(filePath, content, { encoding: 'utf8', flag: 'wx' }),
 		exists: async (filePath: string) => {
 			try {
 				await fs.access(filePath);
@@ -71,9 +80,14 @@ function createDefaultDeps(): SessionStoreDeps {
 		},
 		rename: async (fromPath: string, toPath: string) => fs.rename(fromPath, toPath),
 		unlink: async (filePath: string) => fs.unlink(filePath),
+		wait: async (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
 		logWarning: (message: string) => {
 			console.warn(message);
 		},
+		autoSaveLockRetryMs: 25,
+		autoSaveLockMaxAttempts: 80,
+		autoSaveLockHeartbeatMs: 1_000,
+		autoSaveLockRecoveryGraceMs: 5_000,
 	};
 }
 
@@ -191,6 +205,407 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 		...overrides,
 	};
 
+	interface AutoSaveLockHandle {
+		lockPath: string;
+		ownerToken: string;
+		/** Exact bytes last written by this owner; used for compare-and-rename release. */
+		lastContent: string;
+	}
+
+	interface RevisionAutoSaveCandidate {
+		fileName: string;
+		session: ChatSession;
+	}
+
+	function createAutoSaveLockFileName(identity: AutoSaveSessionIdentity): string {
+		const raw = `${identity.sourceId}\0${identity.sourceSessionId}`;
+		let hash = 0;
+		for (let index = 0; index < raw.length; index += 1) {
+			hash = (hash * 31 + raw.charCodeAt(index)) >>> 0;
+		}
+		return `.session-control-autosave-${hash.toString(16)}.lock`;
+	}
+
+	function createAutoSaveLockOwnerToken(): string {
+		const randomPart = Math.random().toString(16).slice(2);
+		const timePart = Date.now().toString(16);
+		return `${timePart}-${randomPart}`;
+	}
+
+	function serializeAutoSaveLockContent(ownerToken: string, heartbeatAt: number): string {
+		return `${ownerToken}\n${heartbeatAt}\n`;
+	}
+
+	function isExclusiveCreateError(error: unknown): boolean {
+		const code =
+			typeof error === 'object' && error !== null && 'code' in error
+				? String((error as { code?: unknown }).code)
+				: '';
+		if (code === 'EEXIST') {
+			return true;
+		}
+		const message = error instanceof Error ? error.message : String(error);
+		return /eexist|file already exists|cannot create a file when that file already exists/i.test(message);
+	}
+
+	function lockContentFingerprint(content: string): string {
+		let hash = 2166136261;
+		for (let index = 0; index < content.length; index += 1) {
+			hash ^= content.charCodeAt(index);
+			hash = Math.imul(hash, 16777619);
+		}
+		return (hash >>> 0).toString(16);
+	}
+
+	/**
+	 * Safe crash-recovery step: never deletes by lock age alone.
+	 * Observe opaque lock bytes, wait a full grace window, and only then
+	 * rename-aside that exact byte snapshot.
+	 */
+	async function tryReclaimAutoSaveLockIfUnchanged(lockPath: string): Promise<void> {
+		let first: string;
+		try {
+			first = await deps.readFile(lockPath);
+		} catch {
+			return;
+		}
+
+		await deps.wait(deps.autoSaveLockRecoveryGraceMs);
+
+		let second: string;
+		try {
+			second = await deps.readFile(lockPath);
+		} catch {
+			return;
+		}
+		if (second !== first) {
+			return;
+		}
+
+		const trashPath = `${lockPath}.dead.${lockContentFingerprint(first)}`;
+		try {
+			await deps.rename(lockPath, trashPath);
+		} catch {
+			return;
+		}
+
+		await deps.unlink(trashPath).catch(() => undefined);
+	}
+
+	async function acquireAutoSaveIdentityLock(
+		storageDirectory: string,
+		identity: AutoSaveSessionIdentity,
+	): Promise<AutoSaveLockHandle> {
+		await ensureStorageDirectory(storageDirectory);
+		const lockPath = path.join(storageDirectory, createAutoSaveLockFileName(identity));
+		const ownerToken = createAutoSaveLockOwnerToken();
+
+		for (let attempt = 0; attempt < deps.autoSaveLockMaxAttempts; attempt += 1) {
+			const content = serializeAutoSaveLockContent(ownerToken, Date.now());
+			try {
+				await deps.writeFileExclusive(lockPath, content);
+				return { lockPath, ownerToken, lastContent: content };
+			} catch (error) {
+				if (!isExclusiveCreateError(error)) {
+					throw error;
+				}
+
+				// Contention / stale crash recovery only — never wraps the protected upsert.
+				if (attempt > 0 && attempt % 8 === 0) {
+					await tryReclaimAutoSaveLockIfUnchanged(lockPath);
+				} else {
+					await deps.wait(deps.autoSaveLockRetryMs);
+				}
+			}
+		}
+
+		throw new Error(
+			`Could not acquire auto-save lock for ${identity.sourceId}:${identity.sourceSessionId}.`,
+		);
+	}
+
+	async function refreshAutoSaveLockHeartbeat(handle: AutoSaveLockHandle): Promise<void> {
+		try {
+			const current = await deps.readFile(handle.lockPath);
+			if (current !== handle.lastContent) {
+				return;
+			}
+			const next = serializeAutoSaveLockContent(handle.ownerToken, Date.now());
+			await deps.writeFile(handle.lockPath, next);
+			handle.lastContent = next;
+		} catch {
+			// Lock disappeared or raced; release path handles ownership mismatch.
+		}
+	}
+
+	async function releaseAutoSaveIdentityLock(handle: AutoSaveLockHandle): Promise<void> {
+		let current: string;
+		try {
+			current = await deps.readFile(handle.lockPath);
+		} catch {
+			return;
+		}
+
+		if (!current.startsWith(`${handle.ownerToken}\n`)) {
+			return;
+		}
+
+		const trashPath = `${handle.lockPath}.released.${handle.ownerToken}`;
+		try {
+			const confirmed = await deps.readFile(handle.lockPath);
+			if (!confirmed.startsWith(`${handle.ownerToken}\n`)) {
+				return;
+			}
+			await deps.rename(handle.lockPath, trashPath);
+		} catch {
+			return;
+		}
+
+		await deps.unlink(trashPath).catch(() => undefined);
+	}
+
+	async function withAutoSaveIdentityLock<T>(
+		storageDirectory: string,
+		identity: AutoSaveSessionIdentity,
+		run: () => Promise<T>,
+	): Promise<T> {
+		const handle = await acquireAutoSaveIdentityLock(storageDirectory, identity);
+		// Heartbeats are serialized and fully drained before release. A detached
+		// read-compare-write heartbeat could otherwise recreate the lock file after
+		// release renamed it away, leaving a stale lock that peers must wait out.
+		let stopped = false;
+		let pendingHeartbeat: Promise<void> = Promise.resolve();
+		const heartbeat = setInterval(() => {
+			pendingHeartbeat = pendingHeartbeat.then(async () => {
+				if (!stopped) {
+					await refreshAutoSaveLockHeartbeat(handle);
+				}
+			});
+		}, deps.autoSaveLockHeartbeatMs);
+
+		try {
+			return await run();
+		} finally {
+			stopped = true;
+			clearInterval(heartbeat);
+			await pendingHeartbeat;
+			await releaseAutoSaveIdentityLock(handle);
+		}
+	}
+
+	function isNonEmptySourceRevision(value: unknown): value is string {
+		return typeof value === 'string' && value.length > 0;
+	}
+
+	function isPreferredAutoSaveFileName(fileName: string, sourceSessionId: string): boolean {
+		const lower = fileName.toLowerCase();
+		const idPrefix = sourceSessionId
+			.replace(/[^a-zA-Z0-9]+/g, '-')
+			.replace(/^-+|-+$/g, '')
+			.slice(0, 12)
+			.toLowerCase();
+		if (!idPrefix) {
+			return true;
+		}
+		return !new RegExp(`-${idPrefix}(?:-\\d+)?\\.json$`, 'i').test(lower);
+	}
+
+	function compareCanonicalAutoSaveFileNames(left: string, right: string, sourceSessionId: string): number {
+		const leftPreferred = isPreferredAutoSaveFileName(left, sourceSessionId);
+		const rightPreferred = isPreferredAutoSaveFileName(right, sourceSessionId);
+		if (leftPreferred !== rightPreferred) {
+			return leftPreferred ? -1 : 1;
+		}
+		// Collision copies always extend the preferred stem, so the shorter name is
+		// the canonical one. Ordinal comparison keeps the order locale-independent.
+		if (left.length !== right.length) {
+			return left.length - right.length;
+		}
+		return left < right ? -1 : left > right ? 1 : 0;
+	}
+
+	function sameLink(expected: string | null | undefined, actual: string | null | undefined): boolean {
+		if ((expected === null || expected === undefined) && (actual === null || actual === undefined)) {
+			return true;
+		}
+		if (typeof expected !== 'string' || typeof actual !== 'string') {
+			return false;
+		}
+		return expected.toLowerCase() === actual.toLowerCase();
+	}
+
+	function tryWalkCompleteLinkedSet(
+		root: RevisionAutoSaveCandidate,
+		byFileName: Map<string, RevisionAutoSaveCandidate>,
+		identity: AutoSaveSessionIdentity,
+		sourceRevision: string,
+		expectedPartCount: number,
+	): string[] | undefined {
+		const ordered: RevisionAutoSaveCandidate[] = [];
+		const seen = new Set<string>();
+		let current: RevisionAutoSaveCandidate | undefined = root;
+
+		for (let expectedPart = 1; expectedPart <= expectedPartCount; expectedPart += 1) {
+			if (!current) {
+				return undefined;
+			}
+			const key = current.fileName.toLowerCase();
+			if (seen.has(key)) {
+				return undefined;
+			}
+			seen.add(key);
+
+			const { session } = current;
+			const origin = session.origin;
+			if (
+				origin?.saveKind !== 'auto' ||
+				origin.sourceId !== identity.sourceId ||
+				origin.sourceSessionId !== identity.sourceSessionId ||
+				!isNonEmptySourceRevision(origin.sourceRevision) ||
+				origin.sourceRevision !== sourceRevision
+			) {
+				return undefined;
+			}
+			if (session.part !== expectedPart || session.totalParts !== expectedPartCount) {
+				return undefined;
+			}
+
+			const expectedPrevious = expectedPart === 1 ? null : (ordered[expectedPart - 2]?.fileName ?? null);
+			if (!sameLink(expectedPrevious, session.previousPartFile)) {
+				return undefined;
+			}
+
+			ordered.push(current);
+
+			if (expectedPart === expectedPartCount) {
+				if (session.nextPartFile !== null) {
+					return undefined;
+				}
+				break;
+			}
+
+			const nextName = session.nextPartFile;
+			if (typeof nextName !== 'string' || nextName.length === 0) {
+				return undefined;
+			}
+			current = byFileName.get(nextName.toLowerCase());
+		}
+
+		if (ordered.length !== expectedPartCount) {
+			return undefined;
+		}
+		return ordered.map((entry) => entry.fileName);
+	}
+
+	/**
+	 * Adopt only a complete consistent automatic export for one identity+revision.
+	 * Never heals by sorting matches and slicing to expectedPartCount, and never
+	 * unlinks ambiguous, incomplete, or surplus files during adoption.
+	 */
+	async function listRevisionAutoSaveFileNames(
+		storageDirectory: string,
+		identity: AutoSaveSessionIdentity,
+		sourceRevision: string,
+		expectedPartCount: number,
+	): Promise<string[] | undefined> {
+		if (expectedPartCount <= 0 || !isNonEmptySourceRevision(sourceRevision)) {
+			return undefined;
+		}
+
+		const inventory = await findAutoSaveSessionFiles(
+			storageDirectory,
+			identity.sourceId,
+			identity.sourceSessionId,
+		);
+		const candidates: RevisionAutoSaveCandidate[] = [];
+		for (const entry of inventory) {
+			let session: ChatSession;
+			try {
+				session = await readSession(storageDirectory, entry.fileName);
+			} catch {
+				continue;
+			}
+
+			const origin = session.origin;
+			if (
+				origin?.saveKind !== 'auto' ||
+				origin.sourceId !== identity.sourceId ||
+				origin.sourceSessionId !== identity.sourceSessionId
+			) {
+				continue;
+			}
+			if (!isNonEmptySourceRevision(origin.sourceRevision)) {
+				continue;
+			}
+			if (origin.sourceRevision !== sourceRevision) {
+				continue;
+			}
+
+			candidates.push({ fileName: entry.fileName, session });
+		}
+
+		if (candidates.length === 0) {
+			return undefined;
+		}
+
+		const byFileName = new Map(
+			candidates.map((candidate) => [candidate.fileName.toLowerCase(), candidate] as const),
+		);
+
+		if (expectedPartCount === 1) {
+			const singles = candidates.filter((candidate) => {
+				const { session } = candidate;
+				const partOk = session.part === null || session.part === 1;
+				const totalOk = session.totalParts === null || session.totalParts === 1;
+				return partOk && totalOk && session.previousPartFile === null && session.nextPartFile === null;
+			});
+			if (singles.length === 0) {
+				return undefined;
+			}
+
+			singles.sort((left, right) =>
+				compareCanonicalAutoSaveFileNames(left.fileName, right.fileName, identity.sourceSessionId),
+			);
+			const canonical = singles[0];
+			return canonical ? [canonical.fileName] : undefined;
+		}
+
+		const roots = candidates.filter(
+			(candidate) => candidate.session.part === 1 && candidate.session.totalParts === expectedPartCount,
+		);
+		const completeChains: string[][] = [];
+		const seenChainKeys = new Set<string>();
+		for (const root of roots) {
+			const chain = tryWalkCompleteLinkedSet(
+				root,
+				byFileName,
+				identity,
+				sourceRevision,
+				expectedPartCount,
+			);
+			if (!chain) {
+				continue;
+			}
+			const chainKey = chain.map((fileName) => fileName.toLowerCase()).join('\0');
+			if (seenChainKeys.has(chainKey)) {
+				continue;
+			}
+			seenChainKeys.add(chainKey);
+			completeChains.push(chain);
+		}
+
+		if (completeChains.length === 0) {
+			return undefined;
+		}
+
+		completeChains.sort((left, right) => {
+			const leftRoot = left[0] ?? '';
+			const rightRoot = right[0] ?? '';
+			return compareCanonicalAutoSaveFileNames(leftRoot, rightRoot, identity.sourceSessionId);
+		});
+		return completeChains[0];
+	}
+
 	async function ensureStorageDirectory(storageDirectory: string): Promise<void> {
 		await deps.mkdir(storageDirectory);
 	}
@@ -264,65 +679,114 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 			throw new Error('Auto-save upsert requires every new part to have the matching automatic-save origin.');
 		}
 
-		const previousFiles = await findAutoSaveSessionFiles(storageDirectory, identity.sourceId, identity.sourceSessionId);
-		await ensureStorageDirectory(storageDirectory);
-		const existingFiles = await deps.readdir(storageDirectory);
-		const writePlan = createSessionWritePlan(sessions, options, existingFiles);
-		const stagedWrites = writePlan.map((entry) => ({
-			...entry,
-			filePath: path.join(storageDirectory, entry.fileName),
-			tempPath: path.join(storageDirectory, createTempName(entry.fileName)),
-		}));
-		const publishedPaths: string[] = [];
-
-		try {
-			for (const entry of stagedWrites) {
-				await deps.writeFile(entry.tempPath, JSON.stringify(entry.session, null, 2));
+		// Validate every incoming part explicitly. Do not filter missing revisions
+		// before measuring the distinct set — one blank + one valid must reject.
+		const incomingRevisions = new Set<string>();
+		for (const session of sessions) {
+			const revision = session.origin?.sourceRevision;
+			if (!isNonEmptySourceRevision(revision)) {
+				throw new Error('Auto-save upsert requires every new part to have a valid sourceRevision.');
 			}
-
-			for (const entry of stagedWrites) {
-				await deps.rename(entry.tempPath, entry.filePath);
-				publishedPaths.push(entry.filePath);
-			}
-		} catch (error) {
-			for (const entry of stagedWrites) {
-				await deps.unlink(entry.tempPath).catch(() => undefined);
-			}
-			for (const publishedPath of publishedPaths) {
-				await deps.unlink(publishedPath).catch((cleanupError: unknown) => {
-					const reason = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
-					deps.logWarning(`Could not roll back staged auto-save file ${publishedPath}: ${reason}`);
-				});
-			}
-			throw error;
+			incomingRevisions.add(revision);
+		}
+		if (incomingRevisions.size !== 1) {
+			throw new Error('Auto-save upsert requires every new part to share one sourceRevision.');
+		}
+		const [sourceRevision] = [...incomingRevisions];
+		if (!isNonEmptySourceRevision(sourceRevision)) {
+			throw new Error('Auto-save upsert requires a sourceRevision.');
 		}
 
-		const newFileNames = new Set(writePlan.map((entry) => entry.fileName.toLowerCase()));
-		for (const previousFile of previousFiles) {
-			if (newFileNames.has(previousFile.fileName.toLowerCase())) {
-				continue;
+		// Lock covers the entire automatic upsert: adopt/short-circuit, stage,
+		// publication, rollback, and retirement of prior automatic files.
+		return withAutoSaveIdentityLock(storageDirectory, identity, async () => {
+			const existingForRevision = await listRevisionAutoSaveFileNames(
+				storageDirectory,
+				identity,
+				sourceRevision,
+				sessions.length,
+			);
+			if (existingForRevision) {
+				return existingForRevision;
 			}
 
-			let previousSession: ChatSession;
+			const previousFiles = await findAutoSaveSessionFiles(
+				storageDirectory,
+				identity.sourceId,
+				identity.sourceSessionId,
+			);
+			await ensureStorageDirectory(storageDirectory);
+			const existingFiles = await deps.readdir(storageDirectory);
+			const writePlan = createSessionWritePlan(sessions, options, existingFiles);
+			const stagedWrites = writePlan.map((entry) => ({
+				...entry,
+				filePath: path.join(storageDirectory, entry.fileName),
+				tempPath: path.join(storageDirectory, createTempName(entry.fileName)),
+			}));
+			const publishedPaths: string[] = [];
+
 			try {
-				previousSession = await readSession(storageDirectory, previousFile.fileName);
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				if (/no such file|cannot find|enoent/i.test(message)) {
-					continue;
+				for (const entry of stagedWrites) {
+					await deps.writeFile(entry.tempPath, JSON.stringify(entry.session, null, 2));
 				}
 
+				const raced = await listRevisionAutoSaveFileNames(
+					storageDirectory,
+					identity,
+					sourceRevision,
+					sessions.length,
+				);
+				if (raced) {
+					for (const entry of stagedWrites) {
+						await deps.unlink(entry.tempPath).catch(() => undefined);
+					}
+					return raced;
+				}
+
+				for (const entry of stagedWrites) {
+					await deps.rename(entry.tempPath, entry.filePath);
+					publishedPaths.push(entry.filePath);
+				}
+			} catch (error) {
+				for (const entry of stagedWrites) {
+					await deps.unlink(entry.tempPath).catch(() => undefined);
+				}
+				for (const publishedPath of publishedPaths) {
+					await deps.unlink(publishedPath).catch((cleanupError: unknown) => {
+						const reason = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+						deps.logWarning(`Could not roll back staged auto-save file ${publishedPath}: ${reason}`);
+					});
+				}
 				throw error;
 			}
 
-			if (!ownsSession(previousSession)) {
-				continue;
+			const newFileNames = new Set(writePlan.map((entry) => entry.fileName.toLowerCase()));
+			for (const previousFile of previousFiles) {
+				if (newFileNames.has(previousFile.fileName.toLowerCase())) {
+					continue;
+				}
+
+				let previousSession: ChatSession;
+				try {
+					previousSession = await readSession(storageDirectory, previousFile.fileName);
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					if (/no such file|cannot find|enoent/i.test(message)) {
+						continue;
+					}
+
+					throw error;
+				}
+
+				if (!ownsSession(previousSession)) {
+					continue;
+				}
+
+				await deleteSession(storageDirectory, previousFile.fileName);
 			}
 
-			await deleteSession(storageDirectory, previousFile.fileName);
-		}
-
-		return writePlan.map((entry) => entry.fileName);
+			return writePlan.map((entry) => entry.fileName);
+		});
 	}
 
 	async function readSession(storageDirectory: string, fileName: string): Promise<ChatSession> {

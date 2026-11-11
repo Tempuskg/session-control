@@ -353,17 +353,26 @@ suite('sessionStore', () => {
 			);
 
 			const operations: string[] = [];
+			// Auto-save identity lock files share these deps; record only session-file
+			// operations so the assertions keep checking write -> publish -> retire order.
+			const isLockFile = (filePath: string) => path.basename(filePath).startsWith('.session-control-autosave-');
 			const store = createSessionStore({
 				writeFile: async (filePath, content) => {
-					operations.push(`write:${path.basename(filePath)}`);
+					if (!isLockFile(filePath)) {
+						operations.push(`write:${path.basename(filePath)}`);
+					}
 					await fs.writeFile(filePath, content, 'utf8');
 				},
 				rename: async (fromPath, toPath) => {
-					operations.push(`rename:${path.basename(fromPath)}->${path.basename(toPath)}`);
+					if (!isLockFile(fromPath)) {
+						operations.push(`rename:${path.basename(fromPath)}->${path.basename(toPath)}`);
+					}
 					await fs.rename(fromPath, toPath);
 				},
 				unlink: async (filePath) => {
-					operations.push(`unlink:${path.basename(filePath)}`);
+					if (!isLockFile(filePath)) {
+						operations.push(`unlink:${path.basename(filePath)}`);
+					}
 					await fs.unlink(filePath);
 				},
 			});
@@ -773,6 +782,552 @@ suite('sessionStore', () => {
 					.sort(),
 				[...newFileNames].sort(),
 			);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+/**
+ * Add these cases to test/unit/sessionStore.test.ts after approval.
+ * They assume the reviewed sessionStore patch (identity lock + complete-set adoption)
+ * is already applied. Do not call non-exported writeSessionToFile; plant files with
+ * fs.writeFile / writeSession only.
+ *
+ * Coverage required by candidate-review.md / card-mw5le1cs-3:
+ * - forced check-then-publish interleaving under the identity lock
+ * - separate-process writers (filesystem exclusive-create exclusivity)
+ * - owner delay / crash recovery (I1, I3) with injectable lock timings
+ * - manual snapshot preservation
+ * - multipart duplicate / incomplete chains (no sort-and-slice heal)
+ * - same-revision adopt of collision copies without a nonexistent store API
+ */
+
+	test('upsertAutoSaveSessions concurrent same-revision writers force old check-then-publish overlap and converge', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const sourceId = 'cursor-cli';
+		const sourceSessionId = '0a543769-b19a-4873-b798-37f742c75391';
+		const sourceRevision = '3fa2e9fe7485a6a310961ffeea783e30833a81333d42a97249daf41a07175c8d';
+		const createAutoSave = (title: string, savedAt: string, vscodeVersion: string): ChatSession => ({
+			...createSession(sourceSessionId, savedAt, title),
+			provider: 'cursor',
+			vscodeVersion,
+			origin: {
+				saveKind: 'auto',
+				sourceId,
+				sourceSessionId,
+				sourceRevision,
+			},
+		});
+
+		// Barrier recreates the historical race window: every writer reaches the
+		// upsert entrypoint before any returns, which previously allowed
+		// check-then-publish interleaving across hosts.
+		let releaseWriters!: () => void;
+		const writersReady = new Promise<void>((resolve) => {
+			releaseWriters = resolve;
+		});
+		let readyCount = 0;
+		const markReady = async (): Promise<void> => {
+			readyCount += 1;
+			if (readyCount === 3) {
+				releaseWriters();
+			}
+			await writersReady;
+		};
+
+		try {
+			const seedStore = createSessionStore();
+			const manualFileName = await seedStore.writeSession(storageDirectory, {
+				...createSession(sourceSessionId, '2026-10-21T23:56:00.000Z', 'Deliberate manual snapshot'),
+				provider: 'cursor',
+				origin: {
+					saveKind: 'manual',
+					sourceId,
+					sourceSessionId,
+					sourceRevision: 'sha256:manual',
+				},
+			});
+			const manualBefore = await seedStore.readSession(storageDirectory, manualFileName);
+
+			const writers = [0, 1, 2].map(async (index) => {
+				await markReady();
+				return createSessionStore().upsertAutoSaveSessions(
+					storageDirectory,
+					[
+						createAutoSave(
+							'Reply with exactly cursor auto save smoke test complete do not read files',
+							'2026-10-21T23:57:35.821Z',
+							index === 0 ? '1.128.0' : '1.143.0',
+						),
+					],
+					{ sourceId, sourceSessionId },
+				);
+			});
+
+			const results = await Promise.all(writers);
+			assert.equal(results.length, 3);
+			assert.deepEqual(results[1], results[0]);
+			assert.deepEqual(results[2], results[0]);
+			assert.equal(results[0]?.length, 1);
+
+			const remaining = await fs.readdir(storageDirectory);
+			const autoFiles = remaining.filter((fileName) => fileName !== manualFileName && fileName.endsWith('.json'));
+			assert.deepEqual(autoFiles.sort(), [...(results[0] ?? [])].sort());
+			assert.equal(
+				remaining.some((fileName) => /0a543769-b19(?:-\d+)?\.json$/i.test(fileName)),
+				false,
+			);
+			assert.deepEqual(await seedStore.readSession(storageDirectory, manualFileName), manualBefore);
+
+			const recovered = await seedStore.findAutoSaveSessionFiles(storageDirectory, sourceId, sourceSessionId);
+			assert.deepEqual(
+				recovered.map((entry) => entry.fileName).sort(),
+				[...(results[0] ?? [])].sort(),
+			);
+			assert.deepEqual(
+				[...new Set(recovered.map((entry) => entry.sourceRevision))],
+				[sourceRevision],
+			);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('upsertAutoSaveSessions separate-process writers rely on filesystem exclusive create', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const sourceId = 'cursor-cli';
+		const sourceSessionId = 'separate-process-session';
+		const sourceRevision = 'sha256:separate-process';
+		const sessionModulePath = path.resolve(__dirname, '../../src/sessionStore.js');
+		const workerScript = `
+const { createSessionStore } = require(${JSON.stringify(sessionModulePath)});
+// With \`node -e <script> a b c\`, user arguments start at process.argv[1].
+const [storageDirectory, sourceId, sourceSessionId, sourceRevision, title] = process.argv.slice(1);
+const savedAt = '2026-10-21T23:57:35.821Z';
+(async () => {
+  const store = createSessionStore();
+  const fileNames = await store.upsertAutoSaveSessions(
+    storageDirectory,
+    [{
+      version: 1,
+      id: sourceSessionId,
+      title,
+      savedAt,
+      provider: 'cursor',
+      git: { branch: 'main', commit: 'abcdef123456', dirty: false },
+      vscodeVersion: '1.143.0',
+      totalTurns: 2,
+      part: null,
+      totalParts: null,
+      previousPartFile: null,
+      nextPartFile: null,
+      origin: { saveKind: 'auto', sourceId, sourceSessionId, sourceRevision },
+      turns: [
+        { type: 'request', participant: 'copilot', prompt: 'Prompt', references: [], timestamp: savedAt },
+        { type: 'response', participant: 'copilot', content: 'Response', toolCalls: [], timestamp: savedAt },
+      ],
+      markdownSummary: '# Chat: Summary',
+    }],
+    { sourceId, sourceSessionId },
+  );
+  process.stdout.write(JSON.stringify(fileNames));
+})().catch((error) => {
+  console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+  process.exit(1);
+});
+`;
+
+		try {
+			const { spawn } = await import('node:child_process');
+			const runWorker = (title: string) =>
+				new Promise<string[]>((resolve, reject) => {
+					const child = spawn(process.execPath, ['-e', workerScript, storageDirectory, sourceId, sourceSessionId, sourceRevision, title], {
+						stdio: ['ignore', 'pipe', 'pipe'],
+					});
+					let stdout = '';
+					let stderr = '';
+					child.stdout.on('data', (chunk: Buffer | string) => {
+						stdout += String(chunk);
+					});
+					child.stderr.on('data', (chunk: Buffer | string) => {
+						stderr += String(chunk);
+					});
+					child.on('error', reject);
+					child.on('close', (code) => {
+						if (code !== 0) {
+							reject(new Error(`worker exited ${code}: ${stderr || stdout}`));
+							return;
+						}
+						resolve(JSON.parse(stdout) as string[]);
+					});
+				});
+
+			const [first, second, third] = await Promise.all([
+				runWorker('Separate process writer A'),
+				runWorker('Separate process writer B'),
+				runWorker('Separate process writer C'),
+			]);
+			assert.deepEqual(second, first);
+			assert.deepEqual(third, first);
+			assert.equal(first.length, 1);
+
+			const remaining = (await fs.readdir(storageDirectory)).filter((name) => name.endsWith('.json'));
+			assert.deepEqual(remaining.sort(), [...first].sort());
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('upsertAutoSaveSessions delayed live lock owner is not stolen across recovery grace', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const sourceId = 'cursor-cli';
+		const sourceSessionId = 'lock-delay-owner';
+		const sourceRevision = 'sha256:lock-delay';
+		const createAutoSave = (title: string): ChatSession => ({
+			...createSession(sourceSessionId, '2026-10-21T23:57:35.821Z', title),
+			provider: 'cursor',
+			origin: {
+				saveKind: 'auto',
+				sourceId,
+				sourceSessionId,
+				sourceRevision,
+			},
+		});
+
+		let ownerHold!: () => void;
+		const holdGate = new Promise<void>((resolve) => {
+			ownerHold = resolve;
+		});
+		let publishCount = 0;
+		const slowOwner = createSessionStore({
+			autoSaveLockHeartbeatMs: 20,
+			autoSaveLockRecoveryGraceMs: 80,
+			autoSaveLockRetryMs: 5,
+			autoSaveLockMaxAttempts: 40,
+			rename: async (fromPath, toPath) => {
+				if (fromPath.endsWith('.tmp') || fromPath.includes('.tmp')) {
+					publishCount += 1;
+					if (publishCount === 1) {
+						await holdGate;
+					}
+				}
+				await fs.rename(fromPath, toPath);
+			},
+		});
+		const contender = createSessionStore({
+			autoSaveLockHeartbeatMs: 20,
+			autoSaveLockRecoveryGraceMs: 80,
+			autoSaveLockRetryMs: 5,
+			autoSaveLockMaxAttempts: 40,
+		});
+
+		try {
+			const ownerPromise = slowOwner.upsertAutoSaveSessions(
+				storageDirectory,
+				[createAutoSave('Delayed live owner')],
+				{ sourceId, sourceSessionId },
+			);
+			await new Promise((resolve) => setTimeout(resolve, 30));
+			const contenderPromise = contender.upsertAutoSaveSessions(
+				storageDirectory,
+				[createAutoSave('Contender waiting on live owner')],
+				{ sourceId, sourceSessionId },
+			);
+			await new Promise((resolve) => setTimeout(resolve, 200));
+			ownerHold();
+			const [ownerResult, contenderResult] = await Promise.all([ownerPromise, contenderPromise]);
+			assert.deepEqual(contenderResult, ownerResult);
+			assert.equal(ownerResult.length, 1);
+			const remaining = (await fs.readdir(storageDirectory)).filter((name) => name.endsWith('.json'));
+			assert.deepEqual(remaining.sort(), [...ownerResult].sort());
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('upsertAutoSaveSessions recovers after abandoned lock bytes stay unchanged', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const sourceId = 'cursor-cli';
+		const sourceSessionId = 'lock-crash-recovery';
+		const sourceRevision = 'sha256:lock-crash';
+		await fs.mkdir(storageDirectory, { recursive: true });
+		// Plant a crashed-owner lock: opaque bytes that never heartbeat.
+		const lockName = (() => {
+			const raw = `${sourceId}\0${sourceSessionId}`;
+			let hash = 0;
+			for (let index = 0; index < raw.length; index += 1) {
+				hash = (hash * 31 + raw.charCodeAt(index)) >>> 0;
+			}
+			return `.session-control-autosave-${hash.toString(16)}.lock`;
+		})();
+		await fs.writeFile(path.join(storageDirectory, lockName), 'crashed-owner\n1\n', 'utf8');
+
+		const store = createSessionStore({
+			autoSaveLockHeartbeatMs: 20,
+			autoSaveLockRecoveryGraceMs: 40,
+			autoSaveLockRetryMs: 5,
+			autoSaveLockMaxAttempts: 40,
+		});
+		const session: ChatSession = {
+			...createSession(sourceSessionId, '2026-10-21T23:57:35.821Z', 'Recover after crash'),
+			provider: 'cursor',
+			origin: {
+				saveKind: 'auto',
+				sourceId,
+				sourceSessionId,
+				sourceRevision,
+			},
+		};
+
+		try {
+			const fileNames = await store.upsertAutoSaveSessions(storageDirectory, [session], {
+				sourceId,
+				sourceSessionId,
+			});
+			assert.equal(fileNames.length, 1);
+			const remaining = await fs.readdir(storageDirectory);
+			assert.equal(remaining.includes(lockName), false);
+			assert.equal(remaining.filter((name) => name.endsWith('.json')).length, 1);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('upsertAutoSaveSessions adopts complete same-revision export and preserves manual plus incomplete multipart leftovers', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const sourceId = 'cursor-cli';
+		const sourceSessionId = 'provider-session-heal';
+		const oldRevision = 'sha256:old';
+		const incompleteRevision = 'sha256:incomplete';
+		const createAutoSave = (
+			title: string,
+			savedAt: string,
+			sourceRevision: string,
+			part: number | null = null,
+			totalParts: number | null = null,
+			links: { previousPartFile?: string | null; nextPartFile?: string | null } = {},
+		): ChatSession => ({
+			...createSession(sourceSessionId, savedAt, title),
+			provider: 'cursor',
+			part,
+			totalParts,
+			previousPartFile: links.previousPartFile ?? null,
+			nextPartFile: links.nextPartFile ?? null,
+			origin: {
+				saveKind: 'auto',
+				sourceId,
+				sourceSessionId,
+				sourceRevision,
+			},
+		});
+
+		try {
+			const seedStore = createSessionStore();
+			const preferred = await seedStore.writeSession(
+				storageDirectory,
+				createAutoSave('Heal title', '2026-10-21T23:57:00.000Z', oldRevision),
+				{ includeTimestampInFileName: false },
+			);
+			// Plant a collision-suffix copy via fs — writeSessionToFile is not on the store API.
+			const collisionName = preferred.replace(/\.json$/i, '-deadbeef.json');
+			await fs.writeFile(
+				path.join(storageDirectory, collisionName),
+				JSON.stringify(
+					{
+						...createAutoSave('Heal title', '2026-10-21T23:57:00.000Z', oldRevision),
+						id: 'collision-copy-1',
+					},
+					null,
+					2,
+				),
+				'utf8',
+			);
+
+			const manualFileName = await seedStore.writeSession(storageDirectory, {
+				...createSession(sourceSessionId, '2026-10-21T23:56:00.000Z', 'Manual keep'),
+				provider: 'cursor',
+				origin: {
+					saveKind: 'manual',
+					sourceId,
+					sourceSessionId,
+					sourceRevision: 'sha256:manual',
+				},
+			});
+			const manualBefore = await seedStore.readSession(storageDirectory, manualFileName);
+
+			// Complete linked chain for incompleteRevision, plus orphan duplicate
+			// part-1 files that cannot reach a part-2 (must not be heal-deleted).
+			const completePart1 = 'complete-part-1.json';
+			const completePart2 = 'complete-part-2.json';
+			const orphanPart1a = 'orphan-part-1a.json';
+			const orphanPart1b = 'orphan-part-1b.json';
+			await fs.writeFile(
+				path.join(storageDirectory, completePart1),
+				JSON.stringify(
+					createAutoSave('Complete (Part 1/2)', '2026-10-21T23:58:00.000Z', incompleteRevision, 1, 2, {
+						nextPartFile: completePart2,
+					}),
+					null,
+					2,
+				),
+				'utf8',
+			);
+			await fs.writeFile(
+				path.join(storageDirectory, completePart2),
+				JSON.stringify(
+					createAutoSave('Complete (Part 2/2)', '2026-10-21T23:58:00.000Z', incompleteRevision, 2, 2, {
+						previousPartFile: completePart1,
+					}),
+					null,
+					2,
+				),
+				'utf8',
+			);
+			await fs.writeFile(
+				path.join(storageDirectory, orphanPart1a),
+				JSON.stringify(
+					createAutoSave('Orphan (Part 1/2)', '2026-10-21T23:58:01.000Z', incompleteRevision, 1, 2, {
+						nextPartFile: 'missing-part-2.json',
+					}),
+					null,
+					2,
+				),
+				'utf8',
+			);
+			await fs.writeFile(
+				path.join(storageDirectory, orphanPart1b),
+				JSON.stringify(
+					createAutoSave('Orphan duplicate root', '2026-10-21T23:58:02.000Z', incompleteRevision, 1, 2, {
+						nextPartFile: 'also-missing-part-2.json',
+					}),
+					null,
+					2,
+				),
+				'utf8',
+			);
+
+			const store = createSessionStore();
+			const adopted = await store.upsertAutoSaveSessions(
+				storageDirectory,
+				[createAutoSave('Heal title', '2026-10-21T23:57:00.000Z', oldRevision)],
+				{ sourceId, sourceSessionId },
+				{ includeTimestampInFileName: false },
+			);
+			assert.deepEqual(adopted, [preferred]);
+
+			const adoptedMultipart = await store.upsertAutoSaveSessions(
+				storageDirectory,
+				[
+					createAutoSave('Complete (Part 1/2)', '2026-10-21T23:58:00.000Z', incompleteRevision, 1, 2),
+					createAutoSave('Complete (Part 2/2)', '2026-10-21T23:58:00.000Z', incompleteRevision, 2, 2),
+				],
+				{ sourceId, sourceSessionId },
+				{ includeTimestampInFileName: false },
+			);
+			assert.deepEqual(adoptedMultipart, [completePart1, completePart2]);
+
+			const after = await fs.readdir(storageDirectory);
+			assert.equal(after.includes(manualFileName), true);
+			assert.deepEqual(await store.readSession(storageDirectory, manualFileName), manualBefore);
+			assert.equal(after.includes(orphanPart1a), true);
+			assert.equal(after.includes(orphanPart1b), true);
+			assert.equal(after.includes(collisionName), true);
+
+			// Missing + valid incoming revisions must reject (no blank filtering).
+			await assert.rejects(
+				() =>
+					store.upsertAutoSaveSessions(
+						storageDirectory,
+						[
+							{
+								...createAutoSave('Bad part', '2026-10-21T23:59:00.000Z', 'sha256:mixed', 1, 2),
+								origin: {
+									saveKind: 'auto',
+									sourceId,
+									sourceSessionId,
+									sourceRevision: '',
+								},
+							},
+							createAutoSave('Good part', '2026-10-21T23:59:00.000Z', 'sha256:mixed', 2, 2),
+						],
+						{ sourceId, sourceSessionId },
+					),
+				/sourceRevision/,
+			);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('upsertAutoSaveSessions adopts a complete linked multipart set and leaves a duplicate complete chain', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const sourceId = 'cursor-cli';
+		const sourceSessionId = 'multipart-adopt';
+		const sourceRevision = 'sha256:multipart';
+		const store = createSessionStore();
+
+		const part1a = 'multipart-a-1.json';
+		const part2a = 'multipart-a-2.json';
+		const part1b = 'multipart-b-1.json';
+		const part2b = 'multipart-b-2.json';
+		const makePart = (
+			fileName: string,
+			part: number,
+			previousPartFile: string | null,
+			nextPartFile: string | null,
+		): ChatSession => ({
+			...createSession(sourceSessionId, '2026-10-21T23:58:00.000Z', `Multipart ${part}/2`),
+			provider: 'cursor',
+			part,
+			totalParts: 2,
+			previousPartFile,
+			nextPartFile,
+			origin: {
+				saveKind: 'auto',
+				sourceId,
+				sourceSessionId,
+				sourceRevision,
+			},
+		});
+
+		try {
+			await fs.mkdir(storageDirectory, { recursive: true });
+			await fs.writeFile(
+				path.join(storageDirectory, part1a),
+				JSON.stringify(makePart(part1a, 1, null, part2a), null, 2),
+				'utf8',
+			);
+			await fs.writeFile(
+				path.join(storageDirectory, part2a),
+				JSON.stringify(makePart(part2a, 2, part1a, null), null, 2),
+				'utf8',
+			);
+			await fs.writeFile(
+				path.join(storageDirectory, part1b),
+				JSON.stringify(makePart(part1b, 1, null, part2b), null, 2),
+				'utf8',
+			);
+			await fs.writeFile(
+				path.join(storageDirectory, part2b),
+				JSON.stringify(makePart(part2b, 2, part1b, null), null, 2),
+				'utf8',
+			);
+
+			const adopted = await store.upsertAutoSaveSessions(
+				storageDirectory,
+				[makePart('ignored-1.json', 1, null, 'ignored-2.json'), makePart('ignored-2.json', 2, 'ignored-1.json', null)],
+				{ sourceId, sourceSessionId },
+				{ includeTimestampInFileName: false },
+			);
+			assert.deepEqual(adopted, [part1a, part2a]);
+			const remaining = await fs.readdir(storageDirectory);
+			assert.equal(remaining.includes(part1b), true);
+			assert.equal(remaining.includes(part2b), true);
 		} finally {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}

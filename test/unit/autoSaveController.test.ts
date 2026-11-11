@@ -529,7 +529,7 @@ suite('auto-save controller', () => {
 		assert.equal(watcher.isDisposed(), true);
 	});
 
-	test('uses a persisted workspace checkpoint for an unchanged revision without scanning saved files', async () => {
+	test('uses a persisted workspace checkpoint for an unchanged revision after refreshing peer disk state', async () => {
 		const watcher = createFakeWatcher();
 		const session: TestSession = {
 			id: 'persisted-session',
@@ -581,7 +581,9 @@ suite('auto-save controller', () => {
 		controller.reconcile();
 		await drainAsyncWork();
 
-		assert.equal(lookupCount, 0);
+		// Always refresh consults disk once, but empty peer state keeps the
+		// persisted checkpoint and still skips a redundant same-revision save.
+		assert.equal(lookupCount, 1);
 		assert.equal(saveCount, 0);
 		controller.dispose();
 	});
@@ -782,7 +784,9 @@ suite('auto-save controller', () => {
 			autoSaves = await store.findAutoSaveSessionFiles(storageDirectory, sourceId, sourceSessionId);
 			assert.equal(autoSaves.length, 1);
 			assert.equal(autoSaves[0]?.sourceRevision, 'revision:continued after extension reload');
-			assert.equal(lookupCount, 1);
+			// Each controller refreshes peer disk state once before deciding to save,
+			// even with a persisted checkpoint (cross-host duplicate prevention).
+			assert.equal(lookupCount, 2);
 		} finally {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}
@@ -1531,6 +1535,163 @@ suite('auto-save controller', () => {
 		assert.equal(codexSaveCount, 1);
 		assert.equal(diagnosticState.getSource('codex-cli')?.disabled, false);
 		assert.equal(warnings.length, 1);
+		controller.dispose();
+	});
+/**
+ * Add these cases to test/unit/autoSaveController.test.ts after approval.
+ * They assume the reviewed autoSaveController patch (always refresh findExistingAutoSaves
+ * before the revision-equality skip) is already applied.
+ *
+ * Coverage: peer host adoption of an on-disk export while a stale in-memory/persisted
+ * checkpoint would otherwise force a redundant save; persisted checkpoint recovery that
+ * refreshes from disk and skips when the peer already published the same revision.
+ */
+
+	test('adopts a peer-published auto-save while refreshing a stale in-memory checkpoint', async () => {
+		const watcher = createFakeWatcher();
+		const session: TestSession = {
+			id: 'peer-adopt-session',
+			title: 'Peer adopt session',
+			turnCount: 2,
+			semanticContent: 'shared revision body',
+		};
+		let lookupCount = 0;
+		let saveCount = 0;
+		const peerFileNames = ['peer-winner.json'];
+		const source = createSource(session, {
+			findExistingAutoSaves: async () => {
+				lookupCount += 1;
+				return peerFileNames.map((fileName) => ({
+					fileName,
+					sourceRevision: `revision:${session.semanticContent}`,
+				}));
+			},
+			saveCandidates: async () => {
+				saveCount += 1;
+				return ['should-not-write.json'];
+			},
+		});
+		const revisionHash =
+			'{"sourceId":"codex-cli","sourceSessionId":"peer-adopt-session","sourceRevision":"revision:shared revision body"}';
+		const staleCheckpointState: AutoSaveCheckpointState = {
+			version: 1,
+			checkpoints: [
+				{
+					sourceId: 'codex-cli',
+					sourceSessionId: session.id,
+					fileNames: ['stale-local.json'],
+					revisionHash: 'stale-hash-should-be-replaced',
+				},
+			],
+		};
+		const checkpointWrites: AutoSaveCheckpointState[] = [];
+		const outputLines: string[] = [];
+		const controller = createAutoSaveController([source], {
+			createWatcher: () => watcher,
+			pathExists: () => true,
+			diagnosticState: createAutoSaveDiagnosticState(),
+			appendLine: (value) => {
+				outputLines.push(value);
+			},
+			showWarningMessage: async () => undefined,
+			hash: (value) => value,
+			schedule: (callback) => callback as unknown as ReturnType<typeof setTimeout>,
+			clearSchedule: () => undefined,
+			debounceDelayMs: 0,
+			checkpointStorage: {
+				read: () => staleCheckpointState,
+				write: async (state) => {
+					checkpointWrites.push(state);
+				},
+			},
+			...immediateSettlement,
+		});
+
+		controller.reconcile();
+		await drainAsyncWork();
+		await drainAsyncWork();
+
+		assert.equal(lookupCount >= 1, true);
+		assert.equal(saveCount, 0);
+		assert.equal(
+			outputLines.some(
+				(line) =>
+					line.includes('Recovered 1 existing auto-save file(s)') &&
+					line.includes('codex-cli:peer-adopt-session'),
+			),
+			true,
+		);
+		assert.equal(
+			outputLines.some((line) => line.includes('Semantic revision unchanged for session peer-adopt-session')),
+			true,
+		);
+		assert.deepEqual(checkpointWrites.at(-1)?.checkpoints[0]?.fileNames, peerFileNames);
+		assert.equal(checkpointWrites.at(-1)?.checkpoints[0]?.revisionHash, revisionHash);
+		controller.dispose();
+	});
+
+	test('recovers a persisted checkpoint after reload and skips when disk already matches the candidate revision', async () => {
+		const watcher = createFakeWatcher();
+		const session: TestSession = {
+			id: 'persisted-peer-session',
+			title: 'Persisted peer session',
+			turnCount: 3,
+			semanticContent: 'after reload',
+		};
+		let lookupCount = 0;
+		let saveCount = 0;
+		const diskFiles = ['persisted-peer.json'];
+		const matchingRevisionHash =
+			'{"sourceId":"codex-cli","sourceSessionId":"persisted-peer-session","sourceRevision":"revision:after reload"}';
+		let checkpointState: AutoSaveCheckpointState | undefined = {
+			version: 1,
+			checkpoints: [
+				{
+					sourceId: 'codex-cli',
+					sourceSessionId: session.id,
+					fileNames: diskFiles,
+					revisionHash: matchingRevisionHash,
+				},
+			],
+		};
+		const source = createSource(session, {
+			findExistingAutoSaves: async () => {
+				lookupCount += 1;
+				return diskFiles.map((fileName) => ({
+					fileName,
+					sourceRevision: `revision:${session.semanticContent}`,
+				}));
+			},
+			saveCandidates: async () => {
+				saveCount += 1;
+				return ['duplicate-after-reload.json'];
+			},
+		});
+		const controller = createAutoSaveController([source], {
+			createWatcher: () => watcher,
+			pathExists: () => true,
+			diagnosticState: createAutoSaveDiagnosticState(),
+			appendLine: () => undefined,
+			showWarningMessage: async () => undefined,
+			hash: (value) => value,
+			schedule: (callback) => callback as unknown as ReturnType<typeof setTimeout>,
+			clearSchedule: () => undefined,
+			debounceDelayMs: 0,
+			checkpointStorage: {
+				read: () => checkpointState,
+				write: async (state) => {
+					checkpointState = state;
+				},
+			},
+			...immediateSettlement,
+		});
+
+		controller.reconcile();
+		await drainAsyncWork();
+
+		assert.equal(lookupCount, 1);
+		assert.equal(saveCount, 0);
+		assert.deepEqual(checkpointState?.checkpoints[0]?.fileNames, diskFiles);
 		controller.dispose();
 	});
 });

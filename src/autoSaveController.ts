@@ -489,7 +489,7 @@ export function createAutoSaveController<TSession>(
 				`[auto-save] Discarded a stale workspace checkpoint for ${source.sourceId}:${selected.sourceSessionId}; rebuilding from saved files.`,
 			);
 		}
-		if (previous === undefined) {
+		{
 			const existingAutoSaves = await source.findExistingAutoSaves(selected.sourceSessionId);
 			if (existingAutoSaves.length > 0) {
 				const fileNames = [...new Set(existingAutoSaves.map((existing) => existing.fileName))];
@@ -499,7 +499,7 @@ export function createAutoSaveController<TSession>(
 					),
 				);
 				const [recoveredRevisionHash] = [...recoveredRevisionHashes];
-				previous =
+				const recovered =
 					recoveredRevisionHashes.size === 1 && recoveredRevisionHash !== undefined
 						? {
 								sourceId: source.sourceId,
@@ -512,10 +512,19 @@ export function createAutoSaveController<TSession>(
 								sourceSessionId: selected.sourceSessionId,
 								fileNames,
 							};
-				setCheckpoint(previous);
-				deps.appendLine(
-					`[auto-save] Recovered ${fileNames.length} existing auto-save file(s) for ${source.sourceId}:${selected.sourceSessionId}.`,
-				);
+				const previousFileNames = previous?.fileNames ?? [];
+				const recoveredChanged =
+					previous === undefined ||
+					previous.revisionHash !== recovered.revisionHash ||
+					previousFileNames.length !== recovered.fileNames.length ||
+					previousFileNames.some((fileName, index) => fileName !== recovered.fileNames[index]);
+				previous = recovered;
+				if (recoveredChanged) {
+					setCheckpoint(recovered);
+					deps.appendLine(
+						`[auto-save] Recovered ${fileNames.length} existing auto-save file(s) for ${source.sourceId}:${selected.sourceSessionId}.`,
+					);
+				}
 			}
 		}
 
