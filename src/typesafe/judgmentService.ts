@@ -170,6 +170,16 @@ export type JudgmentAnswers<Q extends Questions> = {
 
 export type Answers<Q extends Questions> = JudgmentAnswers<Q>;
 
+export type JudgmentErrorKind =
+	| 'unauthorized'
+	| 'rate-limited'
+	| 'overloaded'
+	| 'timeout'
+	| 'connection'
+	| 'aborted'
+	| 'max-tokens'
+	| 'other';
+
 export interface JudgmentService {
 	ask<Q extends Questions>(
 		state: EntryType,
@@ -179,16 +189,31 @@ export interface JudgmentService {
 	): Promise<JudgmentAnswers<Q> | undefined>;
 	isEnabled(feature?: TypeSafeFeature): boolean;
 	isFeatureEnabled(feature: TypeSafeFeature): boolean;
+	/** Most recent ask error kind, when the implementation records one. */
+	readonly lastErrorKind?: JudgmentErrorKind | undefined;
 }
 
-export type JudgmentErrorKind =
-	| 'unauthorized'
-	| 'rate-limited'
-	| 'overloaded'
-	| 'timeout'
-	| 'connection'
-	| 'aborted'
-	| 'other';
+function extractErrorType(body: unknown): string | undefined {
+	if (!body || typeof body !== 'object') {
+		return undefined;
+	}
+	const detail = (body as { detail?: unknown }).detail;
+	if (!detail || typeof detail !== 'object') {
+		return undefined;
+	}
+	const errorType = (detail as { error_type?: unknown }).error_type;
+	return typeof errorType === 'string' ? errorType : undefined;
+}
+
+function isMaxTokensExceededError(error: unknown): boolean {
+	if (error instanceof APIError) {
+		if (extractErrorType(error.body) === 'max_tokens_exceeded') {
+			return true;
+		}
+		return error.message.includes('max_tokens_exceeded');
+	}
+	return error instanceof Error && error.message.includes('max_tokens_exceeded');
+}
 
 export function mapJudgmentError(error: unknown): JudgmentErrorKind {
 	if (error instanceof APIUserAbortError) {
@@ -208,6 +233,9 @@ export function mapJudgmentError(error: unknown): JudgmentErrorKind {
 	}
 	if (error instanceof APIConnectionError) {
 		return 'connection';
+	}
+	if (isMaxTokensExceededError(error)) {
+		return 'max-tokens';
 	}
 	if (error instanceof APIError) {
 		if (error.status === 401) {
@@ -348,6 +376,7 @@ export class TypeSafeJudgmentService implements JudgmentService {
 	private _cachedModel: string | undefined;
 	private _isRePrompting = false;
 	private _activeRePromptPromise: Promise<void> | undefined;
+	private _lastErrorKind: JudgmentErrorKind | undefined;
 
 	constructor(deps: Partial<TypeSafeJudgmentServiceDeps> = {}) {
 		this.deps = {
@@ -415,6 +444,10 @@ export class TypeSafeJudgmentService implements JudgmentService {
 
 	public get activeRePrompt(): Promise<void> | undefined {
 		return this._activeRePromptPromise;
+	}
+
+	public get lastErrorKind(): JudgmentErrorKind | undefined {
+		return this._lastErrorKind;
 	}
 
 	private log(message: string): void {
@@ -583,6 +616,7 @@ export class TypeSafeJudgmentService implements JudgmentService {
 		});
 
 		const startTime = (this.deps.now ?? Date.now)();
+		this._lastErrorKind = undefined;
 		try {
 			const request: SystemOneRequest<Q> = {
 				state: payloadState,
@@ -622,8 +656,14 @@ export class TypeSafeJudgmentService implements JudgmentService {
 		} catch (error) {
 			const latencyMs = (this.deps.now ?? Date.now)() - startTime;
 			const kind = mapJudgmentError(error);
-			const message = error instanceof Error ? error.message : String(error);
-			this.log(`[typesafe] error kind=${kind} latency=${latencyMs}ms message=${message}`);
+			this._lastErrorKind = kind;
+			if (kind === 'max-tokens') {
+				// Keep this concise: oversized input is a client-side bound, not a transient failure.
+				this.log(`[typesafe] error kind=max-tokens latency=${latencyMs}ms (input exceeded model context)`);
+			} else {
+				const message = error instanceof Error ? error.message : String(error);
+				this.log(`[typesafe] error kind=${kind} latency=${latencyMs}ms message=${message}`);
+			}
 
 			if (kind === 'unauthorized') {
 				this.triggerKeyRePrompt();

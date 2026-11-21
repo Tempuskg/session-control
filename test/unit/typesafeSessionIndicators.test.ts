@@ -2,6 +2,7 @@ import * as assert from 'node:assert';
 import * as vscode from 'vscode';
 import {
 	APIConnectionError,
+	APIError,
 	APITimeoutError,
 	AuthenticationError,
 	RateLimitError,
@@ -18,6 +19,7 @@ import {
 } from '../../src/typesafe/judgmentService';
 import {
 	DEFAULT_SESSION_INDICATOR_THRESHOLD,
+	MAX_SESSION_INDICATOR_STATE_CHARS,
 	SESSION_INDICATOR_QUESTIONS,
 	SessionIndicatorDecorationProvider,
 	buildSessionIndicatorState,
@@ -100,8 +102,17 @@ function recordingClient(respond: () => SessionIndicatorAnswers | Error): Record
 	};
 }
 
-function realService(client: RecordingClient, options: { consent?: TypeSafeConsentGate; apiKey?: string } = {}) {
+function realService(
+	client: RecordingClient,
+	options: {
+		consent?: TypeSafeConsentGate;
+		apiKey?: string;
+		session?: ChatSession;
+		logs?: string[];
+	} = {},
+) {
 	const warnings: string[] = [];
+	const logs = options.logs ?? [];
 	const judgment = createJudgmentService({
 		isEnabled: () => true,
 		getApiKey: () => ('apiKey' in options ? options.apiKey : 'ts_test_key'),
@@ -113,16 +124,43 @@ function realService(client: RecordingClient, options: { consent?: TypeSafeConse
 			warnings.push(message);
 			return Promise.resolve(undefined);
 		},
-		log: () => undefined,
+		log: (message) => {
+			logs.push(message);
+		},
 	});
-	const files = new Map([['/store/a.json', JSON.stringify(createSession())]]);
+	const session = options.session ?? createSession();
+	const files = new Map([['/store/a.json', JSON.stringify(session)]]);
 	const service = createSessionIndicatorService({
 		judgment,
 		isIndicatorsEnabled: () => true,
 		getThresholds: () => THRESHOLDS,
 		readFile: fileReader(files),
+		log: (message) => {
+			logs.push(message);
+		},
 	});
-	return { service, warnings };
+	return { service, warnings, logs, judgment };
+}
+
+function createOversizedSession(): ChatSession {
+	const turns: ChatSession['turns'] = [];
+	for (let i = 0; i < 80; i++) {
+		turns.push({
+			type: 'request',
+			participant: 'user',
+			prompt: `user turn ${i} ${'x'.repeat(1800)}`,
+			references: [],
+			timestamp: `2026-09-26T10:00:${String(i % 60).padStart(2, '0')}.000Z`,
+		});
+		turns.push({
+			type: 'response',
+			participant: 'copilot',
+			content: `assistant turn ${i} ${'y'.repeat(1800)}`,
+			toolCalls: [{ name: 'runInTerminal', arguments: '{}', output: 'SECRET TOOL OUTPUT' }],
+			timestamp: `2026-09-26T10:01:${String(i % 60).padStart(2, '0')}.000Z`,
+		});
+	}
+	return createSession({ id: 'oversized-session', totalTurns: turns.length, turns });
 }
 
 suite('typesafe/sessionIndicators', () => {
@@ -173,6 +211,59 @@ suite('typesafe/sessionIndicators', () => {
 		const serialized = JSON.stringify(buildSessionIndicatorState(createSession()));
 		assert.ok(serialized.includes('runInTerminal'));
 		assert.ok(!serialized.includes('SECRET TOOL OUTPUT'));
+	});
+
+	test('oversized sessions are bounded under the TypeSafe state char budget', () => {
+		const oversized = createOversizedSession();
+		const unboundedChars = oversized.turns.reduce((sum, turn) => {
+			return sum + (turn.type === 'request' ? turn.prompt.length : turn.content.length);
+		}, 0);
+		assert.ok(unboundedChars > MAX_SESSION_INDICATOR_STATE_CHARS, 'fixture must exceed the budget before bounding');
+		const state = buildSessionIndicatorState(oversized);
+		const serialized = JSON.stringify(state);
+		assert.ok(serialized.length <= MAX_SESSION_INDICATOR_STATE_CHARS, `bounded state was ${serialized.length} chars`);
+		assert.ok(!serialized.includes('SECRET TOOL OUTPUT'));
+		const turns = (state as { turns: unknown[] }).turns;
+		assert.ok(Array.isArray(turns) && turns.length > 0);
+		assert.ok(turns.length < oversized.turns.length, 'oldest turns should be dropped to fit the budget');
+	});
+
+	test('oversized session judgments use a fake client and stay under the budget', async () => {
+		const oversized = createOversizedSession();
+		const client = recordingClient(() => answers(0.9, 0.1));
+		const logs: string[] = [];
+		const { service } = realService(client, { session: oversized, logs });
+		const judgment = await service.getJudgment('/store/a.json');
+		assert.strictEqual(resolveSessionIndicatorState(judgment), 'knowledge');
+		assert.strictEqual(client.requests.length, 1);
+		const sentChars = JSON.stringify(client.requests[0]?.state).length;
+		assert.ok(sentChars <= MAX_SESSION_INDICATOR_STATE_CHARS, `sent ${sentChars} chars`);
+		assert.ok(logs.some((line) => line.includes('truncated oversized session')));
+		assert.strictEqual(logs.filter((line) => line.includes('truncated oversized session')).length, 1);
+	});
+
+	test('max_tokens_exceeded is classified, logged once, and not retried after forgetFailures', async () => {
+		const maxTokensError = APIError.fromResponse(
+			400,
+			{ detail: { error_type: 'max_tokens_exceeded' } },
+			new Headers(),
+		);
+		const client = recordingClient(() => maxTokensError);
+		const logs: string[] = [];
+		const { service, judgment } = realService(client, { logs });
+		assert.strictEqual(await service.getJudgment('/store/a.json'), undefined);
+		assert.strictEqual(await service.getJudgment('/store/a.json'), undefined);
+		assert.strictEqual(client.requests.length, 1, 'cached failure must not re-ask');
+		assert.strictEqual(judgment.lastErrorKind, 'max-tokens');
+		assert.strictEqual(
+			logs.filter((line) => line.includes('kind=max-tokens')).length,
+			1,
+			'exactly one concise max-tokens log',
+		);
+		assert.ok(logs.some((line) => line.includes('input exceeded model context')));
+		service.forgetFailures();
+		assert.strictEqual(await service.getJudgment('/store/a.json'), undefined);
+		assert.strictEqual(client.requests.length, 1, 'max-tokens failures must survive forgetFailures');
 	});
 
 	test('passive consent gate never prompts', async () => {

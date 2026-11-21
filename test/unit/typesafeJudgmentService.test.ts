@@ -128,6 +128,16 @@ suite('typesafe/judgmentService', () => {
 			assert.strictEqual(mapJudgmentError(e503), 'overloaded');
 		});
 
+		test('maps max_tokens_exceeded 400 responses to max-tokens', () => {
+			const body = { detail: { error_type: 'max_tokens_exceeded' } };
+			const fromBody = APIError.fromResponse(400, body, new Headers());
+			assert.strictEqual(mapJudgmentError(fromBody), 'max-tokens');
+			assert.strictEqual(
+				mapJudgmentError(new Error('400 {"detail":{"error_type":"max_tokens_exceeded"}}')),
+				'max-tokens',
+			);
+		});
+
 		test('maps AbortError to aborted', () => {
 			const abortErr = new Error('The operation was aborted');
 			abortErr.name = 'AbortError';
@@ -1437,6 +1447,65 @@ suite('typesafe/judgmentService', () => {
 					});
 					assert.ok(thirdResult);
 					assert.strictEqual(serverRequestCount, 2, 'version bump must trigger new server request');
+				});
+			} finally {
+				await fs.rm(tempRoot, { recursive: true, force: true });
+			}
+		});
+
+		test('TypeSafeJudgmentService logs a locked cache write once and still returns answers', async () => {
+			const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'typesafe-service-cache-lock-'));
+			const storageDirectory = path.join(tempRoot, '.chat');
+			let renameAttempts = 0;
+			const store = createAnalysisStore({
+				rename: async (fromPath) => {
+					renameAttempts++;
+					const error: NodeJS.ErrnoException = new Error(`EPERM: operation not permitted, rename '${fromPath}'`);
+					error.code = 'EPERM';
+					throw error;
+				},
+				sleep: async () => undefined,
+			});
+			const logs: string[] = [];
+
+			try {
+				await withServer((_req, res) => {
+					res.writeHead(200, { 'Content-Type': 'application/json' });
+					res.end(
+						JSON.stringify({
+							model: 'jev-latest',
+							answers: { friction: { type: 'score', score: 0.4, confidence: 0.7 } },
+							usage: { input_tokens: 10, output_tokens: 5 },
+						}),
+					);
+				}, async (baseURL) => {
+					const service = createJudgmentService({
+						isEnabled: () => true,
+						getApiKey: () => 'valid-test-key',
+						getBaseURL: () => baseURL,
+						consent: grantedConsent,
+						log: (msg) => logs.push(msg),
+						...noRetry,
+					});
+
+					const result = await service.ask(
+						'session state',
+						{ friction: score('friction', ['none', 'high'] as const) },
+						undefined,
+						{
+							feature: 'triage',
+							cache: { store, storageDirectory, sessionFingerprint: 'sess-locked', questionSetVersion: 'v1' },
+						},
+					);
+
+					assert.ok(result);
+					assert.strictEqual(result.friction.score, 0.4);
+					assert.ok(renameAttempts > 1, 'expected the transient EPERM rename to be retried');
+					assert.strictEqual(logs.filter((l) => l.includes('cache write error')).length, 1);
+					const leftovers = (await fs.readdir(path.join(storageDirectory, 'analysis'))).filter((name) =>
+						name.endsWith('.tmp'),
+					);
+					assert.deepStrictEqual(leftovers, []);
 				});
 			} finally {
 				await fs.rm(tempRoot, { recursive: true, force: true });

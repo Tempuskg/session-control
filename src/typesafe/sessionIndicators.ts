@@ -21,6 +21,12 @@ export const SESSION_INDICATOR_QUESTION_SET_VERSION = 'session-indicators-v1';
 
 const MAX_STATE_TURNS = 80;
 const MAX_TURN_TEXT_LENGTH = 2000;
+/**
+ * Char budget for the JSON state sent to Jev. Default context is 32k tokens
+ * per-question (state + one question); keep a conservative margin so large
+ * sessions are truncated locally instead of returning max_tokens_exceeded.
+ */
+export const MAX_SESSION_INDICATOR_STATE_CHARS = 48_000;
 const MAX_CONCURRENT_JUDGMENTS = 2;
 
 export const SESSION_INDICATOR_QUESTIONS = {
@@ -129,27 +135,74 @@ export function describeSessionIndicator(
 	return { state, badge: '▲', color: 'charts.yellow', tooltip: skillLine };
 }
 
-function clip(text: string): string {
-	return text.length > MAX_TURN_TEXT_LENGTH ? `${text.slice(0, MAX_TURN_TEXT_LENGTH)}…` : text;
+function clip(text: string, maxLength = MAX_TURN_TEXT_LENGTH): string {
+	return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
 }
 
-/**
- * Builds the Jev state for a session. Tool output is never included: only tool
- * names are sent, and the judgment service strips any remaining output too.
- */
-export function buildSessionIndicatorState(session: ChatSession): EntryType {
-	const turns: JsonValue[] = session.turns.slice(-MAX_STATE_TURNS).map((turn) => (turn.type === 'request'
-		? { role: 'user', text: clip(turn.prompt) }
+function toIndicatorTurn(turn: ChatSession['turns'][number], maxTextLength = MAX_TURN_TEXT_LENGTH): JsonValue {
+	return turn.type === 'request'
+		? { role: 'user', text: clip(turn.prompt, maxTextLength) }
 		: {
 				role: 'assistant',
-				text: clip(turn.content),
+				text: clip(turn.content, maxTextLength),
 				tools: turn.toolCalls.map((toolCall) => toolCall.name),
-		  }));
+		  };
+}
+
+function measureStateChars(state: EntryType): number {
+	return JSON.stringify(state).length;
+}
+
+function assembleIndicatorState(
+	session: ChatSession,
+	turns: JsonValue[],
+): EntryType {
 	return {
 		title: session.title,
 		...(session.provider ? { provider: session.provider } : {}),
 		turns,
 	};
+}
+
+/**
+ * Builds the Jev state for a session. Tool output is never included: only tool
+ * names are sent, and the judgment service strips any remaining output too.
+ * Oversized transcripts are truncated from the oldest turn until the JSON
+ * payload fits {@link MAX_SESSION_INDICATOR_STATE_CHARS}.
+ */
+export function buildSessionIndicatorState(session: ChatSession): EntryType {
+	const recent = session.turns.slice(-MAX_STATE_TURNS);
+	let maxTextLength = MAX_TURN_TEXT_LENGTH;
+	let turns = recent.map((turn) => toIndicatorTurn(turn, maxTextLength));
+	let state = assembleIndicatorState(session, turns);
+
+	while (measureStateChars(state) > MAX_SESSION_INDICATOR_STATE_CHARS && turns.length > 1) {
+		turns = turns.slice(1);
+		state = assembleIndicatorState(session, turns);
+	}
+
+	while (measureStateChars(state) > MAX_SESSION_INDICATOR_STATE_CHARS && maxTextLength > 200) {
+		maxTextLength = Math.max(200, Math.floor(maxTextLength / 2));
+		const kept = recent.slice(recent.length - turns.length);
+		turns = kept.map((turn) => toIndicatorTurn(turn, maxTextLength));
+		state = assembleIndicatorState(session, turns);
+	}
+
+	if (measureStateChars(state) > MAX_SESSION_INDICATOR_STATE_CHARS && turns.length === 1) {
+		const only = recent[recent.length - 1];
+		if (only) {
+			const overhead = measureStateChars(assembleIndicatorState(session, [
+				only.type === 'request'
+					? { role: 'user', text: '' }
+					: { role: 'assistant', text: '', tools: only.toolCalls.map((toolCall) => toolCall.name) },
+			]));
+			const budget = Math.max(32, MAX_SESSION_INDICATOR_STATE_CHARS - overhead - 8);
+			turns = [toIndicatorTurn(only, budget)];
+			state = assembleIndicatorState(session, turns);
+		}
+	}
+
+	return state;
 }
 
 export function createSessionIndicatorCacheKey(sessionId: string, content: string): string {
@@ -180,6 +233,10 @@ export class SessionIndicatorService {
 	// failed or declined judgment so a tree refresh does not retry it.
 	private readonly cache = new Map<string, SessionIndicatorAnswers | undefined>();
 	private readonly inflight = new Map<string, Promise<SessionIndicatorAnswers | undefined>>();
+	/** Cache keys that failed with a non-retryable max-tokens response. */
+	private readonly maxTokensFailures = new Set<string>();
+	/** Session ids that already logged a truncation or max-tokens note. */
+	private readonly loggedBoundSessions = new Set<string>();
 	private active = 0;
 	private readonly waiting: (() => void)[] = [];
 
@@ -196,7 +253,7 @@ export class SessionIndicatorService {
 	/** Drops failed/declined entries so they are retried; successful judgments stay cached. */
 	public forgetFailures(): void {
 		for (const [key, value] of this.cache) {
-			if (value === undefined) {
+			if (value === undefined && !this.maxTokensFailures.has(key)) {
 				this.cache.delete(key);
 			}
 		}
@@ -219,6 +276,14 @@ export class SessionIndicatorService {
 		}
 	}
 
+	private noteBoundOnce(sessionId: string, message: string): void {
+		if (this.loggedBoundSessions.has(sessionId)) {
+			return;
+		}
+		this.loggedBoundSessions.add(sessionId);
+		this.deps.log?.(message);
+	}
+
 	private async getAnswers(
 		fsPath: string,
 		token?: vscode.CancellationToken,
@@ -238,12 +303,31 @@ export class SessionIndicatorService {
 			return pending;
 		}
 
-		const request = this.runLimited(() => this.deps.judgment.ask(
-			buildSessionIndicatorState(parsed),
-			SESSION_INDICATOR_QUESTIONS,
-			token,
-			this.createAskOptions(fsPath, key),
-		)).then(
+		const state = buildSessionIndicatorState(parsed);
+		const recentTurnCount = Math.min(parsed.turns.length, MAX_STATE_TURNS);
+		const stateTurns = Array.isArray((state as { turns?: unknown }).turns)
+			? ((state as { turns: unknown[] }).turns).length
+			: 0;
+		if (stateTurns < recentTurnCount) {
+			this.noteBoundOnce(
+				parsed.id,
+				`[session-indicators] ${parsed.id}: truncated oversized session for TypeSafe context limit`,
+			);
+		}
+
+		const request = this.runLimited(async () => {
+			const answers = await this.deps.judgment.ask(
+				state,
+				SESSION_INDICATOR_QUESTIONS,
+				token,
+				this.createAskOptions(fsPath, key),
+			);
+			if (!answers && this.deps.judgment.lastErrorKind === 'max-tokens') {
+				// Do not retry the same oversized fingerprint on refresh/forgetFailures.
+				this.maxTokensFailures.add(key);
+			}
+			return answers;
+		}).then(
 			(answers) => answers,
 			() => undefined,
 		);
