@@ -448,7 +448,7 @@ export function buildAutoSaveStatusTooltip(
 		`Healthy sources: ${summary.healthySourceCount}`,
 		`Attention sources: ${summary.attentionSourceCount}`,
 		`Last successful provider/time: ${lastSuccess}`,
-		enabled ? 'Click to disable auto-save.' : 'Click to enable auto-save.',
+		'Click to open the auto-save and saved sessions menu.',
 	].join('\n');
 }
 

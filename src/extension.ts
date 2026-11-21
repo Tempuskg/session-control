@@ -5,6 +5,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { createAnalysisStore } from './analysisStore';
+import { AUTO_SAVE_MENU_COMMAND, runAutoSaveMenu } from './autoSaveMenu';
 import {
 	buildAutoSaveDiagnosticReport,
 	buildAutoSaveStatusTooltip,
@@ -2959,8 +2960,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		registerSessionExplorerVisibilityRefresh(sessionExplorerView, () => sessionExplorerProvider.refresh()),
 	);
 	const autoSaveStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-	autoSaveStatusBar.command = 'session-control.toggleAutoSave';
-	context.subscriptions.push(autoSaveStatusBar);
+	autoSaveStatusBar.command = AUTO_SAVE_MENU_COMMAND;
+	context.subscriptions.push(
+		autoSaveStatusBar,
+		vscode.commands.registerCommand(AUTO_SAVE_MENU_COMMAND, () => runAutoSaveMenu()),
+	);
 
 	const autoSaveDeps = createDefaultAutoSaveOnChatResponseDeps(context);
 	const autoSaveDiagnosticsByWorkspace = new Map<string, AutoSaveDiagnosticState>();

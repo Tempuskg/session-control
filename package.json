@@ -173,6 +173,11 @@
         "category": "Session Control"
       },
       {
+        "command": "session-control.showAutoSaveMenu",
+        "title": "Auto-Save and Saved Sessions",
+        "category": "Session Control"
+      },
+      {
         "command": "session-control.toggleAutoSave",
         "title": "Toggle Auto-Save on Chat Response",
         "category": "Session Control"
@@ -773,6 +778,10 @@
     ],
     "menus": {
       "commandPalette": [
+        {
+          "command": "session-control.showAutoSaveMenu",
+          "when": "false"
+        },
         {
           "command": "session-control.saveSessionFromProvider"
         },
