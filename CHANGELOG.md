@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-11-21
+
+### Changed
+
+- Clicking the auto-save status bar item opens a menu with Toggle Auto-Save, Diagnose Auto-Save, Open Saved Sessions, and Analyze Saved Chats. Opening or cancelling the menu leaves auto-save unchanged.
+
+### Fixed
+
+- Auto-save keeps a stable export file name across saves of the same session instead of alternating between the plain name and an id-suffixed name. If publishing a save fails, the previous export is restored instead of deleted.
+- Saving an analysis on Windows no longer fails when another window, antivirus, or a file watcher briefly locks the target file. The final rename is retried for a short time.
+- TypeSafe session indicators no longer fail on very large sessions. Oversized transcripts are trimmed to fit the model's context limit, and a session that still exceeds it is not retried on every refresh.
+
 ## [1.13.1] - 2026-11-11
 
 ### Fixed
