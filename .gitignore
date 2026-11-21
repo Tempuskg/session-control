@@ -29,3 +29,6 @@ TYPESAFE_AI_PLAN.md
 
 # Local Kanban smoke-test evidence and editor profiles
 .mwnn/evidence/
+
+# Playwright MCP browser console logs and page snapshots
+.playwright-mcp/
