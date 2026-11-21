@@ -752,8 +752,10 @@ suite('sessionStore', () => {
 			const newFileNames = await store.upsertAutoSaveSessions(
 				storageDirectory,
 				[
-					withOrigin('Welcome content (Part 1/2)', '2026-10-22T20:52:00.000Z', 'sha256:new', 1, 2),
-					withOrigin('Welcome content (Part 2/2)', '2026-10-22T20:52:00.000Z', 'sha256:new', 2, 2),
+					// A changed title gives the new revision new names, so the previous parts
+					// must be retired (same-name parts are replaced in place instead).
+					withOrigin('Welcome content renamed (Part 1/2)', '2026-10-22T20:52:00.000Z', 'sha256:new', 1, 2),
+					withOrigin('Welcome content renamed (Part 2/2)', '2026-10-22T20:52:00.000Z', 'sha256:new', 2, 2),
 				],
 				{ sourceId, sourceSessionId },
 				{ includeTimestampInFileName: false },
@@ -782,6 +784,134 @@ suite('sessionStore', () => {
 					.sort(),
 				[...newFileNames].sort(),
 			);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('upsertAutoSaveSessions keeps one stable file name across repeated saves of a session', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const sourceId = 'claude-code-cli';
+		const sourceSessionId = '5d07aaf4-b312-411b-8113-509f430ed061';
+		const options = { includeTimestampInFileName: false };
+		const createAutoSave = (savedAt: string, sourceRevision: string, title = 'Stable title'): ChatSession => ({
+			...createSession(sourceSessionId, savedAt, title),
+			provider: 'claude-code',
+			origin: { saveKind: 'auto', sourceId, sourceSessionId, sourceRevision },
+		});
+
+		try {
+			const store = createSessionStore();
+			const manualFileName = await store.writeSession(
+				storageDirectory,
+				{
+					...createAutoSave('2026-11-18T21:14:00.000Z', 'sha256:manual', 'Manual snapshot'),
+					origin: { saveKind: 'manual', sourceId, sourceSessionId, sourceRevision: 'sha256:manual' },
+				},
+				options,
+			);
+			const manualBefore = await fs.readFile(path.join(storageDirectory, manualFileName), 'utf8');
+
+			const savedNames: string[] = [];
+			for (let save = 1; save <= 4; save += 1) {
+				const [fileName] = await store.upsertAutoSaveSessions(
+					storageDirectory,
+					[createAutoSave(`2026-11-18T21:1${save}:00.000Z`, `sha256:rev-${save}`)],
+					{ sourceId, sourceSessionId },
+					options,
+				);
+				savedNames.push(fileName as string);
+				const autoSaves = await store.findAutoSaveSessionFiles(storageDirectory, sourceId, sourceSessionId);
+				assert.deepEqual(
+					autoSaves.map((file) => file.fileName),
+					[fileName],
+				);
+				assert.equal(autoSaves[0]?.sourceRevision, `sha256:rev-${save}`);
+			}
+
+			assert.deepEqual(savedNames, Array(4).fill('stable-title.json'));
+			assert.equal(await fs.readFile(path.join(storageDirectory, manualFileName), 'utf8'), manualBefore);
+
+			// A different session already owning the plain name keeps this session on its
+			// id-suffixed name, and that suffixed name must not flip back and forth either.
+			const otherFileName = await store.writeSession(
+				storageDirectory,
+				createSession('other-session', '2026-11-18T21:20:00.000Z', 'Shared title'),
+				options,
+			);
+			const sharedNames: string[] = [];
+			for (let save = 5; save <= 7; save += 1) {
+				const [fileName] = await store.upsertAutoSaveSessions(
+					storageDirectory,
+					[createAutoSave(`2026-11-18T21:2${save}:00.000Z`, `sha256:rev-${save}`, 'Shared title')],
+					{ sourceId, sourceSessionId },
+					options,
+				);
+				sharedNames.push(fileName as string);
+			}
+			assert.deepEqual(sharedNames, Array(3).fill('shared-title-5d07aaf4-b31.json'));
+			assert.equal(otherFileName, 'shared-title.json');
+			assert.deepEqual((await fs.readdir(storageDirectory)).filter((file) => file.endsWith('.json')).sort(), [
+				manualFileName,
+				'shared-title-5d07aaf4-b31.json',
+				'shared-title.json',
+			].sort());
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('upsertAutoSaveSessions restores an overwritten previous part when publication fails', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-session-store-'));
+		const storageDirectory = path.join(tempRoot, '.chat');
+		const sourceId = 'claude-code';
+		const sourceSessionId = 'provider-session-overwrite-rollback';
+		const options = { includeTimestampInFileName: false };
+		const createPart = (sourceRevision: string, part: number): ChatSession => ({
+			...createSession(sourceSessionId, '2026-11-18T21:00:00.000Z', `Same title (Part ${part}/2)`),
+			provider: 'claude-code',
+			part,
+			totalParts: 2,
+			origin: { saveKind: 'auto', sourceId, sourceSessionId, sourceRevision },
+		});
+
+		try {
+			const seedStore = createSessionStore();
+			const previousFileNames = await seedStore.upsertAutoSaveSessions(
+				storageDirectory,
+				[createPart('sha256:old', 1), createPart('sha256:old', 2)],
+				{ sourceId, sourceSessionId },
+				options,
+			);
+			const previousContents = await Promise.all(
+				previousFileNames.map((fileName) => fs.readFile(path.join(storageDirectory, fileName), 'utf8')),
+			);
+			let publishCount = 0;
+			const store = createSessionStore({
+				rename: async (fromPath, toPath) => {
+					publishCount += 1;
+					if (publishCount === 2) {
+						throw new Error('simulated second-part rename failure');
+					}
+					await fs.rename(fromPath, toPath);
+				},
+			});
+
+			await assert.rejects(
+				store.upsertAutoSaveSessions(
+					storageDirectory,
+					[createPart('sha256:new', 1), createPart('sha256:new', 2)],
+					{ sourceId, sourceSessionId },
+					options,
+				),
+				/simulated second-part rename failure/,
+			);
+
+			assert.deepEqual((await fs.readdir(storageDirectory)).sort(), [...previousFileNames].sort());
+			for (const [index, fileName] of previousFileNames.entries()) {
+				assert.equal(await fs.readFile(path.join(storageDirectory, fileName), 'utf8'), previousContents[index]);
+			}
 		} finally {
 			await fs.rm(tempRoot, { recursive: true, force: true });
 		}

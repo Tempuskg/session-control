@@ -178,8 +178,11 @@ function createSessionWritePlan(
 	sessions: readonly ChatSession[],
 	options: SessionFileNameOptions,
 	existingFiles: readonly string[],
+	replaceableFiles: ReadonlySet<string> = new Set(),
 ): SessionWritePlanEntry[] {
-	const reservedFileNames = new Set(existingFiles.map((fileName) => fileName.toLowerCase()));
+	const reservedFileNames = new Set(
+		existingFiles.map((fileName) => fileName.toLowerCase()).filter((fileName) => !replaceableFiles.has(fileName)),
+	);
 	const fileNames = sessions.map((session) => {
 		const fileName = resolveUniqueSessionFileName(session, options, reservedFileNames);
 		reservedFileNames.add(fileName.toLowerCase());
@@ -717,12 +720,32 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 			);
 			await ensureStorageDirectory(storageDirectory);
 			const existingFiles = await deps.readdir(storageDirectory);
-			const writePlan = createSessionWritePlan(sessions, options, existingFiles);
+			// This identity's own previous automatic files are replaced, not collided
+			// with. Reserving them would push every other save onto the id-suffixed
+			// name and make the export name alternate between saves.
+			const previousFileNames = new Set(previousFiles.map((file) => file.fileName.toLowerCase()));
+			const writePlan = createSessionWritePlan(sessions, options, existingFiles, previousFileNames);
 			const stagedWrites = writePlan.map((entry) => ({
 				...entry,
 				filePath: path.join(storageDirectory, entry.fileName),
 				tempPath: path.join(storageDirectory, createTempName(entry.fileName)),
 			}));
+			// Keep the bytes of any previous file this save overwrites so a failed
+			// publication can restore it instead of unlinking it.
+			const overwrittenContents = new Map<string, string>();
+			for (const entry of stagedWrites) {
+				if (!previousFileNames.has(entry.fileName.toLowerCase())) {
+					continue;
+				}
+				try {
+					overwrittenContents.set(entry.filePath, await deps.readFile(entry.filePath));
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					if (!/no such file|cannot find|enoent/i.test(message)) {
+						throw error;
+					}
+				}
+			}
 			const publishedPaths: string[] = [];
 
 			try {
@@ -752,6 +775,14 @@ export function createSessionStore(overrides: Partial<SessionStoreDeps> = {}) {
 					await deps.unlink(entry.tempPath).catch(() => undefined);
 				}
 				for (const publishedPath of publishedPaths) {
+					const overwrittenContent = overwrittenContents.get(publishedPath);
+					if (overwrittenContent !== undefined) {
+						await deps.writeFile(publishedPath, overwrittenContent).catch((cleanupError: unknown) => {
+							const reason = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+							deps.logWarning(`Could not restore previous auto-save file ${publishedPath}: ${reason}`);
+						});
+						continue;
+					}
 					await deps.unlink(publishedPath).catch((cleanupError: unknown) => {
 						const reason = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
 						deps.logWarning(`Could not roll back staged auto-save file ${publishedPath}: ${reason}`);
