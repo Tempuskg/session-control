@@ -1,0 +1,388 @@
+{
+  "verifiedAt": "2026-11-15T11:29:37.484Z",
+  "verifier": {
+    "version": "1.0.15",
+    "file": "C:\\Users\\darre\\.vscode\\extensions\\darrenjmcleod.mwnn-kanban-1.0.15\\dist\\extension.js",
+    "sha256": "f6b8ee9d9368a22f008349911e11abfe41d1c605b80d3b690711e9df61132b14"
+  },
+  "scope": "Offline evidence and current implementation checks; no external evaluation, billing proof, semantic-equivalence claim or publication.",
+  "results": [
+    {
+      "cardId": "card-mvq03qy7-1",
+      "criterion": 1,
+      "text": "Benchmark artifacts distinguish tokenizer counts, provider-reported usage, actual billed amounts, and estimates; missing values remain explicitly unavailable rather than zero.",
+      "status": "pass",
+      "evidence": {
+        "before": {
+          "provider": {
+            "name": "openrouter",
+            "modelId": "openai/gpt-6.1-sol",
+            "modelName": "OpenAI: GPT-6.1 Sol",
+            "providerVersion": "1.0.0"
+          },
+          "tokenizerCounts": {
+            "usageSource": "vscode.LanguageModelChat.countTokens",
+            "classification": "tokenizerCount",
+            "analysisBatches": {
+              "status": "measured",
+              "value": {
+                "inputTokens": 91351,
+                "outputTokens": 8623,
+                "callCount": 5
+              },
+              "unit": "tokens",
+              "note": "VS Code tokenizer counts on explicit user messages and returned text."
+            },
+            "synthesis": {
+              "status": "measured",
+              "value": {
+                "inputTokens": 17190,
+                "outputTokens": 3263,
+                "callCount": 1
+              },
+              "unit": "tokens",
+              "note": "VS Code tokenizer counts on the synthesis prompt and returned text."
+            },
+            "armTotal": {
+              "status": "measured",
+              "value": {
+                "inputTokens": 108541,
+                "outputTokens": 11886
+              },
+              "unit": "tokens",
+              "note": "VS Code model.countTokens on the explicit user message and returned text. Provider billed usage, hidden reasoning, system overhead and provider caching are not exposed; these remain unknown."
+            }
+          },
+          "providerReportedUsage": {
+            "status": "unavailable",
+            "value": null,
+            "reason": "VS Code LanguageModelChatResponse exposes text/stream only; no provider usage object is returned to extensions."
+          },
+          "actualBilledAmount": {
+            "status": "unavailable",
+            "value": null,
+            "reason": "No provider invoice, statement line, or account billed amount was attached to this run. Do not treat tokenizer counts as charges."
+          },
+          "cacheUsage": {
+            "status": "unavailable",
+            "value": null,
+            "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+          },
+          "retryOrFailedCharges": {
+            "status": "unavailable",
+            "value": null,
+            "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+          }
+        },
+        "after": {
+          "provider": {
+            "name": "openrouter",
+            "modelId": "openai/gpt-6.1-sol",
+            "modelName": "OpenAI: GPT-6.1 Sol",
+            "providerVersion": "1.0.0"
+          },
+          "tokenizerCounts": {
+            "usageSource": "vscode.LanguageModelChat.countTokens",
+            "classification": "tokenizerCount",
+            "analysisBatches": {
+              "status": "measured",
+              "value": {
+                "inputTokens": 69668,
+                "outputTokens": 6479,
+                "callCount": 4
+              },
+              "unit": "tokens",
+              "note": "VS Code tokenizer counts on explicit user messages and returned text."
+            },
+            "synthesis": {
+              "status": "measured",
+              "value": {
+                "inputTokens": 15041,
+                "outputTokens": 2897,
+                "callCount": 1
+              },
+              "unit": "tokens",
+              "note": "VS Code tokenizer counts on the synthesis prompt and returned text."
+            },
+            "armTotal": {
+              "status": "measured",
+              "value": {
+                "inputTokens": 84709,
+                "outputTokens": 9376
+              },
+              "unit": "tokens",
+              "note": "VS Code model.countTokens on the explicit user message and returned text. Provider billed usage, hidden reasoning, system overhead and provider caching are not exposed; these remain unknown."
+            }
+          },
+          "providerReportedUsage": {
+            "status": "unavailable",
+            "value": null,
+            "reason": "VS Code LanguageModelChatResponse exposes text/stream only; no provider usage object is returned to extensions."
+          },
+          "actualBilledAmount": {
+            "status": "unavailable",
+            "value": null,
+            "reason": "No provider invoice, statement line, or account billed amount was attached to this run. Do not treat tokenizer counts as charges."
+          },
+          "cacheUsage": {
+            "status": "unavailable",
+            "value": null,
+            "reason": "VS Code does not expose provider cache-read or cache-write token counts for LanguageModelChat requests."
+          },
+          "retryOrFailedCharges": {
+            "status": "unavailable",
+            "value": null,
+            "reason": "The editor helper records completed calls only; retry and failed-call billed usage is not exposed by the VS Code LM API."
+          }
+        },
+        "typesafe": {
+          "provider": {
+            "name": "typesafe",
+            "modelIds": [
+              "jev-1.14.0"
+            ],
+            "requestedModel": "jev-latest",
+            "cacheTreatment": "cold; no persisted judgment reads"
+          },
+          "tokenizerCounts": {
+            "status": "unavailable",
+            "value": null,
+            "reason": "TypeSafe System One responses are not measured with VS Code countTokens in this benchmark."
+          },
+          "providerReportedUsage": {
+            "status": "measured",
+            "value": {
+              "inputTokens": 76385,
+              "outputTokens": 4180,
+              "successfulCalls": 44,
+              "failedCalls": 0
+            },
+            "usageSource": "typesafe.systemOne.response.usage",
+            "classification": "providerReported",
+            "unit": "tokens",
+            "note": "Provider-reported usage summed from successful records. Failed calls contribute neither tokens nor a verified billed amount."
+          },
+          "actualBilledAmount": {
+            "status": "unavailable",
+            "value": null,
+            "reason": "TypeSafe console invoice/statement for this run was not supplied. Rate × provider-reported usage is an estimate until account evidence confirms the charge."
+          },
+          "cacheUsage": {
+            "status": "measured",
+            "value": {
+              "treatment": "cold; no persisted judgment reads",
+              "billedCacheTokens": null
+            },
+            "usageSource": "triage.cache",
+            "classification": "providerReported",
+            "note": "Run recorded cold; no persisted judgment reads. No separate cache token field is present on TypeSafe usage."
+          },
+          "retryOrFailedCharges": {
+            "status": "measured",
+            "value": {
+              "configuredMaxRetries": 0,
+              "failedCalls": 0,
+              "attributableRetryCharges": null,
+              "note": "Runner configured maxRetries: 0; no failed calls in the complete run."
+            },
+            "usageSource": "run.cjs TypeSafeClient retry config + triage.records[].state",
+            "classification": "providerReported"
+          }
+        }
+      }
+    },
+    {
+      "cardId": "card-mvq03qy7-1",
+      "criterion": 2,
+      "text": "Cost calculation includes analysis, synthesis, TypeSafe, and attributable cache/retry charges, using recorded rates and usage sources; unavailable components prevent a verified savings claim.",
+      "status": "pass",
+      "evidence": "All analysis batch/synthesis calls + TypeSafe reconcile with recorded USD list rates (2/10 and 0.042 per million); cache/retry and billed totals unavailable. Historical catalog arithmetic checked, current tariffs and invoices not verified."
+    },
+    {
+      "cardId": "card-mvq03qy7-1",
+      "criterion": 3,
+      "text": "Recomputing a summary preserves recorded human decisions and historical runs; focused checks cover missing usage, arithmetic reconciliation, and decision preservation.",
+      "status": "pass",
+      "evidence": "ok - missing usage remains unavailable rather than zero\nok - absent TypeSafe usage blocks priced TypeSafe component\nok - arithmetic reconciliation of tokens and rate formulas\nok - recompute preserves human decision and archives historical runs\n{\n  \"passed\": 3,\n  \"financialSavingsEstablished\": false,\n  \"decision\": \"adjust before shipping as a cost-saving feature\"\n}\n"
+    },
+    {
+      "cardId": "card-mvq03qy7-1",
+      "criterion": 4,
+      "text": "Record which cost evidence is obtainable and any precise external evidence still required, without claiming that financial savings have been established prematurely.",
+      "status": "pass",
+      "evidence": "cost-evidence.md identifies precise model/time-window usage and billing exports; no credentials required. Adjusted run invoices also absent. Unknown billing is an accepted claim limitation, not a successful billing verification."
+    },
+    {
+      "cardId": "card-mvq03qy7-2",
+      "criterion": 1,
+      "text": "Record the production-versus-fixture payload diagnosis and implement a documented reduction in duplicated or unnecessary triage input with reproducible before/after payload measurements.",
+      "status": "pass",
+      "evidence": {
+        "fixtureEvalPath": {
+          "beforeLabel": "eval-v1: full-fixture adapter + legacy summaryOnly+edges builder",
+          "afterLabel": "eval-v2: revised adapter + triage-payload-v2 builder",
+          "beforeTotalChars": 187002,
+          "afterTotalChars": 81376,
+          "charReduction": "56.48%"
+        },
+        "productionShapedPath": {
+          "beforeLabel": "production-shaped: legacy summaryOnly+edges builder",
+          "afterLabel": "production-shaped: triage-payload-v2 builder",
+          "beforeTotalChars": 92042,
+          "afterTotalChars": 66633,
+          "charReduction": "27.61%"
+        },
+        "adapterDuplicationIsolated": {
+          "beforeLabel": "eval-v1: full-fixture adapter + legacy summaryOnly+edges builder",
+          "afterLabel": "adapter-only fix: meta summary + legacy builder",
+          "beforeTotalChars": 187002,
+          "afterTotalChars": 112309,
+          "charReduction": "39.94%",
+          "note": "Same legacy builder; only fixture summary changed. This isolates adapter duplication from production builder overhead."
+        }
+      }
+    },
+    {
+      "cardId": "card-mvq03qy7-2",
+      "criterion": 2,
+      "text": "Relevant tests cover preserved evidence signals, disabled/error fallback, and appropriate cache invalidation for changed inference inputs; repository-required validation passes for touched code.",
+      "status": "pass",
+      "evidence": "Mapped additionally to compile-tests, compile, repository-tests and lint commands. Existing production tests cover evidence signals, disabled/error/cancellation and judgment cache; their fresh results are recorded in validation logs."
+    },
+    {
+      "cardId": "card-mvq03qy7-2",
+      "criterion": 3,
+      "text": "Preserve the original evaluation artifacts and identify the revised payload/question/cache versions so subsequent results cannot be mistaken for the original run.",
+      "status": "pass",
+      "evidence": "Original v1 files retained; v2 prepared/config artifacts and current production question/cache/payload identities agree; threshold remains 0.7."
+    },
+    {
+      "cardId": "card-mvq03qy7-2",
+      "criterion": 4,
+      "text": "Prepare the adjusted implementation for the separate live evaluation card; make no claim of preserved model recall or financial savings from synthetic judgments alone.",
+      "status": "pass",
+      "evidence": "Versioned preparation and separate live evidence exist; synthetic character reduction is not model recall or monetary savings."
+    },
+    {
+      "cardId": "card-mvq03qy7-3",
+      "criterion": 1,
+      "text": "Save at least three paired repetitions with raw per-call evidence, configuration/hashes, alternating arm order, and separately identified cache conditions; no failed/fallback run is presented as successful model recall.",
+      "status": "pass",
+      "evidence": "3 complete alternating pairs; 132 successful triage records; fixture bytes, fingerprints, label hash, configurations and model identities checked. Cache labels are procedural. Pair 3 analysis reuses pair 1 triage overhead; its separate triage repetition is not its attributed overhead. Provider version 1.0.0 is not a weight snapshot; SDK ^0.6.0 is a range."
+    },
+    {
+      "cardId": "card-mvq03qy7-3",
+      "criterion": 2,
+      "text": "Record per-run and aggregate end-to-end time, analysis tokens, TypeSafe usage, and supported total cost; label unverified billing components and make no monetary-savings claim where they remain unavailable.",
+      "status": "pass",
+      "evidence": [
+        {
+          "pairId": "pair-1",
+          "arm": "baseline",
+          "e2e": 192609.4105,
+          "tokens": 76387
+        },
+        {
+          "pairId": "pair-1",
+          "arm": "triageEnabled",
+          "e2e": 140332.45669999998,
+          "tokens": 57602
+        },
+        {
+          "pairId": "pair-2",
+          "arm": "triageEnabled",
+          "e2e": 138832.7296,
+          "tokens": 57236
+        },
+        {
+          "pairId": "pair-2",
+          "arm": "baseline",
+          "e2e": 184343.85429999995,
+          "tokens": 76256
+        },
+        {
+          "pairId": "pair-3",
+          "arm": "baseline",
+          "e2e": 173623.70900000003,
+          "tokens": 75115
+        },
+        {
+          "pairId": "pair-3",
+          "arm": "triageEnabled",
+          "e2e": 132066.71300000005,
+          "tokens": 56945
+        }
+      ]
+    },
+    {
+      "cardId": "card-mvq03qy7-3",
+      "criterion": 3,
+      "text": "Record adjusted-threshold recall against all 16 positives, all misses, and comparison with the original 16/16 result at 0.7; any regression is explicit rather than silently accepted.",
+      "status": "pass",
+      "evidence": "Recomputed policy from raw judgments: 16/16 at 0.7 in original and all three v2 runs; misses [], skips eval-13/15/24/31/37. No fallback counted as recall."
+    },
+    {
+      "cardId": "card-mvq03qy7-3",
+      "criterion": 4,
+      "text": "Record a structured comparison of report recommendation quality and evidence support, plus unresolved representativeness limits, for human review.",
+      "status": "pass",
+      "evidence": {
+        "quality": [
+          {
+            "pair": "pair-1",
+            "arms": [
+              {
+                "arm": "baseline",
+                "chars": 15404,
+                "citations": 27
+              },
+              {
+                "arm": "triageEnabled",
+                "chars": 13903,
+                "citations": 22
+              }
+            ]
+          },
+          {
+            "pair": "pair-2",
+            "arms": [
+              {
+                "arm": "triageEnabled",
+                "chars": 11926,
+                "citations": 20
+              },
+              {
+                "arm": "baseline",
+                "chars": 15281,
+                "citations": 23
+              }
+            ]
+          },
+          {
+            "pair": "pair-3",
+            "arms": [
+              {
+                "arm": "baseline",
+                "chars": 12527,
+                "citations": 22
+              },
+              {
+                "arm": "triageEnabled",
+                "chars": 11631,
+                "citations": 19
+              }
+            ]
+          }
+        ],
+        "limits": "Shorter triage reports cite fewer sessions (27→22, 23→20, 22→19); changed themes and false all-44 coverage claim remain accepted defects, not proof of semantic equivalence. Compact fixtures omit middle turns/tool events. Human acceptance is user-reported; no new sign-off or publication authorization."
+      }
+    },
+    {
+      "cardId": "card-mvq03qy7-3",
+      "criterion": 5,
+      "text": "Reconcile counts, token/cost totals, dependencies between artifacts, and JSON validity; summarize whether adjustments improved the intended outcomes, including negative results.",
+      "status": "pass",
+      "evidence": "Entire machine summary reproduces exactly except generatedAt; raw dependencies, totals, recall, cost classes, structural quality and negative outcomes reconcile. Original JSON/Markdown and human decisions not rewritten."
+    }
+  ]
+}

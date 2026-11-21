@@ -1,0 +1,171 @@
+{
+  "checkedAt": "2026-11-15T11:26:19.919Z",
+  "installedVersion": "1.0.15",
+  "bundleSha256": "f6b8ee9d9368a22f008349911e11abfe41d1c605b80d3b690711e9df61132b14",
+  "valid": false,
+  "revalidatedBeforeExport": false,
+  "reason": "Independent check compile-tests failed, timed out or was cancelled.",
+  "mappings": [
+    {
+      "cardId": "card-mvq03qy7-1",
+      "text": "Benchmark artifacts distinguish tokenizer counts, provider-reported usage, actual billed amounts, and estimates; missing values remain explicitly unavailable rather than zero.",
+      "checks": [
+        "accounting"
+      ]
+    },
+    {
+      "cardId": "card-mvq03qy7-1",
+      "text": "Cost calculation includes analysis, synthesis, TypeSafe, and attributable cache/retry charges, using recorded rates and usage sources; unavailable components prevent a verified savings claim.",
+      "checks": [
+        "accounting"
+      ]
+    },
+    {
+      "cardId": "card-mvq03qy7-1",
+      "text": "Recomputing a summary preserves recorded human decisions and historical runs; focused checks cover missing usage, arithmetic reconciliation, and decision preservation.",
+      "checks": [
+        "accounting"
+      ]
+    },
+    {
+      "cardId": "card-mvq03qy7-1",
+      "text": "Record which cost evidence is obtainable and any precise external evidence still required, without claiming that financial savings have been established prematurely.",
+      "checks": [
+        "accounting"
+      ]
+    },
+    {
+      "cardId": "card-mvq03qy7-2",
+      "text": "Record the production-versus-fixture payload diagnosis and implement a documented reduction in duplicated or unnecessary triage input with reproducible before/after payload measurements.",
+      "checks": [
+        "payload",
+        "compile-tests",
+        "compile",
+        "repository-tests",
+        "lint"
+      ]
+    },
+    {
+      "cardId": "card-mvq03qy7-2",
+      "text": "Relevant tests cover preserved evidence signals, disabled/error fallback, and appropriate cache invalidation for changed inference inputs; repository-required validation passes for touched code.",
+      "checks": [
+        "payload",
+        "compile-tests",
+        "compile",
+        "repository-tests",
+        "lint"
+      ]
+    },
+    {
+      "cardId": "card-mvq03qy7-2",
+      "text": "Preserve the original evaluation artifacts and identify the revised payload/question/cache versions so subsequent results cannot be mistaken for the original run.",
+      "checks": [
+        "payload",
+        "compile-tests",
+        "compile",
+        "repository-tests",
+        "lint"
+      ]
+    },
+    {
+      "cardId": "card-mvq03qy7-2",
+      "text": "Prepare the adjusted implementation for the separate live evaluation card; make no claim of preserved model recall or financial savings from synthetic judgments alone.",
+      "checks": [
+        "payload",
+        "compile-tests",
+        "compile",
+        "repository-tests",
+        "lint"
+      ]
+    },
+    {
+      "cardId": "card-mvq03qy7-3",
+      "text": "Save at least three paired repetitions with raw per-call evidence, configuration/hashes, alternating arm order, and separately identified cache conditions; no failed/fallback run is presented as successful model recall.",
+      "checks": [
+        "reeval"
+      ]
+    },
+    {
+      "cardId": "card-mvq03qy7-3",
+      "text": "Record per-run and aggregate end-to-end time, analysis tokens, TypeSafe usage, and supported total cost; label unverified billing components and make no monetary-savings claim where they remain unavailable.",
+      "checks": [
+        "reeval"
+      ]
+    },
+    {
+      "cardId": "card-mvq03qy7-3",
+      "text": "Record adjusted-threshold recall against all 16 positives, all misses, and comparison with the original 16/16 result at 0.7; any regression is explicit rather than silently accepted.",
+      "checks": [
+        "reeval"
+      ]
+    },
+    {
+      "cardId": "card-mvq03qy7-3",
+      "text": "Record a structured comparison of report recommendation quality and evidence support, plus unresolved representativeness limits, for human review.",
+      "checks": [
+        "reeval"
+      ]
+    },
+    {
+      "cardId": "card-mvq03qy7-3",
+      "text": "Reconcile counts, token/cost totals, dependencies between artifacts, and JSON validity; summarize whether adjustments improved the intended outcomes, including negative results.",
+      "checks": [
+        "reeval"
+      ]
+    },
+    {
+      "cardId": "card-mwhqmgjl-1",
+      "text": "Workspace verification configuration parses and is accepted by the supported MWNN verifier, with a check mapping for each original criterion of the three named cards.",
+      "checks": [
+        "accounting",
+        "payload",
+        "reeval",
+        "repository-tests",
+        "lint",
+        "diff"
+      ]
+    },
+    {
+      "cardId": "card-mwhqmgjl-1",
+      "text": "Independent verification produces dated per-criterion evidence or a precise failure for accounting, payload adjustment and re-evaluation; successful verification does not silently imply provider billing or semantic equivalence.",
+      "checks": [
+        "accounting",
+        "payload",
+        "reeval",
+        "repository-tests",
+        "lint",
+        "diff"
+      ]
+    },
+    {
+      "cardId": "card-mwhqmgjl-1",
+      "text": "Record resolution of the missing-input handoff failure, or leave this card incomplete with the exact remaining gap; preserve historical artifacts and product sign-off.",
+      "checks": [
+        "accounting",
+        "payload",
+        "reeval",
+        "repository-tests",
+        "lint",
+        "diff"
+      ]
+    }
+  ],
+  "receipt": null,
+  "receiptScope": "Installed verifier factory run with fresh inputs; receipt held in memory during checks then exported locally. Not a live-loop dispatch receipt. Export changes the repository digest; redispatch captures the final profile and evidence.",
+  "logs": [
+    {
+      "id": "compile-tests",
+      "command": "C:\\Program Files\\nodejs\\npm.cmd",
+      "args": [
+        "run",
+        "compile-tests"
+      ],
+      "cwd": "E:\\chat-commit",
+      "started": true,
+      "cancelled": false,
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "Network access is denied.\r\n"
+    }
+  ]
+}
