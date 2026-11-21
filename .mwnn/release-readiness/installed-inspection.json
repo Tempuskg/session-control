@@ -1,0 +1,19 @@
+{
+  "inspectedAt": "2026-11-15T12:08:48.090Z",
+  "root": "C:/Users/darre/.vscode/extensions/darrenjmcleod.session-control-1.13.1",
+  "version": "1.13.1",
+  "bundleSha256": "3fb8cd8b8cd9f87427a9c10e65b6972bcb94fe060f8817469b657e358523ad43",
+  "triageModuleSha256": "8709f29f774d3a3c72a35af978028ce3dddcf243417bd258cd360e302de6d875",
+  "proVersion": "0.10.3",
+  "proBundleSha256": "b058cfa100f2fd6d0947c76e75100698ba9c98903737ed3b79c1470726aa4ee4",
+  "checks": [
+    "production module loads in isolation",
+    "threshold 0.7 boundary",
+    "question/payload v2",
+    "clipped summary/user prompts",
+    "tool-name counts without outputs",
+    "no duplicated evidence",
+    "bundled Pro 0.10.3 resolves; no source map"
+  ],
+  "limits": "Read-only isolated module smoke; not an interactive Extension Host or licensed Pro smoke. No external model call."
+}

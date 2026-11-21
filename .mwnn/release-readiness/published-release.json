@@ -1,0 +1,17 @@
+{
+  "checkedAt": "2026-11-15T12:07:31.700Z",
+  "url": "https://github.com/Tempuskg/session-control/releases/tag/v1.13.1",
+  "tag": "v1.13.1",
+  "publishedAt": "2026-11-11T21:52:31Z",
+  "draft": false,
+  "prerelease": false,
+  "assets": [
+    {
+      "id": 737032570,
+      "name": "session-control-1.13.1.vsix",
+      "size": 6294910,
+      "digest": "sha256:cbb7f817634796b9ec6457f44e8beb4082bb24c1d1f760ad75536c1d09a6fd0b",
+      "url": "https://github.com/Tempuskg/session-control/releases/download/v1.13.1/session-control-1.13.1.vsix"
+    }
+  ]
+}

@@ -1,0 +1,177 @@
+{
+  "total_count": 1,
+  "jobs": [
+    {
+      "id": 130811260245,
+      "run_id": 43106549129,
+      "workflow_name": "Release",
+      "head_branch": "v1.13.1",
+      "run_url": "https://api.github.com/repos/Tempuskg/session-control/actions/runs/43106549129",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOSDX0JM8AAAAedPVtVQ",
+      "head_sha": "4dffa2aec5b1805f1420aebb97509fd122167e07",
+      "url": "https://api.github.com/repos/Tempuskg/session-control/actions/jobs/130811260245",
+      "html_url": "https://github.com/Tempuskg/session-control/actions/runs/43106549129/job/130811260245",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-11T21:50:17Z",
+      "started_at": "2026-11-11T21:50:19Z",
+      "completed_at": "2026-11-11T21:52:46Z",
+      "name": "publish",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-11T21:50:20Z",
+          "completed_at": "2026-11-11T21:50:21Z"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-11T21:50:21Z",
+          "completed_at": "2026-11-11T21:50:22Z"
+        },
+        {
+          "name": "Setup Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-11T21:50:22Z",
+          "completed_at": "2026-11-11T21:50:23Z"
+        },
+        {
+          "name": "Configure GitHub Packages auth",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-11T21:50:23Z",
+          "completed_at": "2026-11-11T21:50:23Z"
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-11T21:50:23Z",
+          "completed_at": "2026-11-11T21:51:16Z"
+        },
+        {
+          "name": "Resolve release tag",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-11T21:51:16Z",
+          "completed_at": "2026-11-11T21:51:16Z"
+        },
+        {
+          "name": "Validate publish secrets",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-11T21:51:16Z",
+          "completed_at": "2026-11-11T21:51:16Z"
+        },
+        {
+          "name": "Lint",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-11T21:51:16Z",
+          "completed_at": "2026-11-11T21:51:19Z"
+        },
+        {
+          "name": "Build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-11T21:51:19Z",
+          "completed_at": "2026-11-11T21:51:24Z"
+        },
+        {
+          "name": "Compile tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-11-11T21:51:24Z",
+          "completed_at": "2026-11-11T21:51:28Z"
+        },
+        {
+          "name": "Run extension tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-11-11T21:51:28Z",
+          "completed_at": "2026-11-11T21:51:56Z"
+        },
+        {
+          "name": "Package extension",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-11-11T21:51:56Z",
+          "completed_at": "2026-11-11T21:52:13Z"
+        },
+        {
+          "name": "Publish to VS Code Marketplace",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-11-11T21:52:13Z",
+          "completed_at": "2026-11-11T21:52:16Z"
+        },
+        {
+          "name": "Publish to Open VSX",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-11-11T21:52:16Z",
+          "completed_at": "2026-11-11T21:52:23Z"
+        },
+        {
+          "name": "Create GitHub release",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-11-11T21:52:23Z",
+          "completed_at": "2026-11-11T21:52:31Z"
+        },
+        {
+          "name": "Post Setup Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29,
+          "started_at": "2026-11-11T21:52:31Z",
+          "completed_at": "2026-11-11T21:52:35Z"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 30,
+          "started_at": "2026-11-11T21:52:35Z",
+          "completed_at": "2026-11-11T21:52:35Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 31,
+          "started_at": "2026-11-11T21:52:35Z",
+          "completed_at": "2026-11-11T21:52:35Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/Tempuskg/session-control/check-runs/130811260245",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000002135,
+      "runner_name": "GitHub Actions 1000002135",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

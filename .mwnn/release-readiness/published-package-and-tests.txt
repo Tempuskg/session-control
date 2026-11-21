@@ -1,0 +1,88 @@
+2026-11-11T21:50:20.3317804Z Ubuntu
+2026-11-11T21:50:20.3318789Z 24.04.5
+2026-11-11T21:50:20.3326452Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-11T21:50:22.5553166Z 4dffa2aec5b1805f1420aebb97509fd122167e07
+2026-11-11T21:50:22.6720451Z 4dffa2aec5b1805f1420aebb97509fd122167e07
+2026-11-11T21:50:23.6180182Z node: v24.22.2
+2026-11-11T21:50:23.6181076Z npm: 11.19.1
+2026-11-11T21:51:37.9014668Z ✔ Validated version: 1.146.0
+2026-11-11T21:51:56.6961317Z   717 passing (6s)
+2026-11-11T21:51:56.6962192Z Extension host test runner exit code: 0
+2026-11-11T21:52:13.2409101Z Packaged: /home/runner/work/session-control/session-control/session-control-1.13.1.vsix (21 files, 6 MB)
+2026-11-11T21:52:16.3983592Z Published darrenjmcleod.session-control v1.13.1.
+2026-11-11T21:52:23.9452635Z 🚀  Published darrenjmcleod.session-control v1.13.1
+2026-11-11T21:51:56.1861918Z   typesafe analysis triage
+2026-11-11T21:51:56.1864933Z     ✔ asks the five triage questions
+2026-11-11T21:51:56.1867787Z     ✔ state keeps summary, tools, user prompts, and edge turns without tool outputs
+2026-11-11T21:51:56.1879399Z     ✔ single-turn sessions send only a first turn
+2026-11-11T21:51:56.1885876Z     ✔ erroring judgment feature check falls back without results
+2026-11-11T21:51:56.1892186Z     ✔ disabled TypeSafe sends nothing and returns no results
+2026-11-11T21:51:56.1902607Z     ✔ disabled triage feature sends nothing
+2026-11-11T21:51:56.1905674Z     ✔ sends one triage request per candidate and keys results by fingerprint
+2026-11-11T21:51:56.1919160Z     ✔ caches answers via the judgment cache so re-runs do not re-query
+2026-11-11T21:51:56.1926107Z     ✔ changed question-set or payload version misses the old cache entry
+2026-11-11T21:51:56.1935489Z     ✔ a failing judgment drops only that candidate
+2026-11-11T21:51:56.1941640Z   typesafe analysis triage policy
+2026-11-11T21:51:56.1947289Z     ✔ weights and thresholds are code constants, not part of the questions
+2026-11-11T21:51:56.1959802Z     ✔ priority is the weighted sum of normalized signals
+2026-11-11T21:51:56.1967030Z     ✔ trivial passes at the threshold
+2026-11-11T21:51:56.1971374Z     ✔ trivial sessions are skipped and the rest are ranked by priority
+2026-11-11T21:51:56.1975679Z     ✔ candidates without triage answers are kept at a neutral priority
+2026-11-11T21:51:56.1988373Z     ✔ evidence detail follows priority rank within the batch budget
+2026-11-11T21:51:56.1995989Z     ✔ detail never increases as rank decreases
+2026-11-11T21:51:56.2006963Z   typesafe/apiKey
+2026-11-11T21:51:56.2007975Z     Resolution order: SecretStorage then env var
+2026-11-11T21:51:56.2015884Z       ✔ returns SecretStorage key when both SecretStorage and env var are set
+2026-11-11T21:51:56.2021336Z       ✔ falls back to env var when SecretStorage is empty
+2026-11-11T21:51:56.2028514Z       ✔ falls back to env var when SecretStorage returns whitespace string
+2026-11-11T21:51:56.2032858Z       ✔ falls back to env var when SecretStorage returns empty string
+2026-11-11T21:51:56.2040454Z       ✔ falls back to env var when SecretStorage is undefined
+2026-11-11T21:51:56.2050047Z       ✔ falls back to env var when SecretStorage throws an error
+2026-11-11T21:51:56.2059776Z       ✔ returns undefined when neither SecretStorage nor env var has a key
+2026-11-11T21:51:56.2066738Z       ✔ returns undefined when env var is whitespace only
+2026-11-11T21:51:56.2073858Z       ✔ trims whitespace from SecretStorage key
+2026-11-11T21:51:56.2106350Z       ✔ trims whitespace from env var key
+2026-11-11T21:51:56.2194452Z [typesafe] success model=jev-latest latency=9ms inputTokens=1 outputTokens=1
+2026-11-11T21:51:56.2200138Z       ✔ TypeSafeJudgmentService resolves SecretStorage before env var in network requests
+2026-11-11T21:51:56.2265237Z [typesafe] success model=jev-latest latency=4ms inputTokens=1 outputTokens=1
+2026-11-11T21:51:56.2273123Z       ✔ TypeSafeJudgmentService falls back to env var in network requests when secrets empty
+2026-11-11T21:52:12.9611360Z Files included in the VSIX:
+2026-11-11T21:52:12.9611927Z session-control-1.13.1.vsix
+2026-11-11T21:52:12.9612668Z ├─ [Content_Types].xml 
+2026-11-11T21:52:12.9613168Z ├─ extension.vsixmanifest 
+2026-11-11T21:52:12.9613618Z └─ extension/
+2026-11-11T21:52:12.9614055Z    ├─ LICENSE.txt [1.06 KB]
+2026-11-11T21:52:12.9614458Z    ├─ changelog.md 
+2026-11-11T21:52:12.9614755Z    ├─ package.json [42.7 KB]
+2026-11-11T21:52:12.9615069Z    ├─ readme.md 
+2026-11-11T21:52:12.9615300Z    ├─ dist/
+2026-11-11T21:52:12.9615576Z    │  ├─ extension.js [383.75 KB]
+2026-11-11T21:52:12.9615903Z    │  └─ mcpServer.js [40.75 KB]
+2026-11-11T21:52:12.9616182Z    ├─ media/
+2026-11-11T21:52:12.9616472Z    │  ├─ session-control.png [1.38 KB]
+2026-11-11T21:52:12.9616838Z    │  ├─ session-control.svg [0.56 KB]
+2026-11-11T21:52:12.9617194Z    │  ├─ session-viewer.css [8.89 KB]
+2026-11-11T21:52:12.9617512Z    │  └─ screenshots/
+2026-11-11T21:52:12.9617794Z    │     ├─ demo.gif [2.32 MB]
+2026-11-11T21:52:12.9618117Z    │     ├─ global-search.png [131.97 KB]
+2026-11-11T21:52:12.9618485Z    │     ├─ harvest-preview.png [309.52 KB]
+2026-11-11T21:52:12.9618844Z    │     ├─ pro-demo.gif [2.82 MB]
+2026-11-11T21:52:12.9619184Z    │     ├─ provider-picker.png [146.82 KB]
+2026-11-11T21:52:12.9619547Z    │     ├─ resume-session.png [142.93 KB]
+2026-11-11T21:52:12.9619893Z    │     ├─ save-session.png [140.01 KB]
+2026-11-11T21:52:12.9620643Z    │     └─ session-explorer.png [121.6 KB]
+2026-11-11T21:52:12.9621322Z    └─ node_modules/
+2026-11-11T21:52:12.9621571Z       └─ @tempuskg/
+2026-11-11T21:52:12.9621859Z          └─ session-control-pro/
+2026-11-11T21:52:12.9622206Z             ├─ package.json [1.96 KB]
+2026-11-11T21:52:12.9622498Z             └─ dist/
+2026-11-11T21:52:12.9622793Z                └─ index.js [350.31 KB]
+2026-11-11T21:52:12.9622969Z 
+2026-11-11T21:52:13.2409101Z Packaged: /home/runner/work/session-control/session-control/session-control-1.13.1.vsix (21 files, 6 MB)
+2026-11-11T21:52:13.2949206Z ##[group]Run set +e
+2026-11-11T21:52:13.2949476Z set +e
+2026-11-11T21:52:13.2949905Z publish_output="$(npx @vscode/vsce publish --packagePath "session-control-1.13.1.vsix" 2>&1)"
+2026-11-11T21:52:13.2950410Z publish_status=$?
+2026-11-11T21:52:13.2950645Z set -e
+2026-11-11T21:52:13.2951199Z printf '%s\n' "$publish_output"
+2026-11-11T21:52:13.2951523Z if [ "$publish_status" -ne 0 ]; then
