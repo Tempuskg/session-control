@@ -129,7 +129,9 @@ How these differ from the free commands:
   control file.
 - The free **Import Copilot Guidance as ... Skills** commands copy Copilot guidance into new skill
   files once and skip copies that already exist. **Sync AI Skills Across Assistants** also updates
-  existing copies in both directions. The free import commands stay free.
+  existing copies in both directions, including reading skill edits back into Copilot. When
+  copies diverge, choose which version to keep and preview the changes before applying them.
+  Skills sync runs locally. The free import commands stay free.
 
 Git sync uses three settings: `session-control-pro.gitSync.remoteUrl` (empty by default,
 which leaves sync off) and `session-control-pro.gitSync.branch` (default `main`) are
@@ -149,6 +151,8 @@ such as relevance-selected resume context.
 Run **Get Session Control Pro** from the Command Palette, or visit
 [sessioncontrol.dev/#pro](https://sessioncontrol.dev/#pro) for pricing and checkout. After
 purchase, run **Enter Pro License Key** and paste the key from your receipt.
+Use **Show Pro License Status** to check activation, or **Clear Pro License Key** to remove
+the stored key.
 
 ## Commands
 

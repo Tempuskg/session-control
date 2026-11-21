@@ -191,3 +191,12 @@ Pages touched: command-gui-access-plan.md, index.md, log.md
 ## [2026-10-29] update | Agent-Mode Tools Lead; @session-control Marked Legacy
 Following card-mvu3rtoq-3, README, CHANGELOG Unreleased, and the listing keywords now lead with the Copilot agent-mode language-model tools (`#savedSessions`, `#resumeSession`, `#analyzeSessions`, `#implementationPrompt`) and the stdio MCP server (`docs/mcp-server.md`). The `@session-control` participant stays registered and is labeled the legacy classic-chat path, not removed. Updated the minimum VS Code version to `^1.95.0`.
 Pages touched: chat-participant.md, resume-system.md, overview.md, architecture.md, index.md, log.md
+
+## [2026-11-14] update | Pro Listing Copy Coworking Preflight
+Verified evidence: README.md already contains Pro listing copy, including session export, local AI skills sync, and the free one-way import boundary. Updated open-vsx-listing.md §3.6.3 against current package.json command contributions and the installed Pro sync preview/conflict flow. Human approval to include the existing copy in this release remains pending in §4 and card-muiovew2-3; no pricing, live availability, or publication decision was inferred.
+Clarified the existing README sync boundary and preview wording and documented license status/clear commands. Implementation code did not change.
+Pages touched: README.md, open-vsx-listing.md, log.md
+
+## [2026-11-14] update | Pro Listing Copy Approved
+User-reported approval: the owner answered "yes" in the card-muiovew2-3 coworking chat to including the revised README Pro section in this release. Recorded the decision in open-vsx-listing.md §4 and updated §3.6.3 to reflect approval. This approves listing copy only; publication and live marketplace/checkout verification remain separate.
+Pages touched: open-vsx-listing.md, log.md

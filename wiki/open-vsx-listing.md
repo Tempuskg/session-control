@@ -2,7 +2,7 @@
 title: "Open VSX Listing — Audit & Rewrite"
 type: reference
 created: 2026-06-28
-updated: 2026-08-02
+updated: 2026-11-14
 status: Step 1 + Step 2 shipped in v1.3.4; Step 3 (overview restructure) drafted 2026-08-02, awaiting release
 ---
 
@@ -232,15 +232,40 @@ at package time — verified against the published v1.3.6 readme, where `CONTRIB
 `LICENSE` are already rewritten. The `docs/auto-save.md` link therefore resolves on both
 listings without shipping the file inside the VSIX.
 
-### 3.6.3 Known gap — Pro commands are undocumented on the listing
+### 3.6.3 Pro command surface — copy approved for this release
 
-`package.json` v1.3.6 contributes `session-control.enterProLicenseKey`,
-`clearProLicenseKey`, `showProLicenseStatus`, `session-control-pro.harvestKnowledge`, and
-`harvestSessionFromExplorer`. A user who installs the extension sees **Session Control Pro:**
-entries in the Command Palette with no explanation anywhere in the overview. Step 1 deliberately
-excluded Pro copy because billing had not shipped; that premise has now changed. Writing the Pro
-section is human-owned (pricing, availability, and tier boundaries are not agent-inferable) and
-is tracked as a separate item rather than being drafted here.
+Verified evidence (2026-11-14): the workspace `README.md` already contains a **Session Control
+Pro** section. The earlier claim that Pro commands are undocumented is superseded by that
+section; this does not verify what is currently rendered on either marketplace.
+
+The current `package.json` (workspace version 1.13.1) contributes these Pro-category commands:
+
+- **Get Session Control Pro**, **Enter Pro License Key**, **Clear Pro License Key**, and
+  **Show Pro License Status**.
+- **Harvest Knowledge to OKF Bundle**, **Preview Knowledge Harvest (Dry Run)**,
+  **Import and Harvest Word Document...**, and **Harvest This Session**.
+- **Search Saved Sessions (All Workspaces)**.
+- **Export Session to AI Control File...**, available from a saved-session context menu.
+- **Sync AI Skills Across Assistants**.
+- **Push Saved Sessions to Git** and **Pull Saved Sessions from Git**.
+
+Verified evidence: the README covers these feature commands, including export and AI skills
+sync, describes Pro as an optional paid layer in the same extension, explains license entry,
+and links to pricing rather than asserting a price. It also documents the license-free harvest
+preview, clearing a license, and checking license status. The coworking edit makes the local
+sync, reverse-to-Copilot, conflict-choice, and preview steps explicit in the existing copy.
+
+The free **Import Copilot Guidance as Cursor / Codex / Claude Code Skills** commands remain
+one-way imports that skip existing copies. Pro sync adds updates to existing copies, reading
+edits back into Copilot, and resolving diverged copies with a preview available before applying
+writes. AI skills sync runs locally; it is distinct from the explicit Git push/pull commands.
+Sources: this card's scope (`.mwnn/cards/card-muiovew2-3.md`), the README's free/Pro comparison,
+and the installed Pro bundle's sync preview and conflict-selection flow.
+
+User-reported decision (2026-11-14, coworking chat for card `card-muiovew2-3`): the owner
+answered "yes" to approving the revised README Pro section for this release and recording
+"yes" in §4. This resolves the listing-copy decision. It does not authorize publication or
+verify live pricing, checkout availability, or marketplace rendering.
 
 ---
 
@@ -268,7 +293,9 @@ Human owner: review and approve before the next release.
 - [x] Add Quick start + Commands table; fix the stale hardcoded version badge.
 - [x] Verify `vsce ls` excludes `docs/**` and still ships README + all five screenshot assets.
 - [ ] Human owner: review the restructured README before the next release.
-- [ ] Decide whether the Pro command surface (Section 3.6.3) gets listing copy this release.
+- [x] Decide whether the Pro command surface (Section 3.6.3) gets listing copy this release.
+      User-reported approval, 2026-11-14 coworking chat: "yes" — include the revised README
+      Pro section in this release (card `card-muiovew2-3`).
 - [ ] Bump version and push the `v*` tag — the overview only changes on the next publish.
 
 ### Step 2 — screenshots + GIF
