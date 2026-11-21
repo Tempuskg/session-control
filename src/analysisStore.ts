@@ -37,6 +37,7 @@ interface AnalysisStoreDeps {
 	now(): Date;
 	createId(): string;
 	hash(value: string): string;
+	sleep(ms: number): Promise<void>;
 }
 
 export interface AnalysisWriteReportInput {
@@ -132,6 +133,7 @@ function createDefaultDeps(): AnalysisStoreDeps {
 		now: () => new Date(),
 		createId: () => randomUUID(),
 		hash: (value: string) => createHash('sha256').update(value).digest('hex'),
+		sleep: async (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
 	};
 }
 
@@ -462,6 +464,31 @@ export function buildAnalysisPersistenceContract(
 	].join('\n');
 }
 
+// Windows briefly locks a rename target while another window, antivirus, or a file
+// watcher has it open; those surface as EPERM/EBUSY/EACCES and clear within milliseconds.
+const TRANSIENT_RENAME_ERROR_CODES = new Set(['EPERM', 'EBUSY', 'EACCES']);
+const RENAME_RETRY_DELAYS_MS = [25, 75, 150, 300];
+
+function isTransientRenameError(error: unknown): boolean {
+	const code = (error as { code?: unknown } | null)?.code;
+	return typeof code === 'string' && TRANSIENT_RENAME_ERROR_CODES.has(code);
+}
+
+async function renameWithRetry(deps: AnalysisStoreDeps, fromPath: string, toPath: string): Promise<void> {
+	for (let attempt = 0; ; attempt++) {
+		try {
+			await deps.rename(fromPath, toPath);
+			return;
+		} catch (error) {
+			const delayMs = RENAME_RETRY_DELAYS_MS[attempt];
+			if (delayMs === undefined || !isTransientRenameError(error)) {
+				throw error;
+			}
+			await deps.sleep(delayMs);
+		}
+	}
+}
+
 async function writeAtomic(
 	deps: AnalysisStoreDeps,
 	filePath: string,
@@ -471,7 +498,7 @@ async function writeAtomic(
 
 	try {
 		await deps.writeFile(tempPath, content);
-		await deps.rename(tempPath, filePath);
+		await renameWithRetry(deps, tempPath, filePath);
 	} catch (error) {
 		await deps.unlink(tempPath).catch(() => undefined);
 		throw error;

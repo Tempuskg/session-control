@@ -537,5 +537,123 @@ suite('analysisStore', () => {
 			assert.strictEqual(isJudgmentCache({ version: 'one' }), false);
 			assert.strictEqual(isJudgmentCache({ version: 1, updatedAt: 'invalid-date', judgments: {} }), false);
 		});
+
+		suite('transient rename locks', () => {
+			function createLockError(code: string): NodeJS.ErrnoException {
+				const error: NodeJS.ErrnoException = new Error(`${code}: operation not permitted, rename`);
+				error.code = code;
+				return error;
+			}
+
+			function createFakeFs(renameFailures: (string | undefined)[]) {
+				const files = new Map<string, string>();
+				const sleeps: number[] = [];
+				let renameCalls = 0;
+				const store = createAnalysisStore({
+					mkdir: async () => undefined,
+					readFile: async (filePath) => {
+						const content = files.get(filePath);
+						if (content === undefined) {
+							throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+						}
+						return content;
+					},
+					writeFile: async (filePath, content) => {
+						files.set(filePath, content);
+					},
+					rename: async (fromPath, toPath) => {
+						const code = renameFailures[renameCalls++];
+						if (code) {
+							throw createLockError(code);
+						}
+						const content = files.get(fromPath);
+						assert.ok(content !== undefined);
+						files.delete(fromPath);
+						files.set(toPath, content);
+					},
+					unlink: async (filePath) => {
+						files.delete(filePath);
+					},
+					exists: async (filePath) => files.has(filePath),
+					sleep: async (ms) => {
+						sleeps.push(ms);
+					},
+				});
+				return { store, files, sleeps, getRenameCalls: () => renameCalls };
+			}
+
+			function tempFiles(files: Map<string, string>): string[] {
+				return [...files.keys()].filter((filePath) => filePath.endsWith('.tmp'));
+			}
+
+			const storageDirectory = path.join('fake-root', '.chat');
+
+			test('retries a transient EPERM rename and then persists the judgment', async () => {
+				const { store, files, sleeps, getRenameCalls } = createFakeFs(['EPERM', 'EBUSY']);
+
+				await store.saveJudgment(storageDirectory, {
+					sessionFingerprint: 'fp-retry',
+					questionSetVersion: 'v1',
+					answers: { friction: true },
+				});
+
+				assert.strictEqual(getRenameCalls(), 3);
+				assert.deepStrictEqual(sleeps, [25, 75]);
+				assert.deepStrictEqual(tempFiles(files), []);
+				const hit = await store.getJudgment(storageDirectory, 'fp-retry', 'v1');
+				assert.deepStrictEqual(hit?.answers, { friction: true });
+			});
+
+			test('gives up after a bounded number of retries without orphaned tmp files or cache loss', async () => {
+				const { store, files, sleeps } = createFakeFs([]);
+				await store.saveJudgment(storageDirectory, {
+					sessionFingerprint: 'fp-existing',
+					questionSetVersion: 'v1',
+					answers: { friction: false },
+				});
+				const judgmentsPath = store.getJudgmentCachePath(storageDirectory);
+				const before = files.get(judgmentsPath);
+				assert.ok(before);
+
+				const locked = createFakeFs(new Array<string>(10).fill('EPERM'));
+				for (const [filePath, content] of files) {
+					locked.files.set(filePath, content);
+				}
+
+				await assert.rejects(
+					locked.store.saveJudgment(storageDirectory, {
+						sessionFingerprint: 'fp-new',
+						questionSetVersion: 'v1',
+						answers: { friction: true },
+					}),
+					(error: NodeJS.ErrnoException) => error.code === 'EPERM',
+				);
+
+				assert.strictEqual(locked.getRenameCalls(), 5);
+				assert.deepStrictEqual(locked.sleeps, [25, 75, 150, 300]);
+				assert.deepStrictEqual(sleeps, []);
+				assert.deepStrictEqual(tempFiles(locked.files), []);
+				assert.strictEqual(locked.files.get(judgmentsPath), before);
+				const existing = await locked.store.getJudgment(storageDirectory, 'fp-existing', 'v1');
+				assert.deepStrictEqual(existing?.answers, { friction: false });
+			});
+
+			test('does not retry non-transient rename errors', async () => {
+				const { store, files, sleeps, getRenameCalls } = createFakeFs(['ENOSPC']);
+
+				await assert.rejects(
+					store.saveJudgment(storageDirectory, {
+						sessionFingerprint: 'fp-nospace',
+						questionSetVersion: 'v1',
+						answers: {},
+					}),
+					(error: NodeJS.ErrnoException) => error.code === 'ENOSPC',
+				);
+
+				assert.strictEqual(getRenameCalls(), 1);
+				assert.deepStrictEqual(sleeps, []);
+				assert.deepStrictEqual(tempFiles(files), []);
+			});
+		});
 	});
 });
