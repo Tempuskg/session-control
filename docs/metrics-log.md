@@ -36,3 +36,4 @@ telemetry and never will just to fill this table.
 | :-- | --: | --: | --: | --: | --: | --: | :-- |
 | 2026-09-08 | 5,334 (baseline) | 73 (baseline) | 567 (baseline) | 0 (baseline) | 0 (baseline) | 0 (baseline) | Baseline from marketing plan §1; v1.3.11 live |
 | 2026-11-11 | 11,009 (+5,675) | 116 (+43) | 1,025 (+458) | 1 (+1) | 0 (+0) | 0 (+0) | Phase 4 review pull; Pro count 0 from Polar.sh (user-reported) |
+| 2026-11-22 | 11,715 (+706) | 128 (+12) | 1,089 (+64) | 1 (+0) | 0 (+0) | 0 (+0) | Weekly pull; first row after landing-page Pro section update (output demo + Pro demo GIF, live 2026-11-14, session-control-pro a955206); Pro count 0 from Polar.sh (user-reported) |
