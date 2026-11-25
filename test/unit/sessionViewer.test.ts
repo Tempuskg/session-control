@@ -1,6 +1,6 @@
 import * as assert from 'node:assert';
 import { ChatSession, RequestTurn, ResponseTurn } from '../../src/types';
-import { buildPageHtml, escapeHtml, renderTurnHtml } from '../../src/sessionViewer';
+import { buildPageHtml, escapeHtml, groupTurnsByPrompt, renderTurnHtml } from '../../src/sessionViewer';
 
 function makeSession(overrides: Partial<ChatSession> = {}): ChatSession {
 	return {
@@ -297,5 +297,128 @@ suite('buildPageHtml — XSS safety', () => {
 	test('escapes session ID containing HTML', () => {
 		const html = makePage(makeSession({ id: '<b>injected</b>' }));
 		assert.ok(!html.includes('<b>injected</b>'), 'raw HTML in id — XSS risk');
+	});
+});
+
+function makeRequest(prompt: string): RequestTurn {
+	return { type: 'request', participant: 'copilot', prompt, references: [], timestamp: '2026-04-13T10:01:00.000Z' };
+}
+
+function makeResponse(content: string): ResponseTurn {
+	return { type: 'response', participant: 'copilot', content, toolCalls: [], timestamp: '2026-04-13T10:01:05.000Z' };
+}
+
+suite('groupTurnsByPrompt', () => {
+	test('groups replies under the prompt they follow: [request, response, response, request, response]', () => {
+		const groups = groupTurnsByPrompt([
+			makeRequest('a'), makeResponse('r1'), makeResponse('r2'), makeRequest('b'), makeResponse('r3'),
+		]);
+		assert.deepEqual(groups, [
+			{ requestIndex: 0, responseIndices: [1, 2] },
+			{ requestIndex: 3, responseIndices: [4] },
+		]);
+	});
+
+	test('gives replies before the first prompt their own group: [response, request]', () => {
+		const groups = groupTurnsByPrompt([makeResponse('r1'), makeRequest('a')]);
+		assert.deepEqual(groups, [
+			{ requestIndex: null, responseIndices: [0] },
+			{ requestIndex: 1, responseIndices: [] },
+		]);
+	});
+
+	test('keeps prompts without replies as empty groups: [request, request]', () => {
+		const groups = groupTurnsByPrompt([makeRequest('a'), makeRequest('b')]);
+		assert.deepEqual(groups, [
+			{ requestIndex: 0, responseIndices: [] },
+			{ requestIndex: 1, responseIndices: [] },
+		]);
+	});
+
+	test('returns no groups for no turns', () => {
+		assert.deepEqual(groupTurnsByPrompt([]), []);
+	});
+});
+
+suite('buildPageHtml — prompts view', () => {
+	const turns = [
+		makeRequest('first prompt'), makeResponse('reply one'), makeResponse('reply two'), makeResponse('reply three'),
+		makeRequest('second prompt'), makeResponse('reply four'),
+		makeRequest('third prompt'),
+	];
+
+	test('renders the toggle as an unpressed type=button with aria-pressed', () => {
+		const html = makePage(makeSession({ turns }));
+		const match = /<button[^>]*id="promptsViewToggle"[^>]*>/.exec(html);
+		assert.ok(match, 'prompts view toggle missing');
+		assert.ok(match[0].includes('type="button"'), 'toggle must be type=button');
+		assert.ok(match[0].includes('aria-pressed="false"'), 'toggle must start unpressed');
+		assert.ok(!match[0].includes('disabled'), 'toggle should be enabled when turns exist');
+		assert.ok(html.indexOf('id="promptsViewToggle"') < html.indexOf('<details class="section"'), 'toggle must precede the sections');
+	});
+
+	test('binds the toggle and expanders with addEventListener', () => {
+		const html = makePage(makeSession({ turns }));
+		assert.ok(html.includes("promptsViewToggle.addEventListener('click'"), 'toggle listener missing');
+		assert.ok(html.includes("replyToggle.addEventListener('click'"), 'expander listener missing');
+	});
+
+	test('uses no inline on* handler attributes in its own markup', () => {
+		const html = makePage(makeSession({ turns }));
+		const markup = html.replace(/<script[\s\S]*?<\/script>/g, '');
+		assert.ok(!/<[a-z][^>]*\son[a-z]+\s*=/i.test(markup), 'inline on* attribute found');
+	});
+
+	test('renders one expander per prompt that has replies, with counts', () => {
+		const html = makePage(makeSession({ turns }));
+		const toggles = html.match(/<button type="button" class="reply-toggle"[^>]*>[^<]*<\/button>/g) ?? [];
+		assert.equal(toggles.length, 2);
+		assert.ok(toggles[0]?.includes('>Show 3 responses<'), 'first expander should count 3 responses');
+		assert.ok(toggles[1]?.includes('>Show 1 response<'), 'second expander should use the singular');
+		assert.equal((html.match(/class="reply-group"/g) ?? []).length, 2);
+	});
+
+	test('wraps only the replies of each prompt in its reply group, keeping order', () => {
+		const html = makePage(makeSession({ turns }));
+		const firstGroup = /<div class="reply-group" id="replyGroup0">([\s\S]*?)<\/div>\n<div class="turn turn-request"/.exec(html);
+		assert.ok(firstGroup?.[1], 'first reply group not found');
+		assert.ok(firstGroup[1].includes('reply one') && firstGroup[1].includes('reply three'), 'replies missing from group');
+		assert.ok(!firstGroup[1].includes('second prompt'), 'next prompt must not be inside the group');
+		assert.ok(html.indexOf('first prompt') < html.indexOf('reply one'));
+		assert.ok(html.indexOf('reply three') < html.indexOf('second prompt'));
+		assert.ok(html.indexOf('second prompt') < html.indexOf('third prompt'));
+	});
+
+	test('adds an expander for replies that precede the first prompt', () => {
+		const html = makePage(makeSession({ turns: [makeResponse('orphan reply'), makeRequest('later prompt')] }));
+		assert.ok(html.includes('>Show 1 response<'), 'leading replies need an expander');
+		assert.ok(html.indexOf('reply-toggle') < html.indexOf('later prompt'), 'leading expander must come first');
+	});
+
+	test('renders no expander for prompts without replies', () => {
+		const html = makePage(makeSession({ turns: [makeRequest('a'), makeRequest('b')] }));
+		assert.ok(!html.includes('class="reply-toggle"'), 'no expander expected');
+		assert.ok(!html.includes('class="reply-group"'), 'no reply group expected');
+	});
+
+	test('disables the toggle and keeps the script safe when there are no turns', () => {
+		const html = makePage(makeSession({ turns: [] }));
+		const match = /<button[^>]*id="promptsViewToggle"[^>]*>/.exec(html);
+		assert.ok(match?.[0].includes('disabled'), 'toggle should be disabled with no turns');
+		assert.ok(html.includes('if (!promptsViewToggle.disabled)'), 'listener must be guarded');
+		assert.ok(html.includes('id="conversation"'), 'conversation container must exist for the script');
+	});
+
+	test('lets search reveal matches inside collapsed reply groups', () => {
+		const html = makePage(makeSession({ turns }));
+		assert.ok(html.includes("current.classList.contains('reply-group')"), 'openAncestorDetails must expand reply groups');
+		assert.ok(html.includes('setReplyGroupExpanded(current, true)'), 'reply group expansion missing');
+	});
+
+	test('keeps the default page state with the mode off', () => {
+		const html = makePage(makeSession({ turns }));
+		assert.ok(html.includes('<details class="section" open>'), 'summary should be open');
+		assert.ok(html.includes('<details class="section">'), 'conversation should be closed');
+		assert.ok(!html.includes('prompts-view"'), 'mode class must not be server-rendered');
 	});
 });

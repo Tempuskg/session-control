@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-11-25
+
+### Added
+
+- **Prompts view in the Session Viewer.** A new **Prompts view** toggle next to Open Raw JSON collapses an open chat down to the prompts you asked. Replies are grouped under the prompt they follow, with one "Show N responses" expander per prompt. Search still finds matches inside hidden replies and reveals them. The mode is off whenever a session opens.
+
 ## [1.15.0] - 2026-11-25
 
 ### Added

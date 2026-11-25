@@ -59,6 +59,33 @@ body {
 	background-color: var(--vscode-button-secondaryHoverBackground);
 }
 
+.header-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-shrink: 0;
+}
+
+.prompts-view-btn[aria-pressed="true"] {
+	color: var(--vscode-button-foreground);
+	background-color: var(--vscode-button-background);
+}
+
+.prompts-view-btn[aria-pressed="true"]:hover {
+	background-color: var(--vscode-button-hoverBackground);
+}
+
+.prompts-view-btn:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.open-json-btn:focus-visible,
+.reply-toggle:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 2px;
+}
+
 .header-meta {
 	display: flex;
 	flex-wrap: wrap;
@@ -245,6 +272,49 @@ details[open] > .section-header::before {
 
 .turn:last-child {
 	margin-bottom: 0;
+}
+
+/* ---- Prompts view ---- */
+
+/* The wrapper is layout-neutral so the conversation looks the same with the mode off. */
+.reply-group {
+	display: contents;
+}
+
+.reply-group > .turn:last-child {
+	margin-bottom: 14px;
+}
+
+.conversation > .reply-group:last-child > .turn:last-child {
+	margin-bottom: 0;
+}
+
+.reply-toggle-row {
+	display: none;
+	margin-bottom: 14px;
+}
+
+.conversation.prompts-view .reply-toggle-row {
+	display: block;
+}
+
+.conversation.prompts-view .reply-group:not(.expanded) {
+	display: none;
+}
+
+.reply-toggle {
+	font-family: var(--vscode-font-family);
+	font-size: 12px;
+	color: var(--vscode-textLink-foreground);
+	background: none;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 3px;
+	padding: 3px 10px;
+	cursor: pointer;
+}
+
+.reply-toggle:hover {
+	background-color: var(--vscode-toolbar-hoverBackground);
 }
 
 .turn-header {

@@ -88,6 +88,62 @@ export function renderTurnHtml(turn: SavedTurn, index: number): string {
 	return renderResponseTurnHtml(turn, index);
 }
 
+export interface PromptGroup {
+	/** Index of the request turn that opens the group, or null for replies that precede the first prompt. */
+	requestIndex: number | null;
+	/** Indices of the response turns that follow the request, up to the next request. */
+	responseIndices: number[];
+}
+
+/**
+ * Groups turns by the prompt they follow. A leading run of responses (e.g. part 2 of a
+ * multi-part session) forms its own group with a null requestIndex.
+ */
+export function groupTurnsByPrompt(turns: readonly SavedTurn[]): PromptGroup[] {
+	const groups: PromptGroup[] = [];
+	let current: PromptGroup | undefined;
+	turns.forEach((turn, index) => {
+		if (turn.type === 'request') {
+			current = { requestIndex: index, responseIndices: [] };
+			groups.push(current);
+			return;
+		}
+		if (!current) {
+			current = { requestIndex: null, responseIndices: [] };
+			groups.push(current);
+		}
+		current.responseIndices.push(index);
+	});
+	return groups;
+}
+
+function renderConversationHtml(turns: readonly SavedTurn[]): string {
+	const parts: string[] = [];
+	groupTurnsByPrompt(turns).forEach((group, groupIndex) => {
+		if (group.requestIndex !== null) {
+			const request = turns[group.requestIndex];
+			if (request) {
+				parts.push(renderTurnHtml(request, group.requestIndex));
+			}
+		}
+		const count = group.responseIndices.length;
+		if (count === 0) {
+			return;
+		}
+		const groupId = `replyGroup${groupIndex}`;
+		const label = `Show ${count} ${count === 1 ? 'response' : 'responses'}`;
+		const replies = group.responseIndices
+			.map((i) => {
+				const turn = turns[i];
+				return turn ? renderTurnHtml(turn, i) : '';
+			})
+			.join('\n');
+		parts.push(`<div class="reply-toggle-row"><button type="button" class="reply-toggle" data-count="${count}" aria-expanded="false" aria-controls="${groupId}">${label}</button></div>
+<div class="reply-group" id="${groupId}">${replies}</div>`);
+	});
+	return parts.join('\n');
+}
+
 export function buildPageHtml(
 	session: ChatSession,
 	cssUri: string,
@@ -100,7 +156,7 @@ export function buildPageHtml(
 		: '<p class="empty-state"><em>No summary available.</em></p>';
 
 	const turnsHtml = session.turns.length > 0
-		? session.turns.map((turn, i) => renderTurnHtml(turn, i)).join('\n')
+		? renderConversationHtml(session.turns)
 		: '<p class="empty-state"><em>No turns recorded.</em></p>';
 
 	const gitHtml = session.git
@@ -124,7 +180,10 @@ export function buildPageHtml(
 	<div class="session-header">
 		<div class="header-title-row">
 			<h1 class="session-title">${escapeHtml(session.title)}</h1>
-			<button class="open-json-btn" id="openRawJson">Open Raw JSON</button>
+			<div class="header-actions">
+				<button type="button" class="open-json-btn prompts-view-btn" id="promptsViewToggle" aria-pressed="false"${session.turns.length === 0 ? ' disabled' : ''}>Prompts view</button>
+				<button class="open-json-btn" id="openRawJson">Open Raw JSON</button>
+			</div>
 		</div>
 		<div class="header-meta">
 			<span class="meta-item">${escapeHtml(formatDate(session.savedAt))}</span>
@@ -148,11 +207,11 @@ export function buildPageHtml(
 	${multiPartHtml}
 	<details class="section" open>
 		<summary class="section-header">Summary</summary>
-		<div class="section-body">${summaryHtml}</div>
+		<div class="section-body" id="summaryBody">${summaryHtml}</div>
 	</details>
 	<details class="section">
 		<summary class="section-header">Full Conversation (${session.totalTurns} turns)</summary>
-		<div class="section-body conversation">${turnsHtml}</div>
+		<div class="section-body conversation" id="conversation">${turnsHtml}</div>
 	</details>
 	<div class="session-footer">
 		<span class="footer-path">${escapeHtml(filePath)}</span>
@@ -216,6 +275,9 @@ export function buildPageHtml(
 			while (current) {
 				if (current.tagName === 'DETAILS') {
 					current.open = true;
+				}
+				if (current.classList.contains('reply-group')) {
+					setReplyGroupExpanded(current, true);
 				}
 				current = current.parentElement;
 			}
@@ -337,6 +399,50 @@ export function buildPageHtml(
 			runSearch();
 			searchInput.focus();
 		});
+
+		const promptsViewToggle = document.getElementById('promptsViewToggle');
+		const conversation = document.getElementById('conversation');
+		const summarySection = document.getElementById('summaryBody').closest('details');
+		const conversationSection = conversation.closest('details');
+
+		function setReplyGroupExpanded(group, expanded) {
+			group.classList.toggle('expanded', expanded);
+			const button = document.querySelector('.reply-toggle[aria-controls="' + group.id + '"]');
+			if (!button) {
+				return;
+			}
+			const count = Number(button.dataset.count);
+			button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+			button.textContent = (expanded ? 'Hide ' : 'Show ') + count + ' ' + pluralize(count, 'response', 'responses');
+		}
+
+		function setPromptsView(enabled) {
+			promptsViewToggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+			conversation.classList.toggle('prompts-view', enabled);
+			if (!enabled) {
+				return;
+			}
+			for (const group of conversation.querySelectorAll('.reply-group')) {
+				setReplyGroupExpanded(group, false);
+			}
+			conversationSection.open = true;
+			summarySection.open = false;
+		}
+
+		if (!promptsViewToggle.disabled) {
+			promptsViewToggle.addEventListener('click', function () {
+				setPromptsView(promptsViewToggle.getAttribute('aria-pressed') !== 'true');
+			});
+		}
+
+		for (const replyToggle of conversation.querySelectorAll('.reply-toggle')) {
+			replyToggle.addEventListener('click', function () {
+				const group = document.getElementById(replyToggle.getAttribute('aria-controls'));
+				if (group) {
+					setReplyGroupExpanded(group, !group.classList.contains('expanded'));
+				}
+			});
+		}
 
 		updateSearchButtons();
 	</script>
