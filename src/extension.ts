@@ -45,6 +45,7 @@ import {
 	type AnalysisProviderChoices,
 	type AnalysisProviderSelection,
 	type ResumeIntoOriginAgentDeps,
+	type ResumePasteLimits,
 	type ResumeOverflowStrategy,
 	type ResumeTargetMode,
 } from './chatParticipant';
@@ -2509,6 +2510,8 @@ interface ResumeSessionConfiguration {
 	overflowStrategy: ResumeOverflowStrategy;
 	providerCommands: ResumeProviderCommands;
 	resumeTargetMode: ResumeTargetMode;
+	pasteMaxChars: ResumePasteLimits;
+	resumeFile: { storageDirectory: string; workspaceRoot?: string };
 }
 
 function readResumeSessionConfiguration(filePath: string): ResumeSessionConfiguration {
@@ -2522,6 +2525,12 @@ function readResumeSessionConfiguration(filePath: string): ResumeSessionConfigur
 		overflowStrategy: configuration.get<ResumeOverflowStrategy>('resume.overflowStrategy', 'summarize'),
 		providerCommands: configuration.get<ResumeProviderCommands>('resume.providerCommands', {}),
 		resumeTargetMode: configuration.get<ResumeTargetMode>('resume.target', 'origin-agent'),
+		pasteMaxChars: configuration.get<ResumePasteLimits>('resume.pasteMaxChars', {}),
+		// Oversized transcripts sit next to the saved session in the session store.
+		resumeFile: {
+			storageDirectory: path.dirname(filePath),
+			...(workspaceFolder ? { workspaceRoot: workspaceFolder.uri.fsPath } : {}),
+		},
 	};
 }
 
@@ -2615,6 +2624,8 @@ async function continueLoadedSessionWithProvider(
 				overflowStrategy: configuration.overflowStrategy,
 				providerCommands: configuration.providerCommands,
 				targetProvider: choice.provider,
+				pasteMaxChars: configuration.pasteMaxChars,
+				resumeFile: configuration.resumeFile,
 			},
 			createResumeIntoAgentDeps(deps.writeClipboard),
 		);
@@ -2749,6 +2760,8 @@ async function resumeLoadedSessionInChat(
 						overflowStrategy: configuration.overflowStrategy,
 						providerCommands: configuration.providerCommands,
 						targetProvider: 'cursor',
+						pasteMaxChars: configuration.pasteMaxChars,
+						resumeFile: configuration.resumeFile,
 					},
 					createResumeIntoAgentDeps(deps.writeClipboard),
 				)
@@ -2772,6 +2785,8 @@ async function resumeLoadedSessionInChat(
 					maxContextChars: configuration.maxContextChars,
 					overflowStrategy: configuration.overflowStrategy,
 					providerCommands: configuration.providerCommands,
+					pasteMaxChars: configuration.pasteMaxChars,
+					resumeFile: configuration.resumeFile,
 				},
 				createResumeIntoAgentDeps(deps.writeClipboard),
 			);

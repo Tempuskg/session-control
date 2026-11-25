@@ -340,9 +340,14 @@ the chat input; the other providers have it copied to the clipboard and pasted i
 panel. When the target differs from where the session was captured, the prompt tells the receiving
 assistant that the transcript came from a different assistant.
 
-The same `resume.maxTurns`, `resume.maxContextChars`, `resume.overflowStrategy`, and
-`resume.providerCommands` settings apply, and if the chosen target cannot be opened, Session
-Control falls back to the VS Code chat resume flow.
+When a resume prompt for Codex, Claude Code, or Cursor is longer than
+`resume.pasteMaxChars` (20,000 characters by default), Session Control writes the transcript to a
+git-ignored `resume/<session-id>.md` file in the session store and pastes a short prompt asking the
+assistant to read it. Set a provider's limit to `0` to always paste in full.
+
+The same `resume.maxTurns`, `resume.maxContextChars`, `resume.overflowStrategy`,
+`resume.pasteMaxChars`, and `resume.providerCommands` settings apply, and if the chosen target
+cannot be opened, Session Control falls back to the VS Code chat resume flow.
 
 ## Configuration
 
@@ -361,6 +366,7 @@ Control falls back to the VS Code chat resume flow.
 | `session-control.resume.maxTurns` | `50` | Max turns injected when resuming |
 | `session-control.resume.overflowStrategy` | `summarize` | `summarize`, `truncate`, or `recent-only` |
 | `session-control.resume.maxContextChars` | `80000` | Hard cap on characters injected as context |
+| `session-control.resume.pasteMaxChars` | `20000` per assistant | Largest resume prompt pasted into Codex, Claude Code, or Cursor; longer prompts go through a git-ignored transcript file. `0` always pastes in full |
 | `session-control.resume.target` | `origin-agent` | Default target for **Resume This Session in Chat**: `origin-agent` or `vscode-chat`. **Continue This Session In...** asks instead |
 | `session-control.resume.providerCommands` | `{}` | Per-provider chat command ID overrides used by both resume and continue |
 | `session-control.save.maxFileSize` | `1mb` | Max size per session file (e.g. `500kb`, `1mb`) |

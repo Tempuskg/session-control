@@ -2,7 +2,7 @@
   "name": "session-control",
   "displayName": "Session Control",
   "description": "Save Cursor, Claude Code, Codex, and Copilot chat history in your repo, linked to commits. Free, local-first. Paid Pro add-on: search, knowledge harvesting, control-file export, skills and Git sync.",
-  "version": "1.14.0",
+  "version": "1.15.0",
   "publisher": "darrenjmcleod",
   "icon": "media/session-control.png",
   "license": "MIT",
@@ -395,6 +395,37 @@
           "default": 80000,
           "minimum": 1000,
           "description": "Hard cap on total characters injected as context when resuming. Overflow is handled by resume.overflowStrategy.",
+          "scope": "resource"
+        },
+        "session-control.resume.pasteMaxChars": {
+          "type": "object",
+          "default": {
+            "codex": 20000,
+            "claude-code": 20000,
+            "cursor": 20000
+          },
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          },
+          "properties": {
+            "codex": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Largest resume prompt pasted into Codex chat. Default: 20000."
+            },
+            "claude-code": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Largest resume prompt pasted into Claude Code chat. Default: 20000."
+            },
+            "cursor": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Largest resume prompt pasted into Cursor agent chat. Default: 20000."
+            }
+          },
+          "description": "Per-assistant limit on the resume prompt pasted into Codex, Claude Code, or Cursor. A longer prompt is written to <storagePath>/resume/<session-id>.md (git-ignored) and the assistant is asked to read that file instead. Use 0 to always paste in full. Copilot chat resume always uses the in-prompt transcript.",
           "scope": "resource"
         },
         "session-control.resume.target": {

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-11-25
+
+### Added
+
+- **Long resumes go through a transcript file.** When a resume or continue prompt for Codex, Claude Code, or Cursor is longer than the new `session-control.resume.pasteMaxChars` setting (20,000 characters per assistant by default), the transcript is written to a git-ignored `resume/<session-id>.md` file in the session store and the assistant is asked to read it instead of receiving a very large paste. Set a limit to `0` to always paste in full. Copilot chat resume is unchanged.
+
+### Fixed
+
+- Saved Codex sessions no longer include Codex's internal approval-review traffic (guardian history replays and their risk verdicts) or the injected AGENTS.md instructions message. Guardian sub-agent sessions are no longer saved as separate sessions.
+
 ## [1.14.0] - 2026-11-21
 
 ### Changed

@@ -100,6 +100,50 @@ function stringifyUnknown(value: unknown): string | undefined {
 	}
 }
 
+const APPROVAL_REVIEW_PROMPT_PREFIXES = [
+	'The following is the Codex agent history whose request action you are assessing',
+	'The following is the Codex agent history added since your last approval assessment',
+];
+
+/**
+ * Codex's guardian sub-agent reviews each risky action by replaying the agent
+ * history as a user prompt. These prompts are internal approval traffic, not
+ * user requests, and can be tens of thousands of characters each.
+ */
+export function isCodexApprovalReviewPrompt(text: string): boolean {
+	const trimmed = text.trimStart();
+	return APPROVAL_REVIEW_PROMPT_PREFIXES.some((prefix) => trimmed.startsWith(prefix));
+}
+
+/** The guardian's reply is a JSON verdict such as `{"risk_level":"low",...,"outcome":"allow"}`. */
+export function isCodexApprovalReviewVerdict(text: string): boolean {
+	const trimmed = text.trim();
+	if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+		return false;
+	}
+
+	try {
+		const parsed: unknown = JSON.parse(trimmed);
+		return isRecord(parsed) && 'risk_level' in parsed && 'outcome' in parsed;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Codex injects the workspace AGENTS.md as a user message. The resumed
+ * assistant reloads it on its own, so it is not part of the conversation.
+ */
+export function isCodexInjectedInstructionsPrompt(text: string): boolean {
+	return /^# AGENTS\.md instructions for /.test(text.trimStart()) && text.includes('<INSTRUCTIONS>');
+}
+
+function isGuardianSessionSource(source: unknown): boolean {
+	return isRecord(source)
+		&& isRecord(source.subagent)
+		&& source.subagent.other === 'guardian';
+}
+
 function appendTurn(turns: SavedTurn[], turn: SavedTurn): void {
 	const previous = turns[turns.length - 1];
 	if (!previous) {
@@ -143,16 +187,42 @@ function flushPendingToolCalls(pendingToolCalls: PendingToolCall[]): ToolCall[] 
 	return toolCalls;
 }
 
+type CodexNormalizeResult = CodexSession | 'approval-review' | null;
+
 function normalizeCodexRecords(
 	records: unknown[],
 	sourceFile: string,
 	sourceRevision: string,
-): CodexSession | null {
+): CodexNormalizeResult {
 	const turns: SavedTurn[] = [];
 	const pendingToolCalls: PendingToolCall[] = [];
+	let inApprovalReview = false;
+	let droppedApprovalReview = false;
 	let sessionId = sourceFile;
 	let sessionTimestamp: string | undefined;
 	let sessionWorkingDirectory: string | undefined;
+
+	// Returns true when a request is internal traffic that must not be saved.
+	const skipRequest = (prompt: string): boolean => {
+		if (isCodexApprovalReviewPrompt(prompt)) {
+			inApprovalReview = true;
+			droppedApprovalReview = true;
+			pendingToolCalls.length = 0;
+			return true;
+		}
+		inApprovalReview = false;
+		return isCodexInjectedInstructionsPrompt(prompt);
+	};
+
+	// Drops the guardian's reply to an approval prompt, and any stray verdict.
+	const skipResponse = (content: string): boolean => {
+		if (inApprovalReview || isCodexApprovalReviewVerdict(content)) {
+			droppedApprovalReview = true;
+			pendingToolCalls.length = 0;
+			return true;
+		}
+		return false;
+	};
 
 	for (const record of records) {
 		if (!isRecord(record)) {
@@ -166,6 +236,9 @@ function normalizeCodexRecords(
 			if (cwd) {
 				sessionWorkingDirectory = cwd;
 			}
+			if (isGuardianSessionSource(record.payload.source)) {
+				return 'approval-review';
+			}
 			continue;
 		}
 
@@ -173,6 +246,9 @@ function normalizeCodexRecords(
 		const timestamp = toIsoTimestamp(record.timestamp ?? payload?.timestamp, sessionTimestamp);
 
 		if (record.type === 'event_msg' && payload?.type === 'user_message' && typeof payload.message === 'string') {
+			if (skipRequest(payload.message)) {
+				continue;
+			}
 			appendTurn(turns, {
 				type: 'request',
 				participant: 'codex',
@@ -184,6 +260,9 @@ function normalizeCodexRecords(
 		}
 
 		if (record.type === 'event_msg' && payload?.type === 'agent_message' && typeof payload.message === 'string') {
+			if (skipResponse(payload.message)) {
+				continue;
+			}
 			appendTurn(turns, {
 				type: 'response',
 				participant: 'codex',
@@ -239,7 +318,7 @@ function normalizeCodexRecords(
 
 		if (payload.type === 'message' && payload.role === 'assistant') {
 			const text = extractContentText(payload.content);
-			if (!text) {
+			if (!text || skipResponse(text)) {
 				continue;
 			}
 
@@ -254,7 +333,7 @@ function normalizeCodexRecords(
 
 		if (payload.type === 'message' && payload.role === 'user') {
 			const text = extractContentText(payload.content);
-			if (!text) {
+			if (!text || skipRequest(text)) {
 				continue;
 			}
 
@@ -269,7 +348,7 @@ function normalizeCodexRecords(
 	}
 
 	if (!turns.length) {
-		return null;
+		return droppedApprovalReview ? 'approval-review' : null;
 	}
 
 	const firstPrompt = turns.find((turn) => turn.type === 'request');
@@ -299,7 +378,7 @@ function normalizeCodexJsonl(
 	content: string,
 	sourceFile: string,
 	hash: (value: string) => string,
-): CodexSession | null {
+): CodexNormalizeResult {
 	const lines = content
 		.split(/\r?\n/)
 		.map((line) => line.trim())
@@ -328,7 +407,7 @@ function normalizeCodexJson(
 	content: string,
 	sourceFile: string,
 	hash: (value: string) => string,
-): CodexSession | null {
+): CodexNormalizeResult {
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(content);
@@ -486,6 +565,11 @@ export function createCodexSessionReader(overrides: Partial<CodexSessionReaderDe
 					const session = filePath.toLowerCase().endsWith('.jsonl')
 						? normalizeCodexJsonl(content, sourceFile, deps.hash)
 						: normalizeCodexJson(content, sourceFile, deps.hash);
+					if (session === 'approval-review') {
+						// Guardian approval reviews are not resumable conversations.
+						deps.logWarning(`Skipped Codex approval-review session: ${path.basename(filePath)}`);
+						continue;
+					}
 					if (!session) {
 						deps.logWarning(`Skipped unreadable Codex session file: ${path.basename(filePath)}`);
 						continue;

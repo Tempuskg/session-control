@@ -136,6 +136,41 @@ export interface ResumeIntoOriginAgentConfig {
 	// Explicit target chosen by the user. When omitted, resume keeps targeting
 	// the session's origin provider.
 	targetProvider?: SessionProviderId;
+	/** Per-target overrides of the pasted prompt size; merged over the defaults. */
+	pasteMaxChars?: ResumePasteLimits;
+	/**
+	 * Where an oversized transcript is written. Omit to always paste in full.
+	 * `workspaceRoot` makes the pasted path workspace-relative when it contains the file.
+	 */
+	resumeFile?: { storageDirectory: string; workspaceRoot?: string };
+}
+
+export type ResumePasteLimits = Partial<Record<SessionProviderId, number>>;
+
+// Coding-agent targets can read workspace files, so prompts over these sizes go
+// through a transcript file instead of their chat input. 0 means no limit;
+// Copilot keeps the in-prompt path.
+export const DEFAULT_RESUME_PASTE_MAX_CHARS: Readonly<Record<SessionProviderId, number>> = {
+	copilot: 0,
+	codex: 20000,
+	cursor: 20000,
+	'claude-code': 20000,
+};
+
+export function resolveResumePasteMaxChars(
+	provider: SessionProviderId,
+	overrides: ResumePasteLimits = {},
+): number {
+	const value = overrides[provider] ?? DEFAULT_RESUME_PASTE_MAX_CHARS[provider];
+	return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+}
+
+async function writeResumeTranscriptFile(filePath: string, content: string): Promise<void> {
+	const directory = path.dirname(filePath);
+	await fs.mkdir(directory, { recursive: true });
+	// Keep generated transcripts out of git even when the session store is committed.
+	await fs.writeFile(path.join(directory, '.gitignore'), '*\n', { flag: 'wx' }).catch(() => undefined);
+	await fs.writeFile(filePath, content, 'utf8');
 }
 
 export interface ResumeIntoOriginAgentDeps {
@@ -144,6 +179,7 @@ export interface ResumeIntoOriginAgentDeps {
 	writeClipboard: (text: string) => Promise<void>;
 	sleep?: (ms: number) => Promise<void>;
 	streamMarkdown: (markdown: string) => void;
+	writeResumeFile?: (filePath: string, content: string) => Promise<void>;
 }
 
 async function sleepFor(ms: number): Promise<void> {
@@ -1092,7 +1128,69 @@ export async function runResumeIntoOriginAgent(
 		constrained.note,
 		originNote,
 	);
-	return runPromptIntoOriginAgent(targetProvider, resumePrompt, config, depsOverrides);
+	const deliveredPrompt = await routeOversizedResumePrompt(
+		session,
+		targetProvider,
+		resumePrompt,
+		config,
+		depsOverrides,
+	);
+	return runPromptIntoOriginAgent(targetProvider, deliveredPrompt, config, depsOverrides);
+}
+
+function sanitizeResumeFileStem(sessionId: string): string {
+	const stem = sessionId.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^[.-]+|-+$/g, '');
+	return stem || 'session';
+}
+
+function formatResumeFileReference(filePath: string, workspaceRoot: string | undefined): string {
+	if (workspaceRoot) {
+		const relative = path.relative(workspaceRoot, filePath);
+		if (relative && !relative.startsWith('..') && !path.isAbsolute(relative)) {
+			return normalizeRelativePath(relative);
+		}
+	}
+
+	return filePath;
+}
+
+// Returns the prompt to paste: the composed prompt when it fits the target's
+// paste limit, otherwise a short read-and-continue prompt pointing at a file
+// that holds the full trimmed transcript.
+async function routeOversizedResumePrompt(
+	session: ChatSession,
+	targetProvider: SessionProviderId,
+	resumePrompt: string,
+	config: ResumeIntoOriginAgentConfig,
+	deps: Partial<ResumeIntoOriginAgentDeps>,
+): Promise<string> {
+	const limit = resolveResumePasteMaxChars(targetProvider, config.pasteMaxChars);
+	if (!config.resumeFile || limit <= 0 || resumePrompt.length <= limit) {
+		return resumePrompt;
+	}
+
+	const filePath = path.join(
+		config.resumeFile.storageDirectory,
+		'resume',
+		`${sanitizeResumeFileStem(session.id)}.md`,
+	);
+	const reference = formatResumeFileReference(filePath, config.resumeFile.workspaceRoot);
+	const providerLabel = formatProviderLabel(targetProvider);
+	try {
+		await (deps.writeResumeFile ?? writeResumeTranscriptFile)(filePath, resumePrompt);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		deps.streamMarkdown?.(`Could not write the resume transcript file (${message}); sending the full prompt to ${providerLabel} instead.\n\n`);
+		return resumePrompt;
+	}
+
+	deps.streamMarkdown?.(
+		`The resume prompt (${resumePrompt.length.toLocaleString('en-US')} characters) is over the ${limit.toLocaleString('en-US')}-character paste limit for ${providerLabel}, so the transcript was saved to \`${reference}\` and ${providerLabel} was asked to read it.\n\n`,
+	);
+	return [
+		`Read ${reference} and continue that session.`,
+		'The file holds the transcript of a previous conversation, followed by the next request from the user.',
+	].join(' ');
 }
 
 /** Report text for verified-recommendation filtering; `undefined` keeps the unfiltered handoff. */
@@ -1565,6 +1663,9 @@ export function registerChatParticipant(context: vscode.ExtensionContext, deps: 
 					const providerCommands = vscode.workspace
 						.getConfiguration('session-control', selection.session.workspaceFolder.uri)
 						.get<ResumeProviderCommands>('resume.providerCommands', {});
+					const pasteMaxChars = vscode.workspace
+						.getConfiguration('session-control', selection.session.workspaceFolder.uri)
+						.get<ResumePasteLimits>('resume.pasteMaxChars', {});
 					if (resumeTargetMode === 'origin-agent' && resumed.provider && resumed.provider !== 'copilot') {
 						const openedOriginAgent = await runResumeIntoOriginAgent(
 							resumed,
@@ -1574,6 +1675,11 @@ export function registerChatParticipant(context: vscode.ExtensionContext, deps: 
 								maxContextChars,
 								overflowStrategy,
 								providerCommands,
+								pasteMaxChars,
+								resumeFile: {
+									storageDirectory: selection.session.storageDirectory,
+									workspaceRoot: selection.session.workspaceFolder.uri.fsPath,
+								},
 								...(deps.judgment
 									? { scoreTurnRelevance: createJudgmentTurnRelevanceScorer(deps.judgment, token, deps.log) }
 									: {}),

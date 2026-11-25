@@ -7,7 +7,9 @@ import {
 	buildResumePrompt,
 	createAnalysisCandidates,
 	loadReassembledSession,
+	DEFAULT_RESUME_PASTE_MAX_CHARS,
 	renderSessionListMarkdown,
+	resolveResumePasteMaxChars,
 	runResumeIntoOriginAgent,
 	selectSessionForResume,
 } from '../../src/chatParticipant';
@@ -15,6 +17,7 @@ import { createSessionStore } from '../../src/sessionStore';
 import { applySaveBloatControls, createChatSession } from '../../src/sessionWriter';
 import { CopilotSession } from '../../src/sessionReader';
 import { SessionProviderId } from '../../src/types';
+import type { ResumeIntoOriginAgentConfig } from '../../src/chatParticipant';
 
 function createCopilotSession(): CopilotSession {
 	return {
@@ -137,6 +140,79 @@ async function continueSessionInto(
 		deliveredPrompt: queryPrompt ?? clipboardPrompt,
 		messages,
 	};
+}
+
+interface PasteLimitResult {
+	opened: boolean;
+	pastedPrompt: string | undefined;
+	writtenFiles: { filePath: string; content: string }[];
+	messages: string[];
+}
+
+async function resumeWithPasteLimit(
+	targetProvider: SessionProviderId,
+	options: {
+		assistantChars?: number;
+		pasteMaxChars?: ResumeIntoOriginAgentConfig['pasteMaxChars'];
+		resumeFile?: ResumeIntoOriginAgentConfig['resumeFile'];
+		writeResumeFile?: (filePath: string, content: string) => Promise<void>;
+		useDefaultFileWriter?: boolean;
+	} = {},
+): Promise<PasteLimitResult> {
+	const base = createChatSession(createCopilotSession(), {
+		title: 'Oversized resume',
+		savedAt: '2026-04-12T13:00:00.000Z',
+		vscodeVersion: '1.115.0',
+	});
+	const saved = {
+		...base,
+		provider: 'codex' as const,
+		turns: options.assistantChars
+			? [
+				...base.turns,
+				{
+					type: 'response' as const,
+					participant: 'codex',
+					content: 'x'.repeat(options.assistantChars),
+					toolCalls: [],
+					timestamp: '2026-04-12T12:10:00.000Z',
+				},
+			]
+			: base.turns,
+	};
+	let pastedPrompt: string | undefined;
+	const writtenFiles: { filePath: string; content: string }[] = [];
+	const messages: string[] = [];
+	const writeResumeFile = options.writeResumeFile ?? (async (filePath: string, content: string) => {
+		writtenFiles.push({ filePath, content });
+	});
+
+	const opened = await runResumeIntoOriginAgent(saved, 'Continue', {
+		maxTurns: 50,
+		maxContextChars: 80000,
+		overflowStrategy: 'truncate',
+		targetProvider,
+		resumeFile: options.resumeFile ?? { storageDirectory: path.join('E:', 'repo', '.chat'), workspaceRoot: path.join('E:', 'repo') },
+		...(options.pasteMaxChars ? { pasteMaxChars: options.pasteMaxChars } : {}),
+	}, {
+		getCommands: async () => ALL_PROVIDER_COMMANDS,
+		executeCommand: async (_commandId: string, args?: unknown) => {
+			const query = (args as { query?: string } | undefined)?.query;
+			if (query !== undefined) {
+				pastedPrompt = query;
+			}
+		},
+		writeClipboard: async (text: string) => {
+			pastedPrompt = text;
+		},
+		...(options.useDefaultFileWriter ? {} : { writeResumeFile }),
+		sleep: async () => undefined,
+		streamMarkdown: (markdown: string) => {
+			messages.push(markdown);
+		},
+	});
+
+	return { opened, pastedPrompt, writtenFiles, messages };
 }
 
 suite('chatParticipant integration', () => {
@@ -1016,5 +1092,93 @@ suite('chatParticipant integration', () => {
 		assert.equal(opened, true);
 		assert.equal(executedCommands[0], 'chatgpt.openSidebar');
 		assert.equal(clipboardText?.includes('a different AI assistant'), false);
+	});
+	test('resume paste limits default to conservative values for coding agents and none for Copilot', () => {
+		assert.equal(resolveResumePasteMaxChars('codex'), DEFAULT_RESUME_PASTE_MAX_CHARS.codex);
+		assert.equal(resolveResumePasteMaxChars('claude-code'), 20000);
+		assert.equal(resolveResumePasteMaxChars('cursor'), 20000);
+		assert.equal(resolveResumePasteMaxChars('copilot'), 0);
+		assert.equal(resolveResumePasteMaxChars('codex', { codex: 5000 }), 5000);
+		assert.equal(resolveResumePasteMaxChars('codex', { codex: 0 }), 0);
+		assert.equal(resolveResumePasteMaxChars('cursor', { codex: 5000 }), 20000);
+	});
+
+	test('resume under the paste limit pastes the full prompt without writing a file', async () => {
+		const result = await resumeWithPasteLimit('codex');
+
+		assert.equal(result.opened, true);
+		assert.equal(result.writtenFiles.length, 0);
+		assert.equal(result.pastedPrompt?.includes('User follow-up: Continue'), true);
+		assert.equal(result.pastedPrompt?.includes('First user question about auth bug.'), true);
+		assert.deepEqual(result.messages, ['Opened the Codex chat tab and pasted the conversation context.']);
+	});
+
+	test('resume over the paste limit writes the transcript file and pastes a read-and-continue prompt', async () => {
+		const result = await resumeWithPasteLimit('codex', { assistantChars: 25000 });
+
+		assert.equal(result.opened, true);
+		assert.equal(result.writtenFiles.length, 1);
+		const written = result.writtenFiles[0]!;
+		assert.equal(written.filePath, path.join('E:', 'repo', '.chat', 'resume', 'resume-roundtrip.md'));
+		assert.equal(written.content.includes('User follow-up: Continue'), true);
+		assert.equal(written.content.includes('x'.repeat(25000)), true);
+		assert.equal(result.pastedPrompt?.startsWith('Read .chat/resume/resume-roundtrip.md and continue that session.'), true);
+		assert.equal((result.pastedPrompt?.length ?? 0) < 500, true);
+		assert.equal(result.messages.length, 2);
+		assert.match(result.messages[0]!, /over the 20,000-character paste limit for Codex, so the transcript was saved to `\.chat\/resume\/resume-roundtrip\.md`/);
+		assert.equal(result.messages[1], 'Opened the Codex chat tab and pasted the conversation context.');
+	});
+
+	test('resume paste limit honours per-provider overrides', async () => {
+		const raised = await resumeWithPasteLimit('codex', { assistantChars: 25000, pasteMaxChars: { codex: 100000 } });
+		assert.equal(raised.writtenFiles.length, 0);
+		assert.equal(raised.pastedPrompt?.includes('x'.repeat(25000)), true);
+
+		const lowered = await resumeWithPasteLimit('claude-code', { pasteMaxChars: { 'claude-code': 200 } });
+		assert.equal(lowered.writtenFiles.length, 1);
+		assert.match(lowered.pastedPrompt ?? '', /^Read \.chat\/resume\/resume-roundtrip\.md and continue that session\./);
+		assert.match(lowered.messages[0]!, /200-character paste limit for Claude Code/);
+
+		const disabled = await resumeWithPasteLimit('cursor', { assistantChars: 25000, pasteMaxChars: { cursor: 0 } });
+		assert.equal(disabled.writtenFiles.length, 0);
+		assert.equal(disabled.pastedPrompt?.includes('x'.repeat(25000)), true);
+	});
+
+	test('Copilot targets keep the in-prompt transcript regardless of size', async () => {
+		const result = await resumeWithPasteLimit('copilot', { assistantChars: 25000 });
+
+		assert.equal(result.writtenFiles.length, 0);
+		assert.equal(result.pastedPrompt?.includes('x'.repeat(25000)), true);
+	});
+
+	test('resume falls back to the full prompt when the transcript file cannot be written', async () => {
+		const result = await resumeWithPasteLimit('codex', {
+			assistantChars: 25000,
+			writeResumeFile: async () => {
+				throw new Error('disk full');
+			},
+		});
+
+		assert.equal(result.opened, true);
+		assert.equal(result.pastedPrompt?.includes('x'.repeat(25000)), true);
+		assert.match(result.messages[0]!, /Could not write the resume transcript file \(disk full\)/);
+	});
+
+	test('resume transcript file is written under the session store with a git-ignore guard', async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'session-control-resume-file-'));
+		try {
+			const outside = await resumeWithPasteLimit('codex', {
+				assistantChars: 25000,
+				resumeFile: { storageDirectory: path.join(tempRoot, '.chat'), workspaceRoot: path.join(tempRoot, 'other') },
+				useDefaultFileWriter: true,
+			});
+			const filePath = path.join(tempRoot, '.chat', 'resume', 'resume-roundtrip.md');
+			assert.equal((await fs.readFile(filePath, 'utf8')).includes('x'.repeat(25000)), true);
+			assert.equal(await fs.readFile(path.join(tempRoot, '.chat', 'resume', '.gitignore'), 'utf8'), '*\n');
+			// A workspace root that does not contain the file falls back to an absolute path.
+			assert.equal(outside.pastedPrompt?.startsWith(`Read ${filePath} and continue`), true);
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true });
+		}
 	});
 });
